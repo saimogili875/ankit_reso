@@ -1,11 +1,8 @@
 from django.urls import path
-from rest_framework.views import APIView
-from rest_framework.response import Response
-
-class ContentOverviewView(APIView):
-    def get(self, request):
-        return Response({'message': 'Content API foundation operational'})
+from .views import LectureVideoView, VideoListView, UploadPresignedUrlView
 
 urlpatterns = [
-    path('', ContentOverviewView.as_view(), name='content-overview'),
+    path('videos/', VideoListView.as_view(), name='video-list'),
+    path('lectures/<str:pk>/video/', LectureVideoView.as_view(), name='lecture-video'),
+    path('upload-presigned-url/', UploadPresignedUrlView.as_view(), name='upload-presigned-url'),
 ]

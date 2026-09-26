@@ -38,14 +38,20 @@ export default function StudentLoginPage() {
 
     setIsLoading(true);
 
-    // Simulate login API loading state
-    setTimeout(() => {
-      setIsLoading(false);
-      setSuccessMessage('Successfully signed in! Redirecting to dashboard...');
-      setTimeout(() => {
-        router.push('/');
-      }, 800);
-    }, 1000);
+    import('@/lib/api-client')
+      .then(({ apiClient }) => apiClient.post('/auth/login/', { email: identifier, password }))
+      .then(() => {
+        setIsLoading(false);
+        setSuccessMessage('Successfully signed in! Redirecting to dashboard...');
+        setTimeout(() => {
+          router.push('/');
+        }, 500);
+      })
+      .catch((err: unknown) => {
+        setIsLoading(false);
+        const msg = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+        setErrorMessage(msg);
+      });
   };
 
   return (

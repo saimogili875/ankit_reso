@@ -2,7 +2,7 @@ from django.db import models
 from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
 from apps.content.models import Video
-from apps.questions.models import Question
+from apps.questions.models import Question, DPP
 
 class VideoProgress(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_progress')
@@ -30,3 +30,21 @@ class StudentProgress(TimeStampedModel):
     questions_solved_count = models.IntegerField(default=0)
     tests_attempted_count = models.IntegerField(default=0)
     overall_accuracy_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
+
+class DPPAttempt(TimeStampedModel):
+    """
+    Tracks a student's execution, submitted answers, and calculated score/accuracy for a DPP.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dpp_attempts')
+    dpp = models.ForeignKey(DPP, on_delete=models.CASCADE, related_name='attempts')
+    score = models.IntegerField(default=0)
+    total_questions = models.IntegerField(default=0)
+    correct_count = models.IntegerField(default=0)
+    incorrect_count = models.IntegerField(default=0)
+    unattempted_count = models.IntegerField(default=0)
+    accuracy_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
+    answers = models.JSONField(default=dict)
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"DPPAttempt #{self.id}: {self.user.email} -> DPP {self.dpp.title} ({self.score} pts)"

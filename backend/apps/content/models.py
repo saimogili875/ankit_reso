@@ -1,15 +1,17 @@
 from django.db import models
 from apps.core.models import TimeStampedModel
-from apps.academics.models import Topic
+from apps.academics.models import Topic, Lecture
 
 class Video(TimeStampedModel):
     """
     Video entity supporting both YOUTUBE and CLOUD (Cloudflare R2) storage backends.
+    Belongs to a Lecture (and optionally a Topic).
     """
     class VideoSourceType(models.TextChoices):
         YOUTUBE = 'YOUTUBE', 'YouTube Video'
         CLOUD = 'CLOUD', 'Cloudflare R2 Hosted'
 
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name='videos', null=True, blank=True)
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='videos', null=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)

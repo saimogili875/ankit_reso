@@ -363,7 +363,14 @@ export default function PracticePage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => setIsSubmitted(true)}
+                      onClick={() => {
+                        setIsSubmitted(true);
+                        if (activeDPP) {
+                          import('@/lib/api-client').then(({ apiClient }) => {
+                            apiClient.post(`/questions/dpps/${activeDPP.id}/submit/`, { answers: userAnswers }).catch(() => {});
+                          });
+                        }
+                      }}
                       className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 border-none px-5"
                     >
                       Submit DPP ✓

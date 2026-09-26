@@ -21,6 +21,7 @@ urlpatterns = [
     # Application API endpoints
     path('api/auth/', include('apps.accounts.urls')),
     path('api/academics/', include('apps.academics.urls')),
+    path('api/enrollment/', include('apps.academics.enrollment_urls')),
     path('api/content/', include('apps.content.urls')),
     path('api/questions/', include('apps.questions.urls')),
     path('api/tests/', include('apps.tests.urls')),

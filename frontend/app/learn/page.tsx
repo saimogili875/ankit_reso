@@ -32,7 +32,23 @@ export default function LearnPage() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [activeLecture, setActiveLecture] = useState<Lecture | null>(null);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
   const [completedLectures, setCompletedLectures] = useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    if (!activeLecture) return;
+    setResolvedVideoUrl(activeLecture.videoUrl);
+    // Fetch real secure video URL from Django backend via storage_service
+    import('@/lib/api-client').then(({ apiClient }) => {
+      apiClient.get<Record<string, string>>(`/content/lectures/${activeLecture.id}/video/`)
+        .then((data) => {
+          if (data && data.video_url) {
+            setResolvedVideoUrl(data.video_url);
+          }
+        })
+        .catch(() => {});
+    });
+  }, [activeLecture]);
 
   const toggleComplete = (lectureId: string) => {
     setCompletedLectures((prev) => ({ ...prev, [lectureId]: !prev[lectureId] }));
@@ -132,7 +148,7 @@ export default function LearnPage() {
           {/* HTML5 Video Player Container */}
           <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl aspect-video relative group">
             <video
-              src={activeLecture.videoUrl}
+              src={resolvedVideoUrl || activeLecture.videoUrl}
               poster={activeLecture.thumbnailUrl}
               controls
               autoPlay

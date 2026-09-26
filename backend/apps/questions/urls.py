@@ -1,11 +1,8 @@
 from django.urls import path
-from rest_framework.views import APIView
-from rest_framework.response import Response
-
-class QuestionsOverviewView(APIView):
-    def get(self, request):
-        return Response({'message': 'Questions API foundation operational'})
+from .views import DPPListView, DPPQuestionsView, DPPSubmitView
 
 urlpatterns = [
-    path('', QuestionsOverviewView.as_view(), name='questions-overview'),
+    path('dpps/', DPPListView.as_view(), name='dpp-list'),
+    path('dpps/<str:pk>/questions/', DPPQuestionsView.as_view(), name='dpp-questions'),
+    path('dpps/<str:pk>/submit/', DPPSubmitView.as_view(), name='dpp-submit'),
 ]

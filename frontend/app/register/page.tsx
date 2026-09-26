@@ -58,13 +58,28 @@ export default function StudentRegisterPage() {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      setSuccessMessage('Account created successfully! Redirecting to login...');
-      setTimeout(() => {
-        router.push('/login');
-      }, 1000);
-    }, 1200);
+    import('@/lib/api-client')
+      .then(({ apiClient }) => apiClient.post('/auth/register/', {
+        email,
+        password,
+        first_name: fullName.split(' ')[0] || fullName,
+        last_name: fullName.split(' ').slice(1).join(' ') || '',
+        phone_number: phone,
+        target_exam: targetExam,
+        target_year: currentClass === 'CLASS_11' ? 2026 : 2025
+      }))
+      .then(() => {
+        setIsLoading(false);
+        setSuccessMessage('Account created successfully! Redirecting to login...');
+        setTimeout(() => {
+          router.push('/login');
+        }, 800);
+      })
+      .catch((err: unknown) => {
+        setIsLoading(false);
+        const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+        setErrorMessage(msg);
+      });
   };
 
   return (
