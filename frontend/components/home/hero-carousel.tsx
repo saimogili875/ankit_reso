@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, CheckCircle2, ArrowRight, Sparkles, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEnrollment } from '@/hooks/use-enrollment';
 import { EnrollmentModal } from './enrollment-modal';

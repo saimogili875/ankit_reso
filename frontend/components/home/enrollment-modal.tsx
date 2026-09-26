@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MAIN_COURSE } from '@/lib/demo-data';
 import { useEnrollment } from '@/hooks/use-enrollment';
-import { CheckCircle2, Sparkles, BookOpen, Edit3, X, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, Edit3, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +26,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({ isOpen, onClos
   const handleConfirmEnrollment = () => {
     setIsSubmitting(true);
     setTimeout(() => {
-      const res = enroll(MAIN_COURSE.id);
+      enroll(MAIN_COURSE.id);
       setIsSubmitting(false);
       setSuccess(true);
     }, 600);
