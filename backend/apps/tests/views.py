@@ -1,11 +1,15 @@
+import logging
 from decimal import Decimal
 from django.utils import timezone
 from django.db import models
 from django.db.models import Avg, Count, Q
+from django.core.cache import cache
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Test,
@@ -109,50 +113,60 @@ class TestStartView(APIView):
                 question_states={}
             )
 
-        # Build CBT layout (sections + sanitized questions)
-        sections = list(test.sections.select_related('subject').order_by('order'))
-        sections_data = [
-            {
-                'id': str(s.id),
-                'name': s.name,
-                'subject_id': str(s.subject_id),
-                'subject_name': s.subject.name,
-                'order': s.order,
-                'instructions': s.instructions,
-            }
-            for s in sections
-        ]
+        # Build or fetch cached CBT layout (sections + sanitized questions)
+        # Prevents high database load when hundreds of students launch the test at once
+        cache_key = f"cbt_test_layout_{test.id}"
+        cached_layout = cache.get(cache_key)
 
-        test_questions = list(
-            test.test_questions.select_related('question', 'section', 'question__subject')
-            .prefetch_related('question__options')
-            .order_by('order')
-        )
-
-        questions_data = []
-        for tq in test_questions:
-            q = tq.question
-            # Secure options payload: never expose is_correct
-            options = [
+        if cached_layout:
+            sections_data = cached_layout.get('sections', [])
+            questions_data = cached_layout.get('questions', [])
+        else:
+            sections = list(test.sections.select_related('subject').order_by('order'))
+            sections_data = [
                 {
-                    'id': str(opt.id),
-                    'text': opt.option_text,
+                    'id': str(s.id),
+                    'name': s.name,
+                    'subject_id': str(s.subject_id),
+                    'subject_name': s.subject.name,
+                    'order': s.order,
+                    'instructions': s.instructions,
                 }
-                for opt in q.options.all()
+                for s in sections
             ]
 
-            questions_data.append({
-                'id': str(q.id),
-                'test_question_id': str(tq.id),
-                'section_id': str(tq.section_id) if tq.section_id else (sections_data[0]['id'] if sections_data else None),
-                'order': tq.order,
-                'question_text': q.question_text,
-                'question_type': q.question_type,
-                'difficulty': q.difficulty,
-                'positive_marks': float(tq.positive_marks),
-                'negative_marks': float(tq.negative_marks),
-                'options': options,
-            })
+            test_questions = list(
+                test.test_questions.select_related('question', 'section', 'question__subject')
+                .prefetch_related('question__options')
+                .order_by('order')
+            )
+
+            questions_data = []
+            for tq in test_questions:
+                q = tq.question
+                # Secure options payload: never expose is_correct
+                options = [
+                    {
+                        'id': str(opt.id),
+                        'text': opt.option_text,
+                    }
+                    for opt in q.options.all()
+                ]
+
+                questions_data.append({
+                    'id': str(q.id),
+                    'test_question_id': str(tq.id),
+                    'section_id': str(tq.section_id) if tq.section_id else (sections_data[0]['id'] if sections_data else None),
+                    'order': tq.order,
+                    'question_text': q.question_text,
+                    'question_type': q.question_type,
+                    'difficulty': q.difficulty,
+                    'positive_marks': float(tq.positive_marks),
+                    'negative_marks': float(tq.negative_marks),
+                    'options': options,
+                })
+
+            cache.set(cache_key, {'sections': sections_data, 'questions': questions_data}, timeout=3600)
 
         # Calculate time elapsed and remaining
         duration_seconds = test.duration_minutes * 60
@@ -283,6 +297,7 @@ class TestSubmitView(APIView):
     updates QuestionAttemptLogs, computes full TestAttemptAnalysis, and refreshes test ranks.
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'test_submit'
 
     def post(self, request, pk):
         attempt = TestAttempt.objects.filter(id=pk, user=request.user).first()
@@ -387,11 +402,19 @@ class TestSubmitView(APIView):
         attempt.answers = final_answers
         attempt.save()
 
-        # Compute full analysis snapshot & update ranks/percentiles
-        analysis = compute_test_attempt_analysis(attempt)
+        # Trigger full performance analysis asynchronously via Celery
+        from .tasks import compute_test_attempt_analysis_task
+        analysis_data = {}
+        try:
+            compute_test_attempt_analysis_task.delay(str(attempt.id))
+        except Exception as e:
+            logger.warning(f"Celery task dispatch failed or unavailable ({e}); running synchronously.")
+            analysis = compute_test_attempt_analysis(attempt)
+            analysis_data = analysis.overview_data
 
         return Response({
             'message': 'Test submitted successfully.',
+            'status': 'PROCESSING' if not analysis_data else 'READY',
             'attempt_id': str(attempt.id),
             'test_id': str(test.id),
             'score': float(attempt.score),
@@ -402,7 +425,7 @@ class TestSubmitView(APIView):
             'unattempted_count': unattempted,
             'rank': attempt.rank,
             'percentile': float(attempt.percentile) if attempt.percentile is not None else None,
-            'overview': analysis.overview_data,
+            'overview': analysis_data,
         }, status=status.HTTP_201_CREATED)
 
 

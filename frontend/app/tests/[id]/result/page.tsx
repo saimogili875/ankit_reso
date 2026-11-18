@@ -304,6 +304,7 @@ export default function TestResultPage() {
   const [cohort, setCohort] = useState<CohortData | null>(null);
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Notes state
@@ -317,14 +318,24 @@ export default function TestResultPage() {
   const [activeModalQuestion, setActiveModalQuestion] = useState<ReviewQuestion | null>(null);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     try {
       const [resData, qData, compData] = await Promise.all([
-        apiClient.get<ResultData>(`/tests/attempts/${attemptId}/result/`),
-        apiClient.get<{ questions: ReviewQuestion[] }>(`/tests/attempts/${attemptId}/questions/`),
+        apiClient.get<ResultData & { status?: string }>(`/tests/attempts/${attemptId}/result/`),
+        apiClient.get<{ questions: ReviewQuestion[] }>(`/tests/attempts/${attemptId}/questions/`).catch(() => ({ questions: [] })),
         apiClient.get<CohortData>(`/tests/attempts/${attemptId}/analysis/comparative/`).catch(() => null),
       ]);
+
+      if (resData?.status === 'PROCESSING' || (!resData?.overview && !resData?.results_locked)) {
+        setIsProcessing(true);
+        setIsLoading(false);
+        setTimeout(() => {
+          loadData();
+        }, 2000);
+        return;
+      }
+
+      setIsProcessing(false);
       setResult(resData);
       setQuestions(qData?.questions || []);
       setCohort(compData);
@@ -411,8 +422,12 @@ export default function TestResultPage() {
     });
   }, [questions, qSubjectFilter, qTypeFilter]);
 
-  if (isLoading) {
-    return <LoadingState message="Generating deep performance snapshot & analysis..." />;
+  if (isLoading || isProcessing) {
+    return (
+      <LoadingState
+        message={isProcessing ? "Computing deep performance analysis & cohort percentiles..." : "Generating deep performance snapshot & analysis..."}
+      />
+    );
   }
 
   if (error || !result) {

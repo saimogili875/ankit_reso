@@ -3,28 +3,38 @@ from .base import *
 DEBUG = False
 
 # Production MUST provide a secure SECRET_KEY in environment variables
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = config('SECRET_KEY', default='prod-secret-key-must-be-set-in-environment-variables')
 
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='adepteduverse.com,api.adepteduverse.com').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='*').split(',') if h.strip()]
 
-CORS_ALLOWED_ORIGINS = [
+# Frontend URL support for split deployment (e.g. Vercel)
+FRONTEND_URL = config('FRONTEND_URL', default='').strip()
+
+cors_origins = [
     origin.strip() for origin in config(
         'CORS_ALLOWED_ORIGINS',
         default='https://adepteduverse.com,https://app.adepteduverse.com'
     ).split(',') if origin.strip()
 ]
+if FRONTEND_URL and FRONTEND_URL not in cors_origins:
+    cors_origins.append(FRONTEND_URL)
+
+CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins for production cross-site requests
-CSRF_TRUSTED_ORIGINS = [
+csrf_origins = [
     origin.strip() for origin in config(
         'CSRF_TRUSTED_ORIGINS',
         default='https://adepteduverse.com,https://app.adepteduverse.com'
     ).split(',') if origin.strip()
 ]
+if FRONTEND_URL and FRONTEND_URL not in csrf_origins:
+    csrf_origins.append(FRONTEND_URL)
+
+CSRF_TRUSTED_ORIGINS = csrf_origins
 
 # Domain Separation & Cross-Site Cookie Configuration:
-# When Next.js frontend (e.g. https://app.adepteduverse.com) and Django API (e.g. https://api.adepteduverse.com)
+# When Next.js frontend (e.g. https://app.adepteduverse.com or Vercel) and Django API (Render)
 # run on different subdomains or origins, cookies must be configured with:
 # 1. SameSite='None' to permit cross-origin authenticated fetch requests with credentials.
 # 2. Secure=True to ensure cookies are only transmitted over HTTPS.
@@ -40,3 +50,19 @@ SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Sentry Production Monitoring
+SENTRY_DSN = config('SENTRY_DSN', default=None)
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=config('SENTRY_TRACES_SAMPLE_RATE', default=0.2, cast=float),
+            send_default_pii=False,
+            environment=config('ENVIRONMENT', default='production'),
+        )
+    except ImportError:
+        pass

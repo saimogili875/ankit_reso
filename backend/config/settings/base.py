@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -75,22 +76,55 @@ WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Configuration
-POSTGRES_DB = config('POSTGRES_DB', default='adepteduverse')
-POSTGRES_USER = config('POSTGRES_USER', default='postgres')
-POSTGRES_PASSWORD = config('POSTGRES_PASSWORD', default='postgres')
-POSTGRES_HOST = config('POSTGRES_HOST', default='postgres')
-POSTGRES_PORT = config('POSTGRES_PORT', default='5432')
+DATABASE_URL = config('DATABASE_URL', default=None)
+CONN_MAX_AGE = config('CONN_MAX_AGE', default=600, cast=int)
+DISABLE_SERVER_SIDE_CURSORS = config('DISABLE_SERVER_SIDE_CURSORS', default=True, cast=bool)
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': POSTGRES_DB,
-        'USER': POSTGRES_USER,
-        'PASSWORD': POSTGRES_PASSWORD,
-        'HOST': POSTGRES_HOST,
-        'PORT': POSTGRES_PORT,
+if DATABASE_URL:
+    try:
+        import dj_database_url
+        DATABASES = {
+            'default': dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=CONN_MAX_AGE,
+                conn_health_checks=True,
+            )
+        }
+        if DISABLE_SERVER_SIDE_CURSORS:
+            DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    except ImportError:
+        parsed_db = urlparse(DATABASE_URL)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': parsed_db.path.lstrip('/'),
+                'USER': unquote(parsed_db.username) if parsed_db.username else '',
+                'PASSWORD': unquote(parsed_db.password) if parsed_db.password else '',
+                'HOST': parsed_db.hostname or '',
+                'PORT': str(parsed_db.port) if parsed_db.port else '5432',
+                'CONN_MAX_AGE': CONN_MAX_AGE,
+                'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+            }
+        }
+else:
+    POSTGRES_DB = config('POSTGRES_DB', default='adepteduverse')
+    POSTGRES_USER = config('POSTGRES_USER', default='postgres')
+    POSTGRES_PASSWORD = config('POSTGRES_PASSWORD', default='postgres')
+    POSTGRES_HOST = config('POSTGRES_HOST', default='postgres')
+    POSTGRES_PORT = config('POSTGRES_PORT', default='5432')
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': POSTGRES_DB,
+            'USER': POSTGRES_USER,
+            'PASSWORD': POSTGRES_PASSWORD,
+            'HOST': POSTGRES_HOST,
+            'PORT': POSTGRES_PORT,
+            'CONN_MAX_AGE': CONN_MAX_AGE,
+            'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+        }
     }
-}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -131,8 +165,12 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/minute',
+        'user': '120/minute',
         'login': '10/minute',
         'register': '10/minute',
+        'live_token': '30/minute',
+        'test_submit': '15/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -147,14 +185,28 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Redis & Celery
+REDIS_URL = config('REDIS_URL', default=None)
 REDIS_HOST = config('REDIS_HOST', default='redis')
 REDIS_PORT = config('REDIS_PORT', default='6379')
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=f'redis://{REDIS_HOST}:{REDIS_PORT}/0')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=f'redis://{REDIS_HOST}:{REDIS_PORT}/0')
+
+if not REDIS_URL:
+    REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+# Redis Cache Backend
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
+    }
+}
 
 # Cloudflare R2 Credentials & Storage Configuration
 R2_ACCOUNT_ID = config('R2_ACCOUNT_ID', default='')
@@ -167,3 +219,37 @@ R2_ENDPOINT = config('R2_ENDPOINT', default='')
 LIVEKIT_URL = config('LIVEKIT_URL', default='wss://livekit.local.demo')
 LIVEKIT_API_KEY = config('LIVEKIT_API_KEY', default='devkey')
 LIVEKIT_API_SECRET = config('LIVEKIT_API_SECRET', default='secret_32_characters_minimum_length_key_for_security!')
+
+# Structured Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}:{lineno} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': config('DJANGO_LOG_LEVEL', default='INFO'),
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}

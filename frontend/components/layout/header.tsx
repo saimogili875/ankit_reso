@@ -150,8 +150,8 @@ export const Header: React.FC = () => {
 
   const displayName = currentUser
     ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() ||
-      currentUser.username ||
-      currentUser.email.split('@')[0]
+    currentUser.username ||
+    currentUser.email.split('@')[0]
     : 'Student';
 
   const initial = displayName.charAt(0).toUpperCase() || 'S';
@@ -224,11 +224,10 @@ export const Header: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBellTab('notifications')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                      bellTab === 'notifications'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${bellTab === 'notifications'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Notifications
                     {unreadCount > 0 && (
@@ -240,11 +239,10 @@ export const Header: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBellTab('announcements')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                      bellTab === 'announcements'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${bellTab === 'announcements'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Notices
                     {announcements.length > 0 && (
@@ -278,9 +276,8 @@ export const Header: React.FC = () => {
                       <div
                         key={item.id}
                         onClick={() => handleNotificationClick(item)}
-                        className={`p-3.5 hover:bg-slate-800/50 transition-colors cursor-pointer flex items-start gap-3 ${
-                          !item.is_read ? 'bg-slate-800/20' : ''
-                        }`}
+                        className={`p-3.5 hover:bg-slate-800/50 transition-colors cursor-pointer flex items-start gap-3 ${!item.is_read ? 'bg-slate-800/20' : ''
+                          }`}
                       >
                         <div className="mt-0.5 shrink-0">
                           {!item.is_read ? (
@@ -292,9 +289,8 @@ export const Header: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1">
                             <span
-                              className={`text-xs font-semibold truncate ${
-                                !item.is_read ? 'text-slate-100 font-bold' : 'text-slate-300'
-                              }`}
+                              className={`text-xs font-semibold truncate ${!item.is_read ? 'text-slate-100 font-bold' : 'text-slate-300'
+                                }`}
                             >
                               {item.title}
                             </span>

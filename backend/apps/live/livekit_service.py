@@ -13,6 +13,7 @@ from livekit.protocol.room import (
     MuteRoomTrackRequest,
     ListParticipantsRequest
 )
+from livekit.protocol import egress
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,81 @@ class LiveKitManager:
                 return True
             except Exception as e:
                 logger.warning(f"LiveKit end_room failed: {e}")
+                return False
+            finally:
+                await api.aclose()
+
+        return async_to_sync(_exec)()
+
+    @classmethod
+    def start_room_egress(cls, room_name, filepath=None):
+        """
+        Initiates a server-side RoomCompositeEgress recording in LiveKit Cloud
+        that outputs an MP4 file directly into the configured Cloudflare R2 bucket.
+        Returns the egress_id string or None if unconfigured/failed.
+        """
+        async def _exec():
+            api = cls._get_api_client()
+            try:
+                r2_endpoint = getattr(settings, 'R2_ENDPOINT', '')
+                r2_access_key = getattr(settings, 'R2_ACCESS_KEY_ID', '')
+                r2_secret = getattr(settings, 'R2_SECRET_ACCESS_KEY', '')
+                r2_bucket = getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
+
+                if not (r2_endpoint and r2_access_key and r2_secret):
+                    logger.warning(f"R2 credentials not set; skipping live class egress for {room_name}.")
+                    return None
+
+                if not filepath:
+                    ts = int(timezone.now().timestamp())
+                    filepath = f"recordings/{room_name}_{ts}.mp4"
+
+                s3_upload = egress.S3Upload(
+                    endpoint=r2_endpoint,
+                    access_key=r2_access_key,
+                    secret=r2_secret,
+                    bucket=r2_bucket,
+                    region='auto',
+                    force_path_style=True
+                )
+
+                file_output = egress.EncodedFileOutput(
+                    file_type=egress.EncodedFileType.MP4,
+                    filepath=filepath,
+                    s3=s3_upload
+                )
+
+                req = egress.RoomCompositeEgressRequest(
+                    room_name=room_name,
+                    file=file_output
+                )
+
+                res = await api.egress.start_room_composite_egress(req)
+                egress_id = getattr(res, 'egress_id', str(res))
+                logger.info(f"Started room egress for {room_name}: egress_id={egress_id}")
+                return egress_id
+            except Exception as e:
+                logger.error(f"LiveKit start_room_egress error: {e}")
+                return None
+            finally:
+                await api.aclose()
+
+        return async_to_sync(_exec)()
+
+    @classmethod
+    def stop_room_egress(cls, egress_id):
+        """
+        Stops an active LiveKit room composite egress recording.
+        """
+        async def _exec():
+            api = cls._get_api_client()
+            try:
+                req = egress.StopEgressRequest(egress_id=egress_id)
+                res = await api.egress.stop_egress(req)
+                logger.info(f"Stopped room egress: {egress_id}")
+                return True
+            except Exception as e:
+                logger.error(f"LiveKit stop_room_egress error: {e}")
                 return False
             finally:
                 await api.aclose()

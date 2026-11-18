@@ -118,11 +118,10 @@ export default function TestsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('available')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-            activeTab === 'available'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'available'
+            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
         >
           Available Tests
         </button>
@@ -130,11 +129,10 @@ export default function TestsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('attempted')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-            activeTab === 'attempted'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'attempted'
+            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
         >
           Attempted Papers
         </button>
@@ -142,11 +140,10 @@ export default function TestsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('upcoming')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-            activeTab === 'upcoming'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'upcoming'
+            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
         >
           Upcoming Tests
         </button>
@@ -164,8 +161,8 @@ export default function TestsPage() {
             {activeTab === 'attempted'
               ? 'No tests attempted yet'
               : activeTab === 'upcoming'
-              ? 'No upcoming scheduled tests'
-              : 'No available tests found'}
+                ? 'No upcoming scheduled tests'
+                : 'No available tests found'}
           </h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             {activeTab === 'attempted'

@@ -33,6 +33,9 @@ def send_live_class_notification(live_class_id, notification_type_code):
     if notification_type_code == '30_MIN':
         title = f"Live Class in 30 Minutes: {live_class.title}"
         message = f"Your live class for '{live_class.course.title}' starts at {live_class.start_time.strftime('%I:%M %p')}. Get ready to join!"
+    elif notification_type_code == '15_MIN':
+        title = f"Live Class in 15 Minutes: {live_class.title}"
+        message = f"Your live class for '{live_class.course.title}' starts in 15 minutes. Check your audio/video and join soon!"
     elif notification_type_code == '5_MIN':
         title = f"Live Class in 5 Minutes: {live_class.title}"
         message = f"Live class is about to begin. Enter the classroom now!"
@@ -63,10 +66,11 @@ def send_live_class_notification(live_class_id, notification_type_code):
 @shared_task
 def check_upcoming_live_class_reminders():
     """
-    Periodic task to scan for classes starting in ~30 mins and ~5 mins.
+    Periodic task to scan for classes starting in ~30 mins, ~15 mins, and ~5 mins.
     """
     now = timezone.now()
     window_30 = now + timedelta(minutes=30)
+    window_15 = now + timedelta(minutes=15)
     window_5 = now + timedelta(minutes=5)
 
     # Classes starting in 28-32 minutes
@@ -77,6 +81,14 @@ def check_upcoming_live_class_reminders():
     for lc in classes_30:
         send_live_class_notification.delay(str(lc.id), '30_MIN')
 
+    # Classes starting in 13-17 minutes
+    classes_15 = LiveClass.objects.filter(
+        status=LiveClass.Status.SCHEDULED,
+        start_time__range=[window_15 - timedelta(minutes=2), window_15 + timedelta(minutes=2)]
+    )
+    for lc in classes_15:
+        send_live_class_notification.delay(str(lc.id), '15_MIN')
+
     # Classes starting in 3-7 minutes
     classes_5 = LiveClass.objects.filter(
         status=LiveClass.Status.SCHEDULED,
@@ -84,3 +96,39 @@ def check_upcoming_live_class_reminders():
     )
     for lc in classes_5:
         send_live_class_notification.delay(str(lc.id), '5_MIN')
+
+
+@shared_task
+def auto_end_abandoned_rooms():
+    """
+    Periodic safety cleaner:
+    Ends live classes that have been active for > 4 hours or where teacher/participants abandoned the room.
+    """
+    from .livekit_service import LiveKitManager
+
+    now = timezone.now()
+    cutoff_time = now - timedelta(hours=4)
+
+    abandoned_classes = LiveClass.objects.filter(
+        status=LiveClass.Status.LIVE,
+        start_time__lte=cutoff_time
+    )
+
+    ended_count = 0
+    for lc in abandoned_classes:
+        logger.info(f"Auto-ending abandoned live class: {lc.title} (ID: {lc.id})")
+        try:
+            LiveKitManager.end_room(lc.room_name)
+        except Exception as e:
+            logger.warning(f"Error terminating room {lc.room_name} on LiveKit: {e}")
+
+        lc.status = LiveClass.Status.ENDED
+        lc.end_time = now
+        lc.save(update_fields=['status', 'end_time'])
+
+        for att in lc.attendances.filter(is_online=True):
+            att.mark_left()
+
+        ended_count += 1
+
+    return f"Auto-ended {ended_count} abandoned live classes."

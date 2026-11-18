@@ -75,6 +75,7 @@ class LiveTokenView(APIView):
       Checks room capacity limits (max_students).
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'live_token'
 
     def post(self, request, pk):
         live_class = get_object_or_404(LiveClass, id=pk)
@@ -142,6 +143,15 @@ class LiveStartView(APIView):
         if not live_class.start_time or live_class.start_time > timezone.now():
             live_class.start_time = timezone.now()
         live_class.save(update_fields=['status', 'start_time'])
+
+        # Auto-start LiveKit Cloud Egress to Cloudflare R2 if credentials present
+        try:
+            egress_id = LiveKitManager.start_room_egress(live_class.room_name)
+            if egress_id:
+                live_class.recording_status = LiveClass.RecordingStatus.RECORDING
+                live_class.save(update_fields=['recording_status'])
+        except Exception as e:
+            logger.warning(f"Could not auto-start LiveKit egress for {live_class.room_name}: {e}")
 
         return Response({
             'status': 'LIVE',
@@ -622,23 +632,36 @@ class LiveWebhookView(APIView):
                 if att:
                     att.mark_left()
 
-        elif event_type == 'egress_ended' and live_class:
-            egress = getattr(event, 'egress_info', None)
-            if egress:
+        elif event_type in ['egress_ended', 'egress_finished'] and live_class:
+            egress_info = getattr(event, 'egress_info', None)
+            if egress_info:
                 file_url = ''
-                file_res = getattr(egress, 'file_results', [])
+                file_res = getattr(egress_info, 'file_results', [])
                 if file_res:
                     file_url = getattr(file_res[0], 'filename', '') or getattr(file_res[0], 'location', '')
+
+                # Construct full public URL if R2 endpoint is present and key is relative
+                from django.conf import settings
+                r2_endpoint = getattr(settings, 'R2_ENDPOINT', '').rstrip('/')
+                bucket = getattr(settings, 'R2_BUCKET_NAME', '')
+                if file_url and not file_url.startswith('http') and r2_endpoint and bucket:
+                    file_url = f"{r2_endpoint}/{bucket}/{file_url.lstrip('/')}"
 
                 if not file_url:
                     file_url = live_class.recording_url or f"https://r2.storage.example/recordings/{live_class.room_name}.mp4"
 
-                rec = Recording.objects.create(
+                duration = int(getattr(egress_info, 'duration', 0) or 0)
+                if duration > 1_000_000_000:
+                    duration = int(duration / 1_000_000_000)
+
+                rec, created = Recording.objects.update_or_create(
                     live_class=live_class,
-                    title=f"Recording: {live_class.title}",
-                    video_url=file_url,
-                    status=Recording.Status.DRAFT,
-                    duration_seconds=int(getattr(egress, 'duration', 0) or 0)
+                    defaults={
+                        'title': f"Recording: {live_class.title}",
+                        'video_url': file_url,
+                        'status': Recording.Status.DRAFT,
+                        'duration_seconds': duration,
+                    }
                 )
                 live_class.recording_status = LiveClass.RecordingStatus.READY
                 live_class.recording_url = file_url

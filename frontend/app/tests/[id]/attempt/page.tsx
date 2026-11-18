@@ -103,7 +103,20 @@ export default function CBTAttemptPage() {
       setTestTitle(res.title);
       setSections(res.sections || []);
       setQuestions(res.questions || []);
-      setAnswers(res.saved_answers || {});
+
+      // Recover any unsaved answers from local browser storage in case of connection drop
+      let initialAnswers = res.saved_answers || {};
+      if (typeof window !== 'undefined') {
+        try {
+          const localCached = localStorage.getItem(`cbt_answers_${res.attempt_id}`);
+          if (localCached) {
+            const parsed = JSON.parse(localCached);
+            initialAnswers = { ...initialAnswers, ...parsed };
+          }
+        } catch {}
+      }
+
+      setAnswers(initialAnswers);
       setQuestionStates(res.question_states || {});
       setTimeLeft(res.time_remaining_seconds || res.duration_minutes * 60);
 
@@ -235,6 +248,11 @@ export default function CBTAttemptPage() {
     setAnswers((prev) => {
       const copy = { ...prev };
       delete copy[qId];
+      if (attemptId && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`cbt_answers_${attemptId}`, JSON.stringify(copy));
+        } catch {}
+      }
       return copy;
     });
 
@@ -259,11 +277,19 @@ export default function CBTAttemptPage() {
     setCurrentQuestionIndex(targetIndex);
   };
 
-  // 8. Select Option
+  // 8. Select Option (persists to local storage instantly)
   const handleSelectOption = (optionId: string) => {
     if (!currentQuestion) return;
     const qId = currentQuestion.id;
-    setAnswers((prev) => ({ ...prev, [qId]: optionId }));
+    setAnswers((prev) => {
+      const updated = { ...prev, [qId]: optionId };
+      if (attemptId && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`cbt_answers_${attemptId}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
   };
 
   // 9. Final Submit Handler
@@ -282,6 +308,12 @@ export default function CBTAttemptPage() {
           is_auto: isAuto,
         }
       );
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`cbt_answers_${attemptId}`);
+        } catch {}
+      }
 
       const targetId = res?.attempt_id || attemptId;
       router.push(`/tests/${targetId}/result`);
