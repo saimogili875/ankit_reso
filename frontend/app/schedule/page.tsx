@@ -114,8 +114,7 @@ export default function SchedulePage() {
 
     setJoiningId(liveClassId);
     try {
-      const res = await apiClient.post<{ join_url: string }>(`/live-classes/${liveClassId}/join/`);
-      const targetUrl = res?.join_url || event.live_class?.join_url || event.link;
+      await apiClient.post<{ join_url: string }>(`/live-classes/${liveClassId}/join/`);
 
       // Update attendance locally
       setScheduleData((prev) => {
@@ -141,9 +140,8 @@ export default function SchedulePage() {
         };
       });
 
-      if (targetUrl) {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      }
+      // Navigate into the in-app LiveKit classroom
+      window.location.href = `/live/${liveClassId}`;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unable to record attendance or join class.';
       alert(msg);

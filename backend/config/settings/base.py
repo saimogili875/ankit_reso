@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.materials',
     'apps.analytics',
     'apps.adminpanel',
+    'apps.live',
 ]
 
 MIDDLEWARE = [
@@ -161,3 +162,8 @@ R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID', default='')
 R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY', default='')
 R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='adepteduverse-storage')
 R2_ENDPOINT = config('R2_ENDPOINT', default='')
+
+# LiveKit Configuration
+LIVEKIT_URL = config('LIVEKIT_URL', default='wss://livekit.local.demo')
+LIVEKIT_API_KEY = config('LIVEKIT_API_KEY', default='devkey')
+LIVEKIT_API_SECRET = config('LIVEKIT_API_SECRET', default='secret_32_characters_minimum_length_key_for_security!')

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -601,6 +602,14 @@ export default function AdminSchedulePage() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <Link
+                      href={`/admin/live/${item.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-8 transition shadow-md shadow-indigo-600/30"
+                    >
+                      <Radio className="w-3.5 h-3.5 animate-pulse text-rose-300" />
+                      <span>{item.status === 'LIVE' ? 'Enter Live Studio' : 'Go Live (Studio)'}</span>
+                    </Link>
+
                     {item.status === 'SCHEDULED' && (
                       <Button
                         size="sm"

@@ -191,12 +191,15 @@ class Command(BaseCommand):
                 title='Rotational Dynamics - Moment of Inertia & Rolling Motion',
                 description='Live conceptual derivation of Moment of Inertia for combined rolling bodies with live Q&A.',
                 subject=physics_subj,
-                teacher='Er. Ankit Sharma (IIT Bombay)',
+                teacher=admin_user,
+                teacher_name='Er. Ankit Sharma (IIT Bombay)',
                 start_time=now - timedelta(minutes=15),
                 end_time=now + timedelta(minutes=45),
-                platform=LiveClass.Platform.YOUTUBE_LIVE,
-                join_url='https://www.youtube.com/watch?v=live_demo_stream',
+                platform=LiveClass.Platform.LIVEKIT,
+                room_name='room_live_rotational_dynamics',
                 status=LiveClass.Status.LIVE,
+                student_mic_policy=LiveClass.StudentMicPolicy.ON_REQUEST,
+                max_students=100,
             )
             # Create corresponding schedule event
             ScheduleEvent.objects.create(

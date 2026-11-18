@@ -715,7 +715,9 @@ class AdminLiveClassSerializer(serializers.ModelSerializer):
             'id', 'course', 'course_title', 'title', 'description',
             'subject', 'subject_name', 'chapter', 'chapter_name',
             'teacher', 'start_time', 'end_time', 'platform', 'join_url',
-            'status', 'recording_url', 'recording_published', 'recording_lecture',
+            'status', 'room_name', 'max_students', 'chat_enabled', 'student_mic_policy',
+            'recording_status', 'recording_url', 'recording_published', 'is_recording_published',
+            'recording_lecture', 'peak_concurrent_users', 'total_attendees_count',
             'attendances_count', 'created_at', 'updated_at'
         ]
 

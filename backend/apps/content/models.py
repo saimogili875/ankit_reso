@@ -133,59 +133,7 @@ class Doubt(TimeStampedModel):
         return f"Doubt #{self.id} by {self.student.email} [{self.status}]"
 
 
-class LiveClass(TimeStampedModel):
-    """
-    Live teaching sessions (YouTube Live / Zoom / Google Meet).
-    """
-    class Status(models.TextChoices):
-        SCHEDULED = 'SCHEDULED', 'Scheduled'
-        LIVE = 'LIVE', 'Live Now'
-        ENDED = 'ENDED', 'Ended'
-        CANCELLED = 'CANCELLED', 'Cancelled'
-
-    class Platform(models.TextChoices):
-        YOUTUBE_LIVE = 'YOUTUBE_LIVE', 'YouTube Live'
-        ZOOM = 'ZOOM', 'Zoom Meeting'
-        MEET = 'MEET', 'Google Meet'
-        OTHER = 'OTHER', 'Other Platform'
-
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='live_classes')
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    subject = models.ForeignKey(Subject, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_classes')
-    chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_classes')
-    teacher = models.CharField(max_length=150, default='Faculty Educator')
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-    platform = models.CharField(max_length=30, choices=Platform.choices, default=Platform.YOUTUBE_LIVE)
-    join_url = models.CharField(max_length=500, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
-    recording_url = models.CharField(max_length=500, blank=True)
-    recording_published = models.BooleanField(default=False)
-    recording_lecture = models.ForeignKey(Lecture, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_class_recordings')
-
-    class Meta:
-        ordering = ['start_time']
-        verbose_name_plural = 'Live Classes'
-
-    def __str__(self):
-        return f"{self.title} ({self.status}) [{self.course.title}]"
-
-
-class LiveAttendance(TimeStampedModel):
-    """
-    Attendance records for students attending live classes.
-    """
-    live_class = models.ForeignKey(LiveClass, on_delete=models.CASCADE, related_name='attendances')
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_attendances')
-    joined_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('live_class', 'student')
-        ordering = ['-joined_at']
-
-    def __str__(self):
-        return f"{self.student.email} - {self.live_class.title}"
+from apps.live.models import LiveClass, LiveAttendance
 
 
 class ScheduleEvent(TimeStampedModel):

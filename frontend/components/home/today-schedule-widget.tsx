@@ -9,7 +9,6 @@ import {
   FileText,
   Target,
   PlayCircle,
-  ExternalLink,
   ChevronRight,
   Radio,
 } from 'lucide-react';
@@ -65,7 +64,6 @@ interface ScheduleTodayResponse {
 export const TodayScheduleWidget: React.FC = () => {
   const [data, setData] = useState<ScheduleTodayResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,22 +82,6 @@ export const TodayScheduleWidget: React.FC = () => {
       isMounted = false;
     };
   }, []);
-
-  const handleJoinLive = async (liveClass: LiveClassData) => {
-    setIsJoining(true);
-    try {
-      const res = await apiClient.post<{ join_url: string }>(`/live-classes/${liveClass.id}/join/`);
-      const targetUrl = res?.join_url || liveClass.join_url;
-      if (targetUrl) {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to join live class.';
-      alert(msg);
-    } finally {
-      setIsJoining(false);
-    }
-  };
 
   const formatTime = (isoString?: string) => {
     if (!isoString) return '';
@@ -147,16 +129,14 @@ export const TodayScheduleWidget: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleJoinLive(liveNow)}
-                disabled={isJoining}
+              <Link
+                href={`/live/${liveNow.id}`}
                 className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Video className="w-4 h-4" />
-                {isJoining ? 'Joining...' : 'Join Live Class'}
-                <ExternalLink className="w-3.5 h-3.5 ml-0.5 opacity-90" />
-              </button>
+                <span>Join Live Classroom</span>
+                <Radio className="w-3.5 h-3.5 ml-0.5 animate-pulse" />
+              </Link>
             </div>
           </div>
         </div>
@@ -264,18 +244,17 @@ export const TodayScheduleWidget: React.FC = () => {
                     </span>
 
                     {ev.live_class ? (
-                      <button
-                        type="button"
-                        onClick={() => handleJoinLive(ev.live_class!)}
+                      <Link
+                        href={`/live/${ev.live_class.id}`}
                         className={`text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors ${
                           isLive
-                            ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-sm shadow-rose-600/30 animate-pulse'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
                         }`}
                       >
                         <Video className="w-3 h-3" />
-                        {isLive ? 'Join' : 'Class'}
-                      </button>
+                        <span>{isLive ? 'Join Live' : 'Class'}</span>
+                      </Link>
                     ) : ev.event_type === 'EXAM' ? (
                       <Link
                         href={ev.link || '/tests'}
