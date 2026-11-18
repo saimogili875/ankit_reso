@@ -16,11 +16,15 @@ from apps.content.models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
     LiveClass, LiveAttendance, ScheduleEvent, Notification
 )
-from apps.questions.models import Question, DPP, DPPQuestion
+from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
 from apps.materials.models import StudyMaterial
-from apps.tests.models import Test, TestQuestion, TestAttempt, QuestionAttemptLog, TestAttemptAnalysis
+from apps.tests.models import (
+    Test, TestSection, TestQuestion, TestAttempt, QuestionAttemptLog,
+    TestAttemptAnalysis, AnalysisSettings
+)
 from apps.progress.models import DPPAttempt, VideoProgress
 from apps.analytics.models import RankPredictor
+from apps.accounts.serializers import UserSerializer
 
 from .serializers import (
     AdminQuestionSerializer,
@@ -234,6 +238,63 @@ class QuestionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(difficulty=difficulty)
         return qs
 
+    @action(detail=False, methods=['post'], url_path='bulk-import')
+    def bulk_import(self, request):
+        dry_run = request.query_params.get('dry_run', 'false').lower() == 'true'
+        rows = request.data.get('questions', [])
+        if not isinstance(rows, list) or not rows:
+            return Response({'error': 'No questions data provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_count = 0
+        errors = []
+        created_ids = []
+
+        for idx, row in enumerate(rows):
+            q_text = row.get('question_text', '').strip()
+            if not q_text:
+                errors.append({'row': idx + 1, 'error': 'Missing question_text'})
+                continue
+
+            q_type = row.get('question_type', Question.QuestionType.SINGLE_CHOICE)
+            diff = row.get('difficulty', Question.Difficulty.MEDIUM)
+            subj_id = row.get('subject_id')
+            chap_id = row.get('chapter_id')
+            ideal_t = int(row.get('ideal_time_seconds', 120))
+            sol_text = row.get('solution_text', '')
+
+            if dry_run:
+                valid_count += 1
+                continue
+
+            q_obj = Question.objects.create(
+                question_text=q_text,
+                question_type=q_type,
+                difficulty=diff,
+                subject_id=subj_id if subj_id else None,
+                chapter_id=chap_id if chap_id else None,
+                ideal_time_seconds=ideal_t,
+                solution_text=sol_text,
+            )
+
+            for opt in row.get('options', []):
+                QuestionOption.objects.create(
+                    question=q_obj,
+                    option_text=opt.get('option_text', ''),
+                    is_correct=bool(opt.get('is_correct', False)),
+                )
+
+            created_ids.append(str(q_obj.id))
+            valid_count += 1
+
+        return Response({
+            'dry_run': dry_run,
+            'total_rows': len(rows),
+            'valid_count': valid_count,
+            'error_count': len(errors),
+            'errors': errors,
+            'created_ids': created_ids,
+        }, status=status.HTTP_200_OK if dry_run else status.HTTP_201_CREATED)
+
 
 class ChapterViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
@@ -336,6 +397,49 @@ class TestViewSet(viewsets.ModelViewSet):
         if test_type:
             qs = qs.filter(test_type=test_type)
         return qs
+
+    @action(detail=True, methods=['post'], url_path='clone')
+    def clone_test(self, request, pk=None):
+        original = self.get_object()
+        new_test = Test.objects.create(
+            title=f"Copy of {original.title}",
+            description=original.description,
+            test_type=original.test_type,
+            duration_minutes=original.duration_minutes,
+            total_marks=original.total_marks,
+            cutoff_score=original.cutoff_score,
+            publish_results_immediately=original.publish_results_immediately,
+            is_published=False,
+            exam=original.exam,
+            course=original.course,
+        )
+
+        section_map = {}
+        for sec in original.sections.all():
+            new_sec = TestSection.objects.create(
+                test=new_test,
+                subject=sec.subject,
+                name=sec.name,
+                order=sec.order,
+                instructions=sec.instructions,
+            )
+            section_map[sec.id] = new_sec
+
+        for tq in original.test_questions.all():
+            TestQuestion.objects.create(
+                test=new_test,
+                section=section_map.get(tq.section_id),
+                question=tq.question,
+                order=tq.order,
+                positive_marks=tq.positive_marks,
+                negative_marks=tq.negative_marks,
+            )
+
+        serializer = self.get_serializer(new_test)
+        return Response({
+            'message': 'Test cloned successfully.',
+            'test': serializer.data,
+        }, status=status.HTTP_201_CREATED)
 
 
 class StudyMaterialViewSet(viewsets.ModelViewSet):
@@ -878,5 +982,97 @@ class RankPredictorViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminRankPredictorSerializer
     queryset = RankPredictor.objects.all().order_by('-min_marks')
+
+
+class SettingsViewSet(viewsets.ViewSet):
+    """
+    Manages analysis settings (ideal time per difficulty, quick/wasted thresholds,
+    time-slot size, percentile bands, comparative minimum attempts) and rank predictor table.
+    """
+    permission_classes = [IsAdminRole]
+
+    def list(self, request):
+        settings = AnalysisSettings.get_settings()
+        predictors = list(RankPredictor.objects.all().order_by('-min_marks').values())
+        return Response({
+            'analysis_settings': {
+                'id': settings.id,
+                'name': settings.name,
+                'easy_ideal_time': settings.easy_ideal_time,
+                'moderate_ideal_time': settings.moderate_ideal_time,
+                'tough_ideal_time': settings.tough_ideal_time,
+                'quick_wasted_threshold_percent': settings.quick_wasted_threshold_percent,
+                'time_slot_minutes': settings.time_slot_minutes,
+                'percentile_band_1': settings.percentile_band_1,
+                'percentile_band_2': settings.percentile_band_2,
+                'comparative_min_attempts': settings.comparative_min_attempts,
+                'show_solutions_after_window': settings.show_solutions_after_window,
+            },
+            'rank_predictor_table': predictors,
+        }, status=status.HTTP_200_OK)
+
+    def create(self, request):
+        settings = AnalysisSettings.get_settings()
+        data = request.data.get('analysis_settings', request.data)
+        for field in [
+            'easy_ideal_time', 'moderate_ideal_time', 'tough_ideal_time',
+            'quick_wasted_threshold_percent', 'time_slot_minutes',
+            'percentile_band_1', 'percentile_band_2', 'comparative_min_attempts',
+            'show_solutions_after_window'
+        ]:
+            if field in data:
+                setattr(settings, field, data[field])
+        settings.save()
+        return Response({
+            'message': 'Settings saved successfully.',
+            'analysis_settings': {
+                'easy_ideal_time': settings.easy_ideal_time,
+                'moderate_ideal_time': settings.moderate_ideal_time,
+                'tough_ideal_time': settings.tough_ideal_time,
+                'quick_wasted_threshold_percent': settings.quick_wasted_threshold_percent,
+                'time_slot_minutes': settings.time_slot_minutes,
+                'percentile_band_1': settings.percentile_band_1,
+                'percentile_band_2': settings.percentile_band_2,
+                'comparative_min_attempts': settings.comparative_min_attempts,
+                'show_solutions_after_window': settings.show_solutions_after_window,
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class AdminUserViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for admin and instructor accounts.
+    """
+    permission_classes = [IsAdminRole]
+    queryset = User.objects.filter(role__in=[User.Role.ADMIN, User.Role.INSTRUCTOR]).order_by('-date_joined')
+    serializer_class = UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        role = data.get('role', User.Role.INSTRUCTOR)
+        if role not in [User.Role.ADMIN, User.Role.INSTRUCTOR]:
+            return Response({'error': 'Role must be ADMIN or INSTRUCTOR.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = data.get('email', '').strip().lower()
+        password = data.get('password')
+        if not email or not password:
+            return Response({'error': 'Email and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(email=email).exists():
+            return Response({'error': 'User with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create(
+            email=email,
+            username=email,
+            first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', ''),
+            role=role,
+            is_staff=True if role == User.Role.ADMIN else False,
+            is_verified=True,
+        )
+        user.set_password(password)
+        user.save()
+
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 

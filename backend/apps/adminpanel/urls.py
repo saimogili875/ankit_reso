@@ -23,6 +23,8 @@ from .views import (
     NotificationViewSet,
     TestAnalyticsViewSet,
     RankPredictorViewSet,
+    SettingsViewSet,
+    AdminUserViewSet,
 )
 
 router = DefaultRouter()
@@ -46,6 +48,8 @@ router.register('students', StudentViewSet, basename='admin-students')
 router.register('live-classes', LiveClassViewSet, basename='admin-live-classes')
 router.register('schedule', ScheduleEventViewSet, basename='admin-schedule-events')
 router.register('notifications', NotificationViewSet, basename='admin-notifications')
+router.register('settings', SettingsViewSet, basename='admin-settings')
+router.register('admins', AdminUserViewSet, basename='admin-users')
 
 urlpatterns = [
     path('overview/', OverviewView.as_view(), name='admin-overview'),

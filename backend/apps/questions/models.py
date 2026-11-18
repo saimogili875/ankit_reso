@@ -21,6 +21,10 @@ class Question(TimeStampedModel):
     solution_video_url = models.URLField(blank=True, null=True)
     difficulty = models.CharField(max_length=20, choices=Difficulty.choices, default=Difficulty.MEDIUM)
     question_type = models.CharField(max_length=20, choices=QuestionType.choices, default=QuestionType.SINGLE_CHOICE)
+    ideal_time_seconds = models.IntegerField(default=120, help_text="Ideal solve time in seconds")
+    tags = models.CharField(max_length=255, blank=True, default='')
+    numerical_lower_bound = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    numerical_upper_bound = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
 
     def __str__(self):
         return f"Question #{self.id} ({self.difficulty})"

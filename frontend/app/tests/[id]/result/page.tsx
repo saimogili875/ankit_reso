@@ -11,12 +11,19 @@ import {
   PlayCircle,
   FileText,
   Target,
+  Download,
+  HelpCircle,
+  Save,
+  Check,
+  ChevronRight,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 
+// Types
 interface ReviewQuestion {
   log_id: string;
   question_id: string;
@@ -56,38 +63,59 @@ interface ResultData {
     score: number;
     total_marks: number;
     percentage: number;
+    subject_cards: Array<{
+      subject_name: string;
+      score: number;
+      max_marks: number;
+      percentage: number;
+      attempted: number;
+      correct: number;
+      wrong: number;
+      accuracy: number;
+      time_spent: number;
+    }>;
     rank?: number | null;
     total_participants: number;
     percentile?: number | null;
-    has_enough_attempts: boolean;
+    qs_attempted: number;
+    total_questions: number;
     accuracy: number;
-    attempted_count: number;
-    correct_count: number;
-    incorrect_count: number;
-    skipped_count: number;
-    negative_marks_lost: number;
+    positive_score: number;
+    negative_lost: number;
     time_taken_seconds: number;
     total_duration_seconds: number;
     cutoff_score: number;
     is_cleared_cutoff: boolean;
     topper_score: number;
     average_score: number;
+    notes?: string[];
   };
-  sections: Array<{
-    id: string;
-    name: string;
-    subject_name: string;
-    total_questions: number;
-    attempted: number;
-    correct: number;
-    incorrect: number;
-    skipped: number;
-    score: number;
-    max_marks: number;
-    accuracy: number;
-    attempt_rate: number;
-    time_spent: number;
-  }>;
+  sections: {
+    sections: Array<{
+      id: string;
+      name: string;
+      subject_name: string;
+      total_questions: number;
+      attempted: number;
+      correct: number;
+      incorrect: number;
+      not_attempted: number;
+      not_visited: number;
+      score: number;
+      max_marks: number;
+      accuracy: number;
+      attempt_rate: number;
+      time_spent: number;
+    }>;
+    test_breakdown: Array<{
+      subject: string;
+      total_score: number;
+      attempted_correct: number;
+      attempted_wrong: number;
+      not_attempted: number;
+      not_visited: number;
+    }>;
+  };
   chapters: Array<{
     id: string;
     name: string;
@@ -98,49 +126,111 @@ interface ResultData {
     skipped: number;
     accuracy: number;
     avg_time_seconds: number;
+    painful_count: number;
     tag: 'Strong' | 'Average' | 'Weak';
   }>;
   time_analysis: {
     total_time_spent: number;
     total_duration: number;
-    ideal_time_per_question: number;
-    average_time_per_question: number;
-    time_on_correct: number;
-    time_on_wrong: number;
-    time_on_skipped: number;
-    time_wasted_total: number;
-    questions_over_2x_ideal: Array<{
-      id: string;
-      question_text: string;
+    time_breakdown: Array<{
+      subject: string;
       time_spent: number;
-      ideal_time: number;
-      is_correct: boolean;
+      attempted: number;
+      total_questions: number;
+      accuracy: number;
     }>;
-    pacing_assessment: string;
+    quality_of_time: {
+      time_on_correct: number;
+      time_on_incorrect: number;
+      time_on_unattempted: number;
+      total_time: number;
+    };
+    time_journey: Array<{
+      slot: string;
+      correct: number;
+      incorrect: number;
+      overall: number;
+    }>;
   };
   attempt_strategy: {
-    guess_count: number;
-    unattempted_easy_count: number;
-    marked_for_review_count: number;
-    total_answer_changes: number;
+    summary: {
+      perfect: number;
+      wasted: number;
+      overtime: number;
+      confused: number;
+    };
+    subject_table: Array<{
+      subject: string;
+      perfect: number;
+      wasted: number;
+      overtime: number;
+      confused: number;
+      total: number;
+    }>;
   };
   marks_analysis: {
-    actual_score: number;
-    negative_marks_lost: number;
-    marks_lost_easy: number;
-    potential_no_negatives: number;
-    potential_easy_solved: number;
-    efficiency_ratio: number;
+    actual: number;
+    potential: number;
+    gain: number;
+    formula_tooltip: string;
+    subject_potentials: Array<{
+      subject: string;
+      actual: number;
+      potential: number;
+      gain: number;
+    }>;
   };
   comparison: {
-    student: { score: number; accuracy: number; time_taken: number };
-    topper: { score: number; accuracy: number; time_taken: number };
-    average: { score: number; accuracy: number; time_taken: number };
-    sections_comparison: Array<{
-      name: string;
-      student_score: number;
-      max_marks: number;
-      student_accuracy: number;
+    difficulty_analysis: {
+      by_subject: Array<{
+        difficulty: string;
+        subject: string;
+        correct: number;
+        wrong: number;
+        skipped: number;
+        total: number;
+      }>;
+      overall: Array<{
+        difficulty: string;
+        correct: number;
+        wrong: number;
+        skipped: number;
+        total: number;
+      }>;
+    };
+    question_journey: Array<{
+      q_no: number;
+      question_id: string;
+      subject: string;
+      status: 'CORRECT' | 'WRONG' | 'SKIPPED';
+      revisits: number;
+      has_revisit: boolean;
+      time_spent: number;
+    }>;
+    single_choice_grid: Array<{
+      q_no: number;
+      question_id: string;
+      subject: string;
+      status: string;
+      is_correct: boolean;
+    }>;
+    numerical_grid: Array<{
+      q_no: number;
+      question_id: string;
+      subject: string;
+      status: string;
+      is_correct: boolean;
+    }>;
+    painful_questions: Array<{
+      q_no: number;
+      question_id: string;
+      subject: string;
+      topic: string;
+      difficulty: string;
+      time_spent: number;
+      ideal_time: number;
+      status: string;
+      issue: string;
     }>;
   };
   recommendations: Array<{
@@ -148,6 +238,7 @@ interface ResultData {
     chapter_name: string;
     subject_name: string;
     accuracy: number;
+    painful_count: number;
     lectures: Array<{ id: string; title: string; order: number }>;
     dpps: Array<{ id: string; title: string; dpp_number: number }>;
     materials: Array<{ id: string; title: string; material_type: string }>;
@@ -159,45 +250,92 @@ interface ResultData {
   }>;
 }
 
-type TabType =
+interface CohortData {
+  has_enough_cohort_data: boolean;
+  total_participants?: number;
+  min_required?: number;
+  message?: string;
+  rows?: Array<{
+    label: string;
+    score: number;
+    accuracy: number;
+    time_taken: number;
+    attempted_qs: number;
+    subjects: {
+      [subject: string]: {
+        score: number;
+        accuracy: number;
+        time: number;
+      };
+    };
+    attempt_classification: {
+      perfect: number;
+      wasted: number;
+      overtime: number;
+      confused: number;
+    };
+  }>;
+}
+
+type MainTab = 'PERSONAL' | 'COMPARATIVE';
+
+type PersonalSubNav =
   | 'overview'
-  | 'sections'
-  | 'chapters'
-  | 'questions'
+  | 'performance'
+  | 'potential'
+  | 'attempt'
   | 'time'
-  | 'strategy'
-  | 'marks'
-  | 'compare'
+  | 'difficulty'
+  | 'journey'
+  | 'questions'
   | 'recommendations';
+
+type ComparativeSubNav = 'performance' | 'attempt' | 'time' | 'difficulty';
 
 export default function TestResultPage() {
   const params = useParams();
   const attemptId = params.id as string;
 
+  const [mainTab, setMainTab] = useState<MainTab>('PERSONAL');
+  const [personalTab, setPersonalTab] = useState<PersonalSubNav>('overview');
+  const [compTab, setCompTab] = useState<ComparativeSubNav>('performance');
+
   const [result, setResult] = useState<ResultData | null>(null);
+  const [cohort, setCohort] = useState<CohortData | null>(null);
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Question Filter
-  const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect' | 'skipped' | 'bookmarked'>('all');
+  // Notes state
+  const [notes, setNotes] = useState<string[]>(['', '', '']);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notesSavedNotice, setNotesSavedNotice] = useState(false);
 
-  const loadResult = useCallback(async () => {
+  // Question Filter & Modal State
+  const [qSubjectFilter, setQSubjectFilter] = useState<string>('All');
+  const [qTypeFilter, setQTypeFilter] = useState<'all' | 'correct' | 'wrong' | 'skipped' | 'bookmarked'>('all');
+  const [activeModalQuestion, setActiveModalQuestion] = useState<ReviewQuestion | null>(null);
+
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [resData, qData] = await Promise.all([
+      const [resData, qData, compData] = await Promise.all([
         apiClient.get<ResultData>(`/tests/attempts/${attemptId}/result/`),
-        apiClient.get<{ questions: ReviewQuestion[] }>(`/tests/attempts/${attemptId}/questions/`).catch(() => ({ questions: [] })),
+        apiClient.get<{ questions: ReviewQuestion[] }>(`/tests/attempts/${attemptId}/questions/`),
+        apiClient.get<CohortData>(`/tests/attempts/${attemptId}/analysis/comparative/`).catch(() => null),
       ]);
+      setResult(resData);
+      setQuestions(qData?.questions || []);
+      setCohort(compData);
 
-      if (resData) {
-        setResult(resData);
-      }
-      if (qData && qData.questions) {
-        setQuestions(qData.questions);
-      }
+      // Populate notes
+      const existingNotes = resData?.overview?.notes || [];
+      setNotes([
+        existingNotes[0] || '',
+        existingNotes[1] || '',
+        existingNotes[2] || '',
+      ]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load test analysis.';
       setError(msg);
@@ -207,68 +345,87 @@ export default function TestResultPage() {
   }, [attemptId]);
 
   useEffect(() => {
-    loadResult();
-  }, [loadResult]);
+    loadData();
+  }, [loadData]);
 
-  // Tag question or bookmark
-  const handleUpdateQuestionTag = async (qId: string, reasonTag: string) => {
+  // Handle Note Save
+  const handleSaveNotes = async () => {
+    setIsSavingNotes(true);
     try {
-      await apiClient.post(`/tests/attempts/${attemptId}/tag-question/`, {
-        question_id: qId,
-        student_reason_tag: reasonTag,
-      });
-
-      setQuestions((prev) =>
-        prev.map((q) => (q.question_id === qId ? { ...q, student_reason_tag: reasonTag } : q))
-      );
+      await apiClient.post(`/tests/attempts/${attemptId}/notes/`, { notes });
+      setNotesSavedNotice(true);
+      setTimeout(() => setNotesSavedNotice(false), 3000);
     } catch {
-      alert('Failed to save reason tag.');
+      alert('Failed to save notes.');
+    } finally {
+      setIsSavingNotes(false);
     }
   };
 
-  const handleToggleBookmark = async (qId: string, currentVal: boolean) => {
+  // Toggle Bookmark
+  const handleToggleBookmark = async (q: ReviewQuestion) => {
     try {
+      const newStatus = !q.is_bookmarked;
       await apiClient.post(`/tests/attempts/${attemptId}/tag-question/`, {
-        question_id: qId,
-        is_bookmarked: !currentVal,
+        question_id: q.question_id,
+        is_bookmarked: newStatus,
       });
-
       setQuestions((prev) =>
-        prev.map((q) => (q.question_id === qId ? { ...q, is_bookmarked: !currentVal } : q))
+        prev.map((item) => (item.question_id === q.question_id ? { ...item, is_bookmarked: newStatus } : item))
       );
+      if (activeModalQuestion?.question_id === q.question_id) {
+        setActiveModalQuestion((prev) => (prev ? { ...prev, is_bookmarked: newStatus } : null));
+      }
     } catch {
       alert('Failed to update bookmark.');
+    }
+  };
+
+  // Update Error Reason Tag
+  const handleUpdateReasonTag = async (q: ReviewQuestion, tag: string) => {
+    try {
+      await apiClient.post(`/tests/attempts/${attemptId}/tag-question/`, {
+        question_id: q.question_id,
+        student_reason_tag: tag,
+      });
+      setQuestions((prev) =>
+        prev.map((item) => (item.question_id === q.question_id ? { ...item, student_reason_tag: tag } : item))
+      );
+      if (activeModalQuestion?.question_id === q.question_id) {
+        setActiveModalQuestion((prev) => (prev ? { ...prev, student_reason_tag: tag } : null));
+      }
+    } catch {
+      alert('Failed to save reason tag.');
     }
   };
 
   // Filtered review questions
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      if (questionFilter === 'correct') return q.is_correct;
-      if (questionFilter === 'incorrect') return !q.is_correct && Boolean(q.selected_answer);
-      if (questionFilter === 'skipped') return !q.selected_answer;
-      if (questionFilter === 'bookmarked') return q.is_bookmarked;
+      if (qSubjectFilter !== 'All' && q.subject_name !== qSubjectFilter) return false;
+      if (qTypeFilter === 'correct') return q.is_correct;
+      if (qTypeFilter === 'wrong') return !q.is_correct && Boolean(q.selected_answer);
+      if (qTypeFilter === 'skipped') return !q.selected_answer;
+      if (qTypeFilter === 'bookmarked') return q.is_bookmarked;
       return true;
     });
-  }, [questions, questionFilter]);
+  }, [questions, qSubjectFilter, qTypeFilter]);
 
   if (isLoading) {
-    return (
-      <div className="max-w-6xl mx-auto py-20 px-4">
-        <LoadingState message="Computing and loading multi-dimensional test analytics..." />
-      </div>
-    );
+    return <LoadingState message="Generating deep performance snapshot & analysis..." />;
   }
 
   if (error || !result) {
     return (
-      <div className="max-w-6xl mx-auto py-20 px-4">
-        <ErrorState title="Unable to load analysis" message={error || 'Result not found.'} onRetry={loadResult} />
-      </div>
+      <ErrorState
+        title="Analysis Unavailable"
+        message={error || 'Unable to load test results.'}
+        onRetry={loadData}
+      />
     );
   }
 
-  // Gated results window
+  // Locked window message
   if (result.results_locked) {
     return (
       <div className="max-w-4xl mx-auto py-16 px-4 text-center space-y-5">
@@ -291,607 +448,1017 @@ export default function TestResultPage() {
     );
   }
 
-  const { overview } = result;
+  const ov = result.overview;
+  const sectionsList = result.sections?.sections || [];
+  const testBreakdown = result.sections?.test_breakdown || [];
 
   return (
-    <div className="max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6 space-y-6">
-      {/* Top Header Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800 uppercase tracking-wider">
-              {result.test_type || 'MOCK'} Analysis
-            </span>
-            {overview.is_cleared_cutoff ? (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                Cleared Cutoff ({overview.cutoff_score})
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">
-                Below Cutoff ({overview.cutoff_score})
-              </span>
-            )}
+    <div className="max-w-7xl mx-auto py-6 sm:py-8 px-4 sm:px-6 space-y-6">
+      {/* Top Banner & Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="border-blue-800 bg-blue-950/50 text-blue-400 text-[10px] font-bold">
+              {result.test_type || 'MOCK'} CBT ANALYSIS
+            </Badge>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight">
+              Test Analysis - {result.test_title}
+            </h1>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-100 tracking-tight">
-            {result.test_title}
-          </h1>
-          <p className="text-xs text-slate-400">
-            Performance snapshot based on {overview.total_participants} authenticated test attempts.
+          <p className="text-xs sm:text-sm text-slate-400">
+            Comprehensive diagnostic breakdown, time management, and cohort benchmarking.
           </p>
         </div>
 
-        {/* Score & Rank Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Score</span>
-            <span className="text-lg font-extrabold text-blue-400">
-              {overview.score}
-              <span className="text-xs text-slate-500 font-normal">/{overview.total_marks}</span>
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Rank</span>
-            <span className="text-lg font-extrabold text-purple-400">
-              {overview.rank ? `#${overview.rank}` : '—'}
-            </span>
-            <span className="text-[10px] text-slate-500 block">of {overview.total_participants}</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Percentile</span>
-            {overview.has_enough_attempts && overview.percentile !== null ? (
-              <span className="text-lg font-extrabold text-emerald-400">{overview.percentile}%</span>
-            ) : (
-              <span className="text-xs font-semibold text-slate-400 block pt-1">Too few attempts</span>
-            )}
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Accuracy</span>
-            <span className="text-lg font-extrabold text-amber-400">{overview.accuracy}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Tabs (9 Dimensions) */}
-      <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'sections', label: 'Sections' },
-          { key: 'chapters', label: 'Chapters & Topics' },
-          { key: 'questions', label: 'Questions Review' },
-          { key: 'time', label: 'Time Management' },
-          { key: 'strategy', label: 'Attempt Strategy' },
-          { key: 'marks', label: 'Marks Analysis' },
-          { key: 'compare', label: 'Compare' },
-          { key: 'recommendations', label: 'Recommendations' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key as TabType)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === tab.key
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
+        {/* Global Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          <a
+            href={`http://127.0.0.1:8000/api/tests/attempts/${attemptId}/report.pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all shadow-sm"
           >
-            {tab.label}
+            <Download className="w-4 h-4 text-blue-400" />
+            Download Analysis (PDF)
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab('PERSONAL');
+              setPersonalTab('questions');
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm shadow-blue-600/30"
+          >
+            <FileText className="w-4 h-4" />
+            View Solutions
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Question Breakdown Chips */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Total Attempted</span>
-              <span className="text-xl font-extrabold text-slate-100">{overview.attempted_count}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-emerald-400 block">Correct Answers</span>
-              <span className="text-xl font-extrabold text-emerald-400">+{overview.correct_count}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-rose-400 block">Incorrect Answers</span>
-              <span className="text-xl font-extrabold text-rose-400">-{overview.incorrect_count}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Skipped Questions</span>
-              <span className="text-xl font-extrabold text-slate-400">{overview.skipped_count}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center col-span-2 sm:col-span-1">
-              <span className="text-xs text-rose-400 block">Negative Lost</span>
-              <span className="text-xl font-extrabold text-rose-400">-{overview.negative_marks_lost}</span>
-            </div>
-          </div>
+      {/* Main Mode Tabs: PERSONAL vs COMPARATIVE */}
+      <div className="flex border-b border-slate-800 gap-2">
+        <button
+          type="button"
+          onClick={() => setMainTab('PERSONAL')}
+          className={`pb-3 px-4 text-sm font-extrabold flex items-center gap-2 border-b-2 transition-all ${
+            mainTab === 'PERSONAL'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          PERSONAL ANALYSIS
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab('COMPARATIVE')}
+          className={`pb-3 px-4 text-sm font-extrabold flex items-center gap-2 border-b-2 transition-all ${
+            mainTab === 'COMPARATIVE'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Zap className="w-4 h-4" />
+          COMPARATIVE BENCHMARKING
+        </button>
+      </div>
 
-          {/* Score Distribution Histogram */}
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-100">Score Distribution vs Test Takers</h3>
-                <p className="text-xs text-slate-400">Where you stand across the participant curve</p>
-              </div>
-              <span className="text-xs font-mono text-blue-400 font-semibold">
-                Class Avg: {overview.average_score} • Topper: {overview.topper_score}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-6 gap-2 pt-4 items-end h-44">
-              {result.score_distribution.map((b, idx) => {
-                const maxCount = Math.max(1, ...result.score_distribution.map((x) => x.count));
-                const heightPct = Math.max(15, (b.count / maxCount) * 100);
-
-                return (
-                  <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end">
-                    <span className="text-[11px] font-bold text-slate-300">{b.count}</span>
-                    <div
-                      style={{ height: `${heightPct}%` }}
-                      className={`w-full rounded-t-lg transition-all ${
-                        b.is_student_bucket
-                          ? 'bg-blue-600 shadow-lg shadow-blue-600/30 ring-2 ring-white'
-                          : 'bg-slate-800 hover:bg-slate-700'
-                      }`}
-                    />
-                    <span
-                      className={`text-[10px] font-mono truncate ${
-                        b.is_student_bucket ? 'text-blue-400 font-bold' : 'text-slate-400'
-                      }`}
-                    >
-                      {b.range}
-                    </span>
-                    {b.is_student_bucket && (
-                      <span className="text-[9px] font-extrabold uppercase text-blue-400 -mt-1">
-                        You
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: SECTIONS */}
-      {activeTab === 'sections' && (
-        <div className="space-y-4">
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
-                <tr>
-                  <th className="p-4 font-semibold">Section / Subject</th>
-                  <th className="p-4 font-semibold text-center">Score / Max</th>
-                  <th className="p-4 font-semibold text-center">Accuracy</th>
-                  <th className="p-4 font-semibold text-center">Attempt Rate</th>
-                  <th className="p-4 font-semibold text-center">Correct / Wrong / Skip</th>
-                  <th className="p-4 font-semibold text-right">Time Spent</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-200">
-                {result.sections.map((sec) => (
-                  <tr key={sec.id} className="hover:bg-slate-800/40">
-                    <td className="p-4 font-bold text-slate-100">
-                      <div>{sec.name}</div>
-                      <span className="text-[10px] text-slate-400 font-normal">{sec.subject_name}</span>
-                    </td>
-                    <td className="p-4 text-center font-extrabold text-blue-400">
-                      {sec.score} / {sec.max_marks}
-                    </td>
-                    <td className="p-4 text-center font-bold text-amber-400">
-                      {sec.accuracy}%
-                    </td>
-                    <td className="p-4 text-center font-bold text-slate-300">
-                      {sec.attempt_rate}%
-                    </td>
-                    <td className="p-4 text-center font-mono">
-                      <span className="text-emerald-400 font-bold">{sec.correct}</span> /{' '}
-                      <span className="text-rose-400 font-bold">{sec.incorrect}</span> /{' '}
-                      <span className="text-slate-400">{sec.skipped}</span>
-                    </td>
-                    <td className="p-4 text-right font-mono text-slate-400">
-                      {Math.floor(sec.time_spent / 60)}m {sec.time_spent % 60}s
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: CHAPTERS / TOPICS */}
-      {activeTab === 'chapters' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-200">Chapter-wise Strength (Weakest First)</h3>
-            <span className="text-xs text-slate-400">Prioritize weak chapters for targeted revision</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {result.chapters.map((c) => {
-              const badgeVariant = c.tag === 'Strong' ? 'emerald' : c.tag === 'Average' ? 'amber' : 'rose';
-
-              return (
-                <div key={c.id} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-100">{c.name}</h4>
-                      <span className="text-xs text-blue-400 font-medium">{c.subject_name}</span>
-                    </div>
-                    <Badge variant={badgeVariant}>{c.tag}</Badge>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1 border-t border-slate-800/80">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Accuracy</span>
-                      <span className="font-extrabold text-slate-200">{c.accuracy}%</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Correct / Total</span>
-                      <span className="font-extrabold text-slate-200">{c.correct} / {c.total_questions}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Avg Time</span>
-                      <span className="font-extrabold text-slate-200">{c.avg_time_seconds}s</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: QUESTIONS (REVIEW) */}
-      {activeTab === 'questions' && (
-        <div className="space-y-6">
-          {/* Question Review Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* =========================================================================
+          TAB 1: PERSONAL ANALYSIS (With left sub-nav in exact order)
+      ========================================================================== */}
+      {mainTab === 'PERSONAL' && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+          {/* Left Sub-Navigation */}
+          <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-2.5 space-y-1">
             {[
-              { key: 'all', label: `All (${questions.length})` },
-              { key: 'correct', label: `Correct (${overview.correct_count})` },
-              { key: 'incorrect', label: `Incorrect (${overview.incorrect_count})` },
-              { key: 'skipped', label: `Skipped (${overview.skipped_count})` },
-              { key: 'bookmarked', label: `Bookmarked (${questions.filter((q) => q.is_bookmarked).length})` },
-            ].map((f) => (
+              { key: 'overview', label: '1. Overview' },
+              { key: 'performance', label: '2. Performance Analysis' },
+              { key: 'potential', label: '3. Score Potential' },
+              { key: 'attempt', label: '4. Attempt Analysis' },
+              { key: 'time', label: '5. Time Analysis' },
+              { key: 'difficulty', label: '6. Difficulty Analysis' },
+              { key: 'journey', label: '7. Question Journey' },
+              { key: 'questions', label: '8. Qs by Qs Analysis' },
+              { key: 'recommendations', label: '9. Recommendations' },
+            ].map((nav) => (
               <button
-                key={f.key}
+                key={nav.key}
                 type="button"
-                onClick={() => setQuestionFilter(f.key as 'all' | 'correct' | 'incorrect' | 'skipped' | 'bookmarked')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  questionFilter === f.key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                onClick={() => setPersonalTab(nav.key as PersonalSubNav)}
+                className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                  personalTab === nav.key
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`}
               >
-                {f.label}
+                <span>{nav.label}</span>
+                {personalTab === nav.key && <ChevronRight className="w-3.5 h-3.5" />}
               </button>
             ))}
           </div>
 
-          {/* Questions List */}
-          <div className="space-y-4">
-            {filteredQuestions.map((q, qIdx) => {
-              const isCorrect = q.is_correct;
-              const isSkipped = !q.selected_answer;
-
-              return (
-                <div
-                  key={q.question_id}
-                  className={`p-5 rounded-2xl border space-y-4 ${
-                    isCorrect
-                      ? 'bg-slate-900 border-emerald-900/40'
-                      : isSkipped
-                      ? 'bg-slate-900 border-slate-800'
-                      : 'bg-slate-900 border-rose-900/40'
-                  }`}
-                >
-                  {/* Top Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-200">
-                        Q{q.order || qIdx + 1}
-                      </span>
-                      <span className="text-xs text-blue-400 font-medium">
-                        {[q.subject_name, q.chapter_name].filter(Boolean).join(' • ')}
-                      </span>
-                      <Badge variant="slate" className="text-[10px]">{q.difficulty}</Badge>
+          {/* Right Content Panel */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* 1. OVERVIEW */}
+            {personalTab === 'overview' && (
+              <div className="space-y-6">
+                {/* Score & Key Metric Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Your Score</span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-blue-400">{ov.score}</span>
+                      <span className="text-xs text-slate-500">/ {ov.total_marks}</span>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      {isCorrect ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Correct (+{q.marks_awarded})
-                        </span>
-                      ) : isSkipped ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
-                          Skipped (0)
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-800 flex items-center gap-1">
-                          <XCircle className="w-3.5 h-3.5" />
-                          Wrong ({q.marks_awarded})
-                        </span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleToggleBookmark(q.question_id, q.is_bookmarked)}
-                        className={`p-1.5 rounded-lg border transition-colors ${
-                          q.is_bookmarked
-                            ? 'bg-amber-950/60 border-amber-600 text-amber-400'
-                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-                        }`}
-                        title="Bookmark for Notebook revision"
-                      >
-                        <Bookmark className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1 block">Accuracy: {ov.accuracy}%</span>
                   </div>
 
-                  {/* Question Text */}
-                  <p className="text-sm text-slate-100 font-medium leading-relaxed whitespace-pre-wrap">
-                    {q.question_text}
-                  </p>
-
-                  {/* Options */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                    {q.options.map((opt, oIdx) => {
-                      const letter = String.fromCharCode(65 + oIdx);
-                      const isUserPick = q.selected_answer === str(opt.id) || q.selected_answer === opt.option_text;
-                      const isCorrectOpt = opt.is_correct;
-
-                      let optClass = 'bg-slate-950 border-slate-800 text-slate-300';
-                      if (isCorrectOpt) {
-                        optClass = 'bg-emerald-950/40 border-emerald-600 text-emerald-200 font-semibold';
-                      } else if (isUserPick && !isCorrect) {
-                        optClass = 'bg-rose-950/40 border-rose-600 text-rose-200 font-semibold';
-                      }
-
-                      return (
-                        <div key={opt.id} className={`p-3 rounded-xl border flex items-center gap-3 text-xs ${optClass}`}>
-                          <span className="w-5 h-5 rounded flex items-center justify-center font-bold bg-white/10 shrink-0">
-                            {letter}
-                          </span>
-                          <span className="flex-1">{opt.option_text}</span>
-                          {isCorrectOpt && <span className="text-[10px] text-emerald-400 font-extrabold uppercase">Correct</span>}
-                          {isUserPick && !isCorrectOpt && <span className="text-[10px] text-rose-400 font-extrabold uppercase">Your Pick</span>}
-                        </div>
-                      );
-                    })}
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Leaderboard Rank</span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-purple-400">#{ov.rank || 'N/A'}</span>
+                      <span className="text-xs text-slate-500">of {ov.total_participants}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Percentile: {ov.percentile !== null && ov.percentile !== undefined ? `${ov.percentile}%` : 'Too few attempts'}
+                    </span>
                   </div>
 
-                  {/* Solution & Class Stats */}
-                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                      <div className="flex items-center gap-4">
-                        <span>Time Spent: <strong className="text-slate-200">{q.time_spent_seconds}s</strong></span>
-                        <span>Class Avg: <strong className="text-slate-200">{q.class_avg_time_seconds}s</strong></span>
-                        <span>Class Accuracy: <strong className="text-slate-200">{q.class_accuracy_percentage}%</strong></span>
-                      </div>
-
-                      {/* Why I Got It Wrong Selector */}
-                      {!isCorrect && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-amber-400 font-semibold">Error Reason:</span>
-                          <select
-                            value={q.student_reason_tag}
-                            onChange={(e) => handleUpdateQuestionTag(q.question_id, e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-slate-200 py-1 px-2 focus:outline-none focus:border-blue-500"
-                          >
-                            <option value="NONE">Tag Error Reason...</option>
-                            <option value="CONCEPT_GAP">Concept Gap</option>
-                            <option value="CALCULATION">Calculation Error</option>
-                            <option value="SILLY">Silly Mistake</option>
-                            <option value="GUESS">Blind Guess</option>
-                            <option value="TIME_PRESSURE">Time Pressure</option>
-                            <option value="DIDNT_KNOW">Did Not Know Formula</option>
-                          </select>
-                        </div>
-                      )}
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Questions Attempted</span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400">{ov.qs_attempted}</span>
+                      <span className="text-xs text-slate-500">/ {ov.total_questions}</span>
                     </div>
+                    <span className="text-[11px] text-emerald-400 mt-1 block">+{ov.positive_score} pts / -{ov.negative_lost} pts</span>
+                  </div>
 
-                    {q.solution_text && (
-                      <div className="pt-2 border-t border-slate-800/80">
-                        <span className="text-xs font-bold text-emerald-400 block mb-1">Detailed Solution:</span>
-                        <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">
-                          {q.solution_text}
-                        </p>
-                      </div>
-                    )}
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Time Taken</span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-amber-400">{Math.round(ov.time_taken_seconds / 60)}</span>
+                      <span className="text-xs text-slate-500">/ {Math.round(ov.total_duration_seconds / 60)} min</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Cutoff: {ov.is_cleared_cutoff ? 'Cleared ✓' : 'Below Cutoff ✗'} ({ov.cutoff_score})
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {/* TAB 5: TIME MANAGEMENT */}
-      {activeTab === 'time' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Total Time Spent</span>
-              <span className="text-lg font-bold text-slate-100">
-                {Math.floor(result.time_analysis.total_time_spent / 60)}m {result.time_analysis.total_time_spent % 60}s
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Avg Time per Question</span>
-              <span className="text-lg font-bold text-blue-400">
-                {result.time_analysis.average_time_per_question}s
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-rose-400 block">Time on Wrong Answers</span>
-              <span className="text-lg font-bold text-rose-400">
-                {Math.floor(result.time_analysis.time_on_wrong / 60)}m {result.time_analysis.time_on_wrong % 60}s
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-xs text-amber-400 block">Time Wasted Total</span>
-              <span className="text-lg font-bold text-amber-400">
-                {Math.floor(result.time_analysis.time_wasted_total / 60)}m
-              </span>
-            </div>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-            <h3 className="text-sm font-bold text-slate-200">
-              Questions Taking &gt; 2x Ideal Time ({Math.round(result.time_analysis.ideal_time_per_question)}s ideal)
-            </h3>
-            {result.time_analysis.questions_over_2x_ideal.length === 0 ? (
-              <p className="text-xs text-slate-400">No time traps encountered. Excellent pace control.</p>
-            ) : (
-              <div className="space-y-2">
-                {result.time_analysis.questions_over_2x_ideal.map((q) => (
-                  <div key={q.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-300 truncate max-w-md">{q.question_text}</span>
-                    <span className="font-mono text-rose-400 font-bold shrink-0">{q.time_spent}s</span>
+                {/* Per-Subject Score Cards */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject Performance Cards</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(ov.subject_cards || []).map((sc) => (
+                      <div key={sc.subject_name} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-extrabold text-sm text-slate-200">{sc.subject_name}</span>
+                          <span className="text-xs font-bold text-blue-400">{sc.score} / {sc.max_marks}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, sc.percentage))}%` }} />
+                        </div>
+                        <div className="grid grid-cols-3 text-center pt-2 border-t border-slate-800/80 text-[11px]">
+                          <div>
+                            <span className="text-emerald-400 font-bold block">{sc.correct}</span>
+                            <span className="text-slate-500">Correct</span>
+                          </div>
+                          <div>
+                            <span className="text-rose-400 font-bold block">{sc.wrong}</span>
+                            <span className="text-slate-500">Wrong</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-300 font-bold block">{sc.accuracy}%</span>
+                            <span className="text-slate-500">Accuracy</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                {/* Note Down Your Learnings (3 editable notes) */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-200">Note Down Your Learnings</h3>
+                      <p className="text-xs text-slate-400">Save up to 3 personal action items or mistakes identified in this attempt.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveNotes}
+                      disabled={isSavingNotes}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      {notesSavedNotice ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Save className="w-3.5 h-3.5" />}
+                      {notesSavedNotice ? 'Saved!' : 'Save Notes'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {[0, 1, 2].map((idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={notes[idx]}
+                          onChange={(e) => {
+                            const updated = [...notes];
+                            updated[idx] = e.target.value;
+                            setNotes(updated);
+                          }}
+                          placeholder={`Key takeaway or correction #${idx + 1}...`}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. PERFORMANCE ANALYSIS */}
+            {personalTab === 'performance' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200">Test Breakdown Table</h3>
+                  <p className="text-xs text-slate-400">Subject-wise distribution of correct, wrong, unattempted, and unvisited questions.</p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400">
+                        <th className="py-2.5 px-3 font-bold">Subject</th>
+                        <th className="py-2.5 px-3 font-bold">Total Score</th>
+                        <th className="py-2.5 px-3 font-bold text-emerald-400">Attempted Correct</th>
+                        <th className="py-2.5 px-3 font-bold text-rose-400">Attempted Wrong</th>
+                        <th className="py-2.5 px-3 font-bold text-slate-400">Not Attempted</th>
+                        <th className="py-2.5 px-3 font-bold text-slate-500">Not Visited</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {testBreakdown.map((row, idx) => {
+                        const isTotal = row.subject === 'Total';
+                        return (
+                          <tr key={idx} className={isTotal ? 'bg-slate-950 font-bold text-slate-100' : 'text-slate-300'}>
+                            <td className="py-3 px-3">{row.subject}</td>
+                            <td className="py-3 px-3 text-blue-400 font-extrabold">{row.total_score}</td>
+                            <td className="py-3 px-3 text-emerald-400">{row.attempted_correct}</td>
+                            <td className="py-3 px-3 text-rose-400">{row.attempted_wrong}</td>
+                            <td className="py-3 px-3 text-slate-400">{row.not_attempted}</td>
+                            <td className="py-3 px-3 text-slate-500">{row.not_visited}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 3. SCORE POTENTIAL */}
+            {personalTab === 'potential' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-200">Score Potential Analysis</h3>
+                    <p className="text-xs text-slate-400">Recoverable marks if error reduction and pacing discipline were applied.</p>
+                  </div>
+                  <div className="group relative flex items-center gap-1.5 text-xs text-slate-400 cursor-help bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/60">
+                    <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Potential Formula</span>
+                    <div className="absolute right-0 top-full mt-2 hidden group-hover:block w-72 p-3 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl text-[11px] text-slate-300 z-30 leading-relaxed">
+                      {result.marks_analysis.formula_tooltip}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overall Comparison Bar */}
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-300">Overall Paper Score</span>
+                    <span className="text-emerald-400 font-bold">+{result.marks_analysis.gain} Potential Points Gain</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Actual Score:</span>
+                      <span className="font-extrabold text-blue-400">{result.marks_analysis.actual}</span>
+                    </div>
+                    <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex">
+                      <div
+                        className="bg-blue-600 h-full"
+                        style={{ width: `${Math.min(100, Math.max(0, (result.marks_analysis.actual / (ov.total_marks || 300)) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Potential Score:</span>
+                      <span className="font-extrabold text-emerald-400">{result.marks_analysis.potential}</span>
+                    </div>
+                    <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex">
+                      <div
+                        className="bg-emerald-500 h-full"
+                        style={{ width: `${Math.min(100, Math.max(0, (result.marks_analysis.potential / (ov.total_marks || 300)) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subject-Wise Potential Bars */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Potential Gain by Subject</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(result.marks_analysis.subject_potentials || []).map((sp) => (
+                      <div key={sp.subject} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-bold text-slate-200">{sp.subject}</span>
+                          <span className="text-emerald-400 font-bold">+{sp.gain} pts</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span>Actual: {sp.actual}</span>
+                          <span className="text-slate-300 font-bold">Potential: {sp.potential}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. ATTEMPT ANALYSIS */}
+            {personalTab === 'attempt' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-5">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200">Attempt Quality Classification</h3>
+                  <p className="text-xs text-slate-400">Questions categorized by accuracy and solve time relative to ideal thresholds.</p>
+                </div>
+
+                {/* 4 Classification Metric Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-900/40">
+                    <span className="text-[11px] font-bold text-emerald-400 uppercase block">Perfect Attempt</span>
+                    <span className="text-2xl font-extrabold text-emerald-300 mt-1 block">
+                      {result.attempt_strategy.summary.perfect}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Correct within ideal time</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-900/40">
+                    <span className="text-[11px] font-bold text-rose-400 uppercase block">Wasted Attempt</span>
+                    <span className="text-2xl font-extrabold text-rose-300 mt-1 block">
+                      {result.attempt_strategy.summary.wasted}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Wrong in &lt;25% ideal time</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-900/40">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase block">Overtime Attempt</span>
+                    <span className="text-2xl font-extrabold text-amber-300 mt-1 block">
+                      {result.attempt_strategy.summary.overtime}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Spent &gt; ideal time</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-900/40">
+                    <span className="text-[11px] font-bold text-purple-400 uppercase block">Confused Attempt</span>
+                    <span className="text-2xl font-extrabold text-purple-300 mt-1 block">
+                      {result.attempt_strategy.summary.confused}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Skipped after overtime</span>
+                  </div>
+                </div>
+
+                {/* Subject Summary Table */}
+                <div className="overflow-x-auto pt-2">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400">
+                        <th className="py-2.5 px-3 font-bold">Subject</th>
+                        <th className="py-2.5 px-3 font-bold text-emerald-400">Perfect</th>
+                        <th className="py-2.5 px-3 font-bold text-rose-400">Wasted</th>
+                        <th className="py-2.5 px-3 font-bold text-amber-400">Overtime</th>
+                        <th className="py-2.5 px-3 font-bold text-purple-400">Confused</th>
+                        <th className="py-2.5 px-3 font-bold text-slate-200">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {(result.attempt_strategy.subject_table || []).map((row) => (
+                        <tr key={row.subject}>
+                          <td className="py-2.5 px-3 font-bold text-slate-200">{row.subject}</td>
+                          <td className="py-2.5 px-3 text-emerald-400 font-bold">{row.perfect}</td>
+                          <td className="py-2.5 px-3 text-rose-400 font-bold">{row.wasted}</td>
+                          <td className="py-2.5 px-3 text-amber-400 font-bold">{row.overtime}</td>
+                          <td className="py-2.5 px-3 text-purple-400 font-bold">{row.confused}</td>
+                          <td className="py-2.5 px-3 font-extrabold text-slate-100">{row.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 5. TIME ANALYSIS */}
+            {personalTab === 'time' && (
+              <div className="space-y-6">
+                {/* Time Breakdown per Subject */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                  <h3 className="text-sm font-extrabold text-slate-200">Time Breakdown per Subject</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(result.time_analysis.time_breakdown || []).map((tb) => (
+                      <div key={tb.subject} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-200">{tb.subject}</span>
+                          <span className="text-blue-400 font-bold">{Math.round(tb.time_spent / 60)} min</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span>Attempted: {tb.attempted}/{tb.total_questions}</span>
+                          <span>Accuracy: {tb.accuracy}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quality of Time Spent */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                  <h3 className="text-sm font-extrabold text-slate-200">Quality of Time Spent</h3>
+                  <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900/30">
+                      <span className="text-emerald-400 font-extrabold text-lg block">
+                        {Math.round(result.time_analysis.quality_of_time.time_on_correct / 60)}m
+                      </span>
+                      <span className="text-slate-400 text-[11px]">Time on Correct</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/30">
+                      <span className="text-rose-400 font-extrabold text-lg block">
+                        {Math.round(result.time_analysis.quality_of_time.time_on_incorrect / 60)}m
+                      </span>
+                      <span className="text-slate-400 text-[11px]">Time on Incorrect</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-300 font-extrabold text-lg block">
+                        {Math.round(result.time_analysis.quality_of_time.time_on_unattempted / 60)}m
+                      </span>
+                      <span className="text-slate-400 text-[11px]">Time on Unattempted</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Journey Table by 30-min slot */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                  <h3 className="text-sm font-extrabold text-slate-200">Time Journey (30-Minute Windows)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400">
+                          <th className="py-2.5 px-3 font-bold">Exam Slot</th>
+                          <th className="py-2.5 px-3 font-bold text-emerald-400">Correct Solved</th>
+                          <th className="py-2.5 px-3 font-bold text-rose-400">Incorrect Solved</th>
+                          <th className="py-2.5 px-3 font-bold text-slate-200">Overall Attempted</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                        {(result.time_analysis.time_journey || []).map((tj) => (
+                          <tr key={tj.slot}>
+                            <td className="py-2.5 px-3 font-bold text-slate-200">{tj.slot}</td>
+                            <td className="py-2.5 px-3 text-emerald-400 font-bold">{tj.correct}</td>
+                            <td className="py-2.5 px-3 text-rose-400 font-bold">{tj.incorrect}</td>
+                            <td className="py-2.5 px-3 text-slate-100 font-extrabold">{tj.overall}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 6. DIFFICULTY ANALYSIS */}
+            {personalTab === 'difficulty' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200">Difficulty Level Performance</h3>
+                  <p className="text-xs text-slate-400">Accuracy and strike rate across Easy, Moderate, and Tough questions.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(result.comparison?.difficulty_analysis?.overall || []).map((diff) => (
+                    <div key={diff.difficulty} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-extrabold text-slate-200">{diff.difficulty}</span>
+                        <span className="text-blue-400 font-bold">{diff.total} Questions</span>
+                      </div>
+                      <div className="grid grid-cols-3 text-center text-[11px] pt-1">
+                        <div>
+                          <span className="text-emerald-400 font-bold block">{diff.correct}</span>
+                          <span className="text-slate-500">Correct</span>
+                        </div>
+                        <div>
+                          <span className="text-rose-400 font-bold block">{diff.wrong}</span>
+                          <span className="text-slate-500">Wrong</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-bold block">{diff.skipped}</span>
+                          <span className="text-slate-500">Skipped</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 7. QUESTION JOURNEY */}
+            {personalTab === 'journey' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-5">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200">Chronological Question Journey</h3>
+                  <p className="text-xs text-slate-400">Visual pathway of every question visited with revisit indicators.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  {(result.comparison?.question_journey || []).map((box, idx) => {
+                    const isCorrect = box.status === 'CORRECT';
+                    const isWrong = box.status === 'WRONG';
+                    return (
+                      <div
+                        key={idx}
+                        className={`relative w-11 h-11 rounded-xl font-extrabold text-xs flex flex-col items-center justify-center border transition-all ${
+                          isCorrect
+                            ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-300'
+                            : isWrong
+                            ? 'bg-rose-950/80 border-rose-700/80 text-rose-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-400'
+                        }`}
+                        title={`Q#${box.q_no} (${box.subject}) - ${box.status} | Time: ${box.time_spent}s | Visits: ${box.revisits}`}
+                      >
+                        <span>{box.q_no}</span>
+                        {box.has_revisit && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-[9px] text-black font-extrabold flex items-center justify-center">
+                            {box.revisits}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 pt-3 border-t border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-emerald-600 inline-block" />
+                    <span>Correct</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-rose-600 inline-block" />
+                    <span>Wrong</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-slate-800 border border-slate-700 inline-block" />
+                    <span>Skipped</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-black font-extrabold text-[9px] flex items-center justify-center">2</span>
+                    <span>Revisited (&gt;1 visits)</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 8. QS BY QS ANALYSIS */}
+            {personalTab === 'questions' && (
+              <div className="space-y-6">
+                {/* Painful Questions Table */}
+                {(result.comparison?.painful_questions || []).length > 0 && (
+                  <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-rose-400" />
+                      <h3 className="text-sm font-extrabold text-rose-300">Painful Questions (Wasted, Overtime or Wrong)</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-rose-900/40 text-slate-400">
+                            <th className="py-2 px-3 font-bold">Q#</th>
+                            <th className="py-2 px-3 font-bold">Subject</th>
+                            <th className="py-2 px-3 font-bold">Topic</th>
+                            <th className="py-2 px-3 font-bold">Difficulty</th>
+                            <th className="py-2 px-3 font-bold">Time Spent</th>
+                            <th className="py-2 px-3 font-bold text-rose-400">Issue</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-rose-900/20 text-slate-300">
+                          {result.comparison.painful_questions.map((pq, idx) => (
+                            <tr key={idx}>
+                              <td className="py-2.5 px-3 font-bold text-slate-100">Q#{pq.q_no}</td>
+                              <td className="py-2.5 px-3">{pq.subject}</td>
+                              <td className="py-2.5 px-3">{pq.topic}</td>
+                              <td className="py-2.5 px-3">{pq.difficulty}</td>
+                              <td className="py-2.5 px-3 text-amber-400">{pq.time_spent}s (Ideal: {pq.ideal_time}s)</td>
+                              <td className="py-2.5 px-3 font-bold text-rose-400">{pq.issue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter and Complete Breakdown Table */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h3 className="text-sm font-extrabold text-slate-200">Complete Question-by-Question Breakdown</h3>
+
+                    {/* Filter controls */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={qSubjectFilter}
+                        onChange={(e) => setQSubjectFilter(e.target.value)}
+                        className="bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 py-1.5 px-2.5 focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="All">All Subjects</option>
+                        {sectionsList.map((s) => (
+                          <option key={s.id} value={s.subject_name}>{s.subject_name}</option>
+                        ))}
+                      </select>
+
+                      {[
+                        { key: 'all', label: 'All' },
+                        { key: 'correct', label: 'Correct' },
+                        { key: 'wrong', label: 'Wrong' },
+                        { key: 'skipped', label: 'Skipped' },
+                        { key: 'bookmarked', label: 'Bookmarked' },
+                      ].map((tab) => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setQTypeFilter(tab.key as 'all' | 'correct' | 'wrong' | 'skipped' | 'bookmarked')}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            qTypeFilter === tab.key
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400">
+                          <th className="py-2.5 px-3 font-bold">Q#</th>
+                          <th className="py-2.5 px-3 font-bold">Subject</th>
+                          <th className="py-2.5 px-3 font-bold">Chapter / Topic</th>
+                          <th className="py-2.5 px-3 font-bold">Difficulty</th>
+                          <th className="py-2.5 px-3 font-bold">Time</th>
+                          <th className="py-2.5 px-3 font-bold">Status</th>
+                          <th className="py-2.5 px-3 font-bold">Marks</th>
+                          <th className="py-2.5 px-3 font-bold text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                        {filteredQuestions.map((q) => (
+                          <tr key={q.question_id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="py-3 px-3 font-bold text-slate-100">Q#{q.order}</td>
+                            <td className="py-3 px-3">{q.subject_name}</td>
+                            <td className="py-3 px-3">{q.chapter_name}</td>
+                            <td className="py-3 px-3">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                                {q.difficulty}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">{q.time_spent_seconds}s</td>
+                            <td className="py-3 px-3">
+                              {q.is_correct ? (
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Correct
+                                </span>
+                              ) : q.selected_answer ? (
+                                <span className="text-rose-400 font-bold flex items-center gap-1">
+                                  <XCircle className="w-3.5 h-3.5" /> Wrong
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 font-medium">Skipped</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 font-bold">
+                              {q.marks_awarded > 0 ? (
+                                <span className="text-emerald-400">+{q.marks_awarded}</span>
+                              ) : q.marks_awarded < 0 ? (
+                                <span className="text-rose-400">{q.marks_awarded}</span>
+                              ) : (
+                                <span className="text-slate-500">0</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setActiveModalQuestion(q)}
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all border border-blue-500/30"
+                              >
+                                View Solution
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 9. RECOMMENDATIONS */}
+            {personalTab === 'recommendations' && (
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-5">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200">Targeted Study Recommendations</h3>
+                  <p className="text-xs text-slate-400">Direct remedial lectures, DPPs, and formula sheets for identified weak chapters.</p>
+                </div>
+
+                <div className="space-y-4">
+                  {(result.recommendations || []).map((rec) => (
+                    <div key={rec.chapter_id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-slate-100">{rec.chapter_name}</span>
+                            <Badge variant="outline" className="text-rose-400 border-rose-900/60 bg-rose-950/40 text-[10px]">
+                              {rec.accuracy}% Accuracy
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-slate-400">{rec.subject_name}</span>
+                        </div>
+
+                        <Link
+                          href={`/practice?chapter=${rec.chapter_id}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm"
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                          Practice Weak Chapter
+                        </Link>
+                      </div>
+
+                      {/* Attached curriculum resources */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 font-bold block mb-1">Lectures ({rec.lectures?.length || 0})</span>
+                          <ul className="space-y-1 text-slate-300">
+                            {(rec.lectures || []).map((lec) => (
+                              <li key={lec.id} className="truncate">
+                                <Link href="/learn" className="hover:text-blue-400 hover:underline flex items-center gap-1">
+                                  <PlayCircle className="w-3 h-3 text-blue-400 shrink-0" />
+                                  <span className="truncate">{lec.title}</span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <span className="text-slate-400 font-bold block mb-1">Practice DPPs ({rec.dpps?.length || 0})</span>
+                          <ul className="space-y-1 text-slate-300">
+                            {(rec.dpps || []).map((dpp) => (
+                              <li key={dpp.id} className="truncate">
+                                <Link href="/practice" className="hover:text-blue-400 hover:underline flex items-center gap-1">
+                                  <Target className="w-3 h-3 text-emerald-400 shrink-0" />
+                                  <span className="truncate">{dpp.title}</span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <span className="text-slate-400 font-bold block mb-1">Study Handouts ({rec.materials?.length || 0})</span>
+                          <ul className="space-y-1 text-slate-300">
+                            {(rec.materials || []).map((mat) => (
+                              <li key={mat.id} className="truncate">
+                                <Link href="/materials" className="hover:text-blue-400 hover:underline flex items-center gap-1">
+                                  <FileText className="w-3 h-3 text-purple-400 shrink-0" />
+                                  <span className="truncate">{mat.title}</span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB 6: ATTEMPT STRATEGY */}
-      {activeTab === 'strategy' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 block">Fast Answers (&lt; 10s Blind Guesses)</span>
-            <span className="text-2xl font-extrabold text-amber-400">{result.attempt_strategy.guess_count}</span>
-            <p className="text-xs text-slate-500">Rapid answers often indicate instinctive guesses or memorized shortcuts.</p>
-          </div>
-
-          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 block">Unattempted Easy Questions</span>
-            <span className="text-2xl font-extrabold text-rose-400">{result.attempt_strategy.unattempted_easy_count}</span>
-            <p className="text-xs text-slate-500">Missed opportunities on standard formula-based questions.</p>
-          </div>
-
-          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 block">Marked for Review Count</span>
-            <span className="text-2xl font-extrabold text-purple-400">{result.attempt_strategy.marked_for_review_count}</span>
-            <p className="text-xs text-slate-500">Questions tagged to re-evaluate in the final pass.</p>
-          </div>
-
-          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 block">Total Answer Changes</span>
-            <span className="text-2xl font-extrabold text-blue-400">{result.attempt_strategy.total_answer_changes}</span>
-            <p className="text-xs text-slate-500">Frequency of revising initial choices before final submission.</p>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 7: MARKS ANALYSIS */}
-      {activeTab === 'marks' && (
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Current Realized Score</span>
-              <span className="text-2xl font-extrabold text-blue-400">{result.marks_analysis.actual_score}</span>
+      {/* =========================================================================
+          TAB 2: COMPARATIVE BENCHMARKING (Student vs Cohort)
+      ========================================================================== */}
+      {mainTab === 'COMPARATIVE' && (
+        <div className="space-y-6">
+          {!cohort?.has_enough_cohort_data ? (
+            <div className="p-8 rounded-2xl bg-slate-900 border border-slate-800 text-center space-y-3 max-w-xl mx-auto">
+              <div className="w-12 h-12 rounded-xl bg-amber-950/60 border border-amber-900/60 text-amber-400 mx-auto flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-extrabold text-slate-200">Not Enough Attempts Yet</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {cohort?.message || 'A minimum of 10 submitted test attempts from students is required to compute reliable comparative cohort statistics.'}
+              </p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Potential (Zero Negatives)</span>
-              <span className="text-2xl font-extrabold text-emerald-400">{result.marks_analysis.potential_no_negatives}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 block">Potential (+ Solved Easy Skipped)</span>
-              <span className="text-2xl font-extrabold text-purple-400">{result.marks_analysis.potential_easy_solved}</span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 leading-relaxed">
-            By eliminating negative marking alone, your score would increase by{' '}
-            <strong className="text-rose-400">+{result.marks_analysis.negative_marks_lost} marks</strong>. Solving unattempted easy questions yields an additional{' '}
-            <strong className="text-emerald-400">+{result.marks_analysis.marks_lost_easy} marks</strong>.
-          </div>
-        </div>
-      )}
-
-      {/* TAB 8: COMPARE */}
-      {activeTab === 'compare' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-900/60">
-              <span className="text-xs text-blue-300 block font-semibold">You</span>
-              <span className="text-xl font-extrabold text-white">{result.comparison.student.score}</span>
-              <span className="text-[11px] text-slate-400 block">{result.comparison.student.accuracy}% accuracy</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-              <span className="text-xs text-slate-400 block font-semibold">Test Average</span>
-              <span className="text-xl font-extrabold text-slate-300">{result.comparison.average.score}</span>
-              <span className="text-[11px] text-slate-400 block">{result.comparison.average.accuracy}% accuracy</span>
-            </div>
-            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-900/60">
-              <span className="text-xs text-emerald-300 block font-semibold">Test Topper</span>
-              <span className="text-xl font-extrabold text-emerald-400">{result.comparison.topper.score}</span>
-              <span className="text-[11px] text-slate-400 block">{result.comparison.topper.accuracy}% accuracy</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 9: RECOMMENDATIONS */}
-      {activeTab === 'recommendations' && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-slate-100">Recommended Targeted Study Links</h3>
-          {result.recommendations.length === 0 ? (
-            <p className="text-xs text-slate-400">Outstanding performance across all tested chapters.</p>
           ) : (
-            result.recommendations.map((rec) => (
-              <div key={rec.chapter_id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-100">{rec.chapter_name}</h4>
-                    <span className="text-xs text-blue-400 font-medium">{rec.subject_name}</span>
-                  </div>
-                  <Badge variant="rose">Accuracy: {rec.accuracy}%</Badge>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+              {/* Left Sub-Nav for Comparative */}
+              <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-2.5 space-y-1">
+                {[
+                  { key: 'performance', label: 'Performance' },
+                  { key: 'attempt', label: 'Attempt Quality' },
+                  { key: 'time', label: 'Time & Pacing' },
+                  { key: 'difficulty', label: 'Difficulty Breakdown' },
+                ].map((nav) => (
+                  <button
+                    key={nav.key}
+                    type="button"
+                    onClick={() => setCompTab(nav.key as ComparativeSubNav)}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                      compTab === nav.key
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <span>{nav.label}</span>
+                    {compTab === nav.key && <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+
+              {/* Right Content Panel for Comparative */}
+              <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-200 capitalize">
+                    {compTab} Comparison (You vs. Top 10% vs. Top 25% vs. Average)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Cohort statistics computed server-side across {cohort.total_participants} submitted student attempts.
+                  </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 pt-2">
-                  <Link
-                    href="/practice"
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 transition-colors"
-                  >
-                    <Target className="w-3.5 h-3.5" />
-                    Solve Practice DPPs
-                  </Link>
-
-                  <Link
-                    href="/learn"
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-950/60 hover:bg-blue-900/60 text-blue-300 border border-blue-800 flex items-center gap-1.5 transition-colors"
-                  >
-                    <PlayCircle className="w-3.5 h-3.5" />
-                    Watch Lectures
-                  </Link>
-
-                  <Link
-                    href="/materials"
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Formula Sheets
-                  </Link>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400">
+                        <th className="py-2.5 px-3 font-bold">Cohort Benchmark</th>
+                        <th className="py-2.5 px-3 font-bold">Total Score</th>
+                        <th className="py-2.5 px-3 font-bold">Accuracy %</th>
+                        <th className="py-2.5 px-3 font-bold">Attempted Qs</th>
+                        <th className="py-2.5 px-3 font-bold">Time Taken</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {(cohort.rows || []).map((crow) => {
+                        const isYou = crow.label === 'You';
+                        return (
+                          <tr key={crow.label} className={isYou ? 'bg-blue-950/40 text-blue-300 font-extrabold' : 'text-slate-300'}>
+                            <td className="py-3 px-3 flex items-center gap-2">
+                              {crow.label}
+                              {isYou && <span className="px-1.5 py-0.5 rounded bg-blue-600 text-[10px] text-white">Your Attempt</span>}
+                            </td>
+                            <td className="py-3 px-3 font-bold">{crow.score}</td>
+                            <td className="py-3 px-3">{crow.accuracy}%</td>
+                            <td className="py-3 px-3">{crow.attempted_qs}</td>
+                            <td className="py-3 px-3">{Math.round(crow.time_taken / 60)} min</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            ))
+            </div>
           )}
+        </div>
+      )}
+
+      {/* =========================================================================
+          QUESTION DETAIL & SOLUTION MODAL
+      ========================================================================== */}
+      {activeModalQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-base text-slate-100">
+                  Question #{activeModalQuestion.order} ({activeModalQuestion.subject_name})
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                  {activeModalQuestion.difficulty}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModalQuestion(null)}
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Question Text */}
+            <div className="text-sm text-slate-200 leading-relaxed font-medium bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+              {activeModalQuestion.question_text}
+            </div>
+
+            {/* Options */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Answer Options</span>
+              {activeModalQuestion.options.map((opt) => {
+                const isSelected = activeModalQuestion.selected_answer === opt.id || activeModalQuestion.selected_answer === opt.option_text;
+                const isCorrect = opt.is_correct;
+                return (
+                  <div
+                    key={opt.id}
+                    className={`p-3 rounded-xl border text-xs flex justify-between items-center ${
+                      isCorrect
+                        ? 'bg-emerald-950/40 border-emerald-600/80 text-emerald-300 font-bold'
+                        : isSelected
+                        ? 'bg-rose-950/40 border-rose-600/80 text-rose-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <span>{opt.option_text}</span>
+                    {isCorrect && <span className="text-[10px] text-emerald-400">Correct Answer ✓</span>}
+                    {isSelected && !isCorrect && <span className="text-[10px] text-rose-400">Your Pick ✗</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Verified Faculty Solution */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Verified Solution</span>
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
+                {activeModalQuestion.solution_text || 'Detailed LaTeX solution verified by ANKIT JEE faculties.'}
+              </div>
+            </div>
+
+            {/* Cohort Statistics */}
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+              <div>
+                <span className="text-slate-500 block">Class Accuracy Rate</span>
+                <span className="font-extrabold text-blue-400 text-sm">{activeModalQuestion.class_accuracy_percentage}%</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Class Average Solve Time</span>
+                <span className="font-extrabold text-amber-400 text-sm">{activeModalQuestion.class_avg_time_seconds}s</span>
+              </div>
+            </div>
+
+            {/* Student Diagnostics: Error Tag & Bookmark */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400 font-bold">Why I got it wrong:</span>
+                <select
+                  value={activeModalQuestion.student_reason_tag}
+                  onChange={(e) => handleUpdateReasonTag(activeModalQuestion, e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 py-1.5 px-2 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="NONE">None / Not set</option>
+                  <option value="CONCEPT_GAP">Concept Gap</option>
+                  <option value="CALCULATION">Calculation Error</option>
+                  <option value="SILLY">Silly Mistake</option>
+                  <option value="GUESS">Fluke / Blind Guess</option>
+                  <option value="TIME_PRESSURE">Time Pressure</option>
+                  <option value="DIDNT_KNOW">Did Not Know Formula</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleToggleBookmark(activeModalQuestion)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeModalQuestion.is_bookmarked
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                {activeModalQuestion.is_bookmarked ? 'Bookmarked in Notebook' : 'Add to Notebook'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
-}
-
-function str(val: unknown): string {
-  return String(val ?? '');
 }
