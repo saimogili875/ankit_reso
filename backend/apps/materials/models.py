@@ -17,6 +17,10 @@ class StudyMaterial(TimeStampedModel):
     # Cloudflare R2 object reference key for stored PDF/document
     r2_object_key = models.CharField(max_length=500)
     file_size_bytes = models.BigIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"[{self.material_type}] {self.title}"

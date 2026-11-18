@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from .models import User, StudentProfile
 
 class StudentProfileSerializer(serializers.ModelSerializer):
@@ -9,15 +10,22 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     student_profile = StudentProfileSerializer(read_only=True)
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'role', 'phone_number', 'is_verified', 'student_profile']
-        read_only_fields = ['id', 'is_verified']
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'role', 'phone_number', 'is_verified', 'is_admin', 'student_profile'
+        ]
+        read_only_fields = ['id', 'is_verified', 'is_admin']
+
+    def get_is_admin(self, obj):
+        return bool(obj.role == User.Role.ADMIN or obj.is_superuser)
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
     first_name = serializers.CharField(required=False, allow_blank=True, default='')
     last_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(required=False, allow_blank=True, default='')
@@ -28,6 +36,10 @@ class RegisterSerializer(serializers.Serializer):
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value.lower()
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
 
     def create(self, validated_data):
         target_exam = validated_data.pop('target_exam', 'BOTH')
@@ -54,30 +66,49 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.CharField(required=False, allow_blank=True)
+    identifier = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True)
+    portal = serializers.ChoiceField(choices=['student', 'admin'], default='student', required=False)
+    remember_me = serializers.BooleanField(default=False, required=False)
 
     def validate(self, data):
-        email = data.get('email', '').lower()
+        identifier = (data.get('identifier') or data.get('email') or '').strip()
         password = data.get('password', '')
+        portal = data.get('portal', 'student').lower()
 
-        if not email or not password:
-            raise serializers.ValidationError("Both email and password are required.")
+        if not identifier or not password:
+            raise serializers.ValidationError("Both username/email and password are required.")
 
-        user = authenticate(username=email, password=password)
-        if not user:
-            # Fallback check if authenticated via email directly
-            try:
-                u = User.objects.get(email__iexact=email)
-                if u.check_password(password):
-                    user = u
-            except User.DoesNotExist:
-                pass
+        GENERIC_ERROR = "Invalid credentials. Please check your username and password."
 
-        if not user:
-            raise serializers.ValidationError("Invalid email or password.")
+        user = None
+        if '@' in identifier:
+            user = User.objects.filter(email__iexact=identifier).first()
+        else:
+            phone_matches = User.objects.filter(phone_number=identifier)
+            count = phone_matches.count()
+            if count > 1:
+                raise serializers.ValidationError("Multiple accounts found with this phone number. Please use your email to log in.")
+            elif count == 1:
+                user = phone_matches.first()
+            else:
+                user = User.objects.filter(username__iexact=identifier).first()
+
+        if not user or not user.check_password(password):
+            raise serializers.ValidationError(GENERIC_ERROR)
+
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled.")
+
+        is_admin_user = (user.role == User.Role.ADMIN or user.is_superuser)
+
+        if portal == 'admin':
+            if not is_admin_user:
+                raise serializers.ValidationError(GENERIC_ERROR)
+        elif portal == 'student':
+            if is_admin_user:
+                raise serializers.ValidationError("Use Admin login")
 
         data['user'] = user
         return data

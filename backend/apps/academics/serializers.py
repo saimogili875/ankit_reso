@@ -14,14 +14,23 @@ class SubjectSerializer(serializers.ModelSerializer):
 class CourseSerializer(serializers.ModelSerializer):
     classes = AcademicClassSerializer(many=True, read_only=True)
     subjects = SubjectSerializer(many=True, read_only=True)
+    is_enrolled = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'slug', 'subtitle', 'description', 
-            'price', 'original_price', 'discount_badge', 'is_free', 
-            'is_published', 'classes', 'subjects'
+            'id', 'title', 'slug', 'subtitle', 'description',
+            'thumbnail_url', 'exam_type', 'price', 'original_price',
+            'discount_badge', 'is_free', 'features', 'start_date', 'end_date',
+            'status', 'is_published', 'allow_self_enrollment',
+            'classes', 'subjects', 'is_enrolled', 'created_at'
         ]
+
+    def get_is_enrolled(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        return Enrollment.objects.filter(user=request.user, course=obj, status='ACTIVE').exists()
 
 class LectureSerializer(serializers.ModelSerializer):
     class Meta:

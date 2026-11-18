@@ -16,7 +16,7 @@ class R2StorageClient:
         self.account_id = getattr(settings, 'R2_ACCOUNT_ID', '')
         self.access_key_id = getattr(settings, 'R2_ACCESS_KEY_ID', '')
         self.secret_access_key = getattr(settings, 'R2_SECRET_ACCESS_KEY', '')
-        self.bucket_name = getattr(settings, 'R2_BUCKET_NAME', 'ankit-jee-storage')
+        self.bucket_name = getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
         self.endpoint_url = getattr(settings, 'R2_ENDPOINT', '') or (
             f"https://{self.account_id}.r2.cloudflarestorage.com" if self.account_id else ""
         )

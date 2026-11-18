@@ -34,8 +34,15 @@ class Subject(TimeStampedModel):
     """
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
     icon = models.CharField(max_length=50, blank=True)
     color_hex = models.CharField(max_length=10, default='#3B82F6')
+    topics = models.JSONField(default=list, blank=True)
+    order = models.IntegerField(default=0)
+    is_visible = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'name']
 
     def __str__(self):
         return self.name
@@ -45,15 +52,31 @@ class Course(TimeStampedModel):
     Central Course product (e.g. JEE Main + Advanced Complete Preparation Course).
     Aggregates AcademicClasses and Subjects.
     """
+    class ExamType(models.TextChoices):
+        JEE_MAIN = 'JEE_MAIN', 'JEE Main'
+        JEE_ADVANCED = 'JEE_ADVANCED', 'JEE Advanced'
+        BOTH = 'BOTH', 'JEE Main & Advanced'
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        PUBLISHED = 'PUBLISHED', 'Published'
+
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     subtitle = models.CharField(max_length=500, blank=True)
     description = models.TextField(blank=True)
+    thumbnail_url = models.CharField(max_length=500, blank=True, default='/images/hero/slide-1.jpg')
+    exam_type = models.CharField(max_length=50, choices=ExamType.choices, default=ExamType.BOTH)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     original_price = models.DecimalField(max_digits=10, decimal_places=2, default=7999.00)
     discount_badge = models.CharField(max_length=50, default='100% OFF (FREE)')
     is_free = models.BooleanField(default=True)
+    features = models.JSONField(default=list, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PUBLISHED)
     is_published = models.BooleanField(default=True)
+    allow_self_enrollment = models.BooleanField(default=True)
     classes = models.ManyToManyField(AcademicClass, related_name='courses', blank=True)
     subjects = models.ManyToManyField(Subject, related_name='courses', blank=True)
 

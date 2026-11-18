@@ -3,7 +3,7 @@ from .r2 import R2StorageClient
 
 class StorageService:
     """
-    High-level Storage Service abstraction for ANKIT JEE application.
+    High-level Storage Service abstraction for AdeptEduverse application.
     Encapsulates cloud file path conventions (/videos/, /thumbnails/, /materials/, /images/)
     and abstracts the underlying storage provider (Cloudflare R2).
     """

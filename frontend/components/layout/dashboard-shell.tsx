@@ -22,9 +22,19 @@ const AUTH_PATHS = [
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   const pathname = usePathname();
-  const isAuthPage = AUTH_PATHS.some((path) => pathname === path || pathname?.startsWith('/admin/login') || pathname?.startsWith('/admin/forgot') || pathname?.startsWith('/admin/reset'));
 
-  if (isAuthPage) {
+  const isAuthPage = AUTH_PATHS.some(
+    (path) =>
+      pathname === path ||
+      pathname?.startsWith('/admin/login') ||
+      pathname?.startsWith('/admin/forgot') ||
+      pathname?.startsWith('/admin/reset')
+  );
+
+  // Admin pages have their own dedicated admin layout and header
+  const isAdminPage = pathname?.startsWith('/admin');
+
+  if (isAuthPage || isAdminPage) {
     return <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">{children}</div>;
   }
 

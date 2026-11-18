@@ -1,4 +1,5 @@
-from rest_framework import generics, permissions, status
+from django.db import models
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -7,42 +8,54 @@ from .models import Question, QuestionOption, PYQ, DPP, DPPQuestion
 from .serializers import QuestionSerializer, DPPSerializer, DPPQuestionSerializer
 
 class DPPListView(generics.ListAPIView):
-    permission_classes = [permissions.AllowAny]
     serializer_class = DPPSerializer
 
     def get_queryset(self):
         queryset = DPP.objects.filter(is_published=True)
         chapter_param = self.request.query_params.get('chapter', None)
+        subject_param = self.request.query_params.get('subject', None)
+
         if chapter_param:
-            if chapter_param.isdigit():
-                queryset = queryset.filter(chapter_id=int(chapter_param))
-            else:
+            try:
+                queryset = queryset.filter(
+                    models.Q(chapter_id=chapter_param) |
+                    models.Q(chapter__slug=chapter_param)
+                )
+            except Exception:
                 queryset = queryset.filter(chapter__slug=chapter_param)
-        return queryset
+
+        if subject_param:
+            try:
+                queryset = queryset.filter(
+                    models.Q(chapter__category__subject_id=subject_param) |
+                    models.Q(chapter__category__subject__slug=subject_param)
+                )
+            except Exception:
+                queryset = queryset.filter(chapter__category__subject__slug=subject_param)
+
+        return queryset.order_by('dpp_number', 'title')
 
 class DPPQuestionsView(APIView):
-    permission_classes = [permissions.AllowAny]
-
     def get(self, request, pk):
+        dpp = None
         try:
-            if pk.isdigit():
-                dpp = DPP.objects.get(pk=int(pk))
-            else:
-                dpp = DPP.objects.get(title__icontains=pk)
-        except DPP.DoesNotExist:
+            dpp = DPP.objects.filter(models.Q(id=pk) | models.Q(title__icontains=pk)).first()
+        except Exception:
+            dpp = DPP.objects.filter(title__icontains=pk).first()
+
+        if not dpp:
             return Response({'error': 'DPP not found'}, status=status.HTTP_404_NOT_FOUND)
 
         dpp_questions = dpp.dpp_questions.all().order_by('order')
         dpp_data = DPPSerializer(dpp).data
         
-        # Transform questions format to include options and question details
         questions_list = []
         for dq in dpp_questions:
             q = dq.question
             options_list = []
             correct_ans_id = 'A'
             for idx, opt in enumerate(q.options.all()):
-                opt_letter = chr(65 + idx) # A, B, C, D
+                opt_letter = chr(65 + idx)
                 if opt.is_correct:
                     correct_ans_id = str(opt.id) if str(opt.id) else opt_letter
                 options_list.append({
@@ -65,15 +78,17 @@ class DPPQuestionsView(APIView):
         return Response(dpp_data)
 
 class DPPSubmitView(APIView):
-    permission_classes = [permissions.AllowAny]
-
     def post(self, request, pk):
+        dpp = None
         try:
-            dpp = DPP.objects.get(pk=pk) if pk.isdigit() else DPP.objects.get(title__icontains=pk)
-        except DPP.DoesNotExist:
+            dpp = DPP.objects.filter(models.Q(id=pk) | models.Q(title__icontains=pk)).first()
+        except Exception:
+            dpp = DPP.objects.filter(title__icontains=pk).first()
+
+        if not dpp:
             return Response({'error': 'DPP not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        answers = request.data.get('answers', {}) # dict of {question_id: option_id}
+        answers = request.data.get('answers', {})
         dpp_questions = dpp.dpp_questions.all()
 
         correct = 0
@@ -88,7 +103,6 @@ class DPPSubmitView(APIView):
             if not user_ans:
                 continue
 
-            # Check if user selected correct option
             is_correct = False
             for opt in q.options.all():
                 if opt.is_correct and (str(opt.id) == user_ans or opt.option_text == user_ans):
@@ -105,14 +119,7 @@ class DPPSubmitView(APIView):
         unattempted = max(0, total - (correct + incorrect))
         accuracy = round((correct / (correct + incorrect)) * 100, 2) if (correct + incorrect) > 0 else 0.0
 
-        user = request.user if request.user.is_authenticated else None
-        if not user:
-            from apps.accounts.models import User
-            user, _ = User.objects.get_or_create(
-                email='demo_student@ankitjee.com',
-                defaults={'username': 'demo_student', 'first_name': 'Student', 'last_name': 'Demo'}
-            )
-
+        user = request.user
         attempt = DPPAttempt.objects.create(
             user=user,
             dpp=dpp,
@@ -126,8 +133,8 @@ class DPPSubmitView(APIView):
         )
 
         return Response({
-            'attempt_id': attempt.id,
-            'dpp_id': dpp.id,
+            'attempt_id': str(attempt.id),
+            'dpp_id': str(dpp.id),
             'dpp_title': dpp.title,
             'total': total,
             'score': score,

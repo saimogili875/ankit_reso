@@ -1,5 +1,5 @@
 """
-ANKIT JEE Backend Configuration Package.
+AdeptEduverse Backend Configuration Package.
 """
 from .celery import app as celery_app
 

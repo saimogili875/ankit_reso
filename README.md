@@ -1,4 +1,4 @@
-# ANKIT JEE — EdTech Platform
+# AdeptEduverse — EdTech Platform
 
 A production-ready EdTech platform for **JEE Main** and **JEE Advanced** preparation. Provides video lectures, previous-year question (PYQ) banks, computer-based mock tests (CBT), detailed performance analytics, and study material downloads.
 
@@ -32,7 +32,7 @@ A production-ready EdTech platform for **JEE Main** and **JEE Advanced** prepara
 ## 📁 Repository Structure
 
 ```
-ankit-jee/
+adepteduverse/
 ├── frontend/                 # Next.js 15 TypeScript application
 │   ├── app/                  # App Router pages (learn, tests, progress, materials, profile)
 │   ├── components/           # UI components (ui, layout, dashboard)
@@ -75,8 +75,8 @@ ankit-jee/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/ankit/ankit-jee.git
-   cd ankit-jee
+   git clone https://github.com/adepteduverse/adepteduverse.git
+   cd adepteduverse
    ```
 
 2. **Setup environment variables**:
@@ -150,7 +150,7 @@ To configure R2 storage, update the following keys in `.env`:
 R2_ACCOUNT_ID=your_cloudflare_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key_id
 R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
-R2_BUCKET_NAME=ankit-jee-storage
+R2_BUCKET_NAME=adepteduverse-storage
 R2_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com
 ```
 

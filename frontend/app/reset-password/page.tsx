@@ -50,7 +50,7 @@ export default function StudentResetPasswordPage() {
       <AuthCard>
         <AuthHeader
           title="Create a new password"
-          subtitle="Please set a strong password to secure your Ankit JEE account."
+          subtitle="Please set a strong password to secure your AdeptEduverse account."
         />
 
         <FormMessage type="error" message={errorMessage} />

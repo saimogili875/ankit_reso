@@ -1,8 +1,8 @@
-# ANKIT JEE — System Architecture & Design Document
+# AdeptEduverse — System Architecture & Design Document
 
 ## 1. Executive System Overview
 
-ANKIT JEE is a production-grade, highly responsive EdTech platform tailored for **JEE Main** and **JEE Advanced** aspirants. It adopts a **Modular Monolith** architecture designed to scale seamlessly while keeping deployment and maintenance overhead minimal.
+AdeptEduverse is a production-grade, highly responsive EdTech platform tailored for **JEE Main** and **JEE Advanced** aspirants. It adopts a **Modular Monolith** architecture designed to scale seamlessly while keeping deployment and maintenance overhead minimal.
 
 ```mermaid
 graph TD

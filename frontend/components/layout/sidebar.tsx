@@ -2,16 +2,18 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Home,
   BookOpen,
   Edit3,
+  CalendarDays,
   BarChart3,
   MessageSquare,
-  User,
   GraduationCap,
+  User,
   Settings,
   ChevronRight,
 } from 'lucide-react';
@@ -20,7 +22,9 @@ export const navItems = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Learn', href: '/learn', icon: BookOpen },
   { label: 'Practice', href: '/practice', icon: Edit3 },
-  { label: 'Analysis', href: '/analysis', icon: BarChart3 },
+  { label: 'Schedule', href: '/schedule', icon: CalendarDays },
+  { label: 'Courses', href: '/courses', icon: GraduationCap },
+  { label: 'Analysis', href: '/progress', icon: BarChart3 },
   { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare },
   { label: 'Profile', href: '/profile', icon: User },
 ];
@@ -31,18 +35,27 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-slate-950 text-slate-100 border-r border-slate-800/80 min-h-screen fixed left-0 top-0 z-30 shadow-xl shadow-black/40">
       {/* Brand Header */}
-      <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 border border-blue-400/30">
-          <GraduationCap className="w-5 h-5" />
-        </div>
-        <div>
-          <h1 className="font-extrabold text-base tracking-wide text-white flex items-center gap-1">
-            ANKIT <span className="text-blue-500">JEE</span>
-          </h1>
-          <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-            MAIN & ADVANCED
-          </p>
-        </div>
+      <div className="h-16 flex items-center gap-3 px-5 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur">
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-xl bg-white/95 flex items-center justify-center p-1.5 shadow-md shadow-blue-500/10 border border-slate-700/60 group-hover:scale-105 transition-transform flex-shrink-0">
+            <Image
+              src="/images/logo-icon.png"
+              alt="Adept Eduverse Logo"
+              width={34}
+              height={34}
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-sm tracking-wide text-white flex items-center gap-1">
+              ADEPT <span className="text-blue-500">EDUVERSE</span>
+            </h1>
+            <p className="text-[9px] uppercase font-bold tracking-widest text-rose-400">
+              A SKILLFUL LEARNING
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* Main Student Navigation Links */}

@@ -87,7 +87,7 @@ export default function StudentRegisterPage() {
       <AuthCard className="max-w-lg">
         <AuthHeader
           title="Create Your Account"
-          subtitle="Start your JEE preparation with Ankit JEE."
+          subtitle="Start your JEE preparation with AdeptEduverse."
         />
 
         <FormMessage type="error" message={errorMessage} />
@@ -97,7 +97,7 @@ export default function StudentRegisterPage() {
           <AuthInput
             label="Full Name"
             type="text"
-            placeholder="e.g. Ankit Kumar"
+            placeholder="e.g. Rahul Sharma"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             icon={User}

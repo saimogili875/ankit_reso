@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = 'Seeds initial course, class, subject, chapter, lecture, DPP, and question data into Django database'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS("Starting database seeding for ANKIT JEE..."))
+        self.stdout.write(self.style.SUCCESS("Starting database seeding for AdeptEduverse..."))
 
         # 1. Academic Classes
         c11, _ = AcademicClass.objects.get_or_create(

@@ -1,11 +1,8 @@
 from django.urls import path
-from rest_framework.views import APIView
-from rest_framework.response import Response
-
-class ProgressOverviewView(APIView):
-    def get(self, request):
-        return Response({'message': 'Progress API foundation operational'})
+from .views import ProgressOverviewView, RecentActivityView, VideoProgressUpdateView
 
 urlpatterns = [
     path('', ProgressOverviewView.as_view(), name='progress-overview'),
+    path('recent/', RecentActivityView.as_view(), name='recent-activity'),
+    path('video/', VideoProgressUpdateView.as_view(), name='video-progress-update'),
 ]

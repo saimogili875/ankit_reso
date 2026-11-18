@@ -6,8 +6,12 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ANKIT JEE — Premier JEE Main & Advanced Prep Platform',
+  title: 'AdeptEduverse — Premier JEE Main & Advanced Prep Platform',
   description: 'A professional EdTech platform for JEE Main & JEE Advanced preparation with video lectures, PYQs, mock tests, and detailed performance analytics.',
+  icons: {
+    icon: '/images/logo-icon.png',
+    apple: '/app/apple-icon.png',
+  },
 };
 
 export default function RootLayout({

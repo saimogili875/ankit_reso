@@ -5,7 +5,7 @@ from apps.core.models import TimeStampedModel
 
 class User(AbstractUser):
     """
-    Custom User model for ANKIT JEE Platform.
+    Custom User model for AdeptEduverse Platform.
     Supports Roles: STUDENT, ADMIN, INSTRUCTOR.
     """
     class Role(models.TextChoices):
@@ -24,6 +24,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.email} ({self.role})"
+
+    def save(self, *args, **kwargs):
+        if self.is_superuser and self.role != self.Role.ADMIN:
+            self.role = self.Role.ADMIN
+        super().save(*args, **kwargs)
 
 
 class StudentProfile(TimeStampedModel):

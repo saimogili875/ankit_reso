@@ -52,7 +52,7 @@ export default function AdminForgotPasswordPage() {
           <AuthInput
             label="Admin Email Address"
             type="email"
-            placeholder="admin@ankitjee.com"
+            placeholder="admin@adepteduverse.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             icon={ShieldCheck}

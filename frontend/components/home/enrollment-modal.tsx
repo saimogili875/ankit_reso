@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MAIN_COURSE } from '@/lib/demo-data';
 import { useEnrollment } from '@/hooks/use-enrollment';
 import { CheckCircle2, Sparkles, BookOpen, Edit3, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,25 +10,32 @@ import { Button } from '@/components/ui/button';
 export interface EnrollmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  courseTitle?: string;
+  courseSubtitle?: string;
+  courseId?: string;
 }
 
-export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({ isOpen, onClose }) => {
+export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
+  isOpen,
+  onClose,
+  courseTitle = 'JEE Main + Advanced Complete Course',
+  courseSubtitle = 'Structured learning, video lectures, and practice problems for JEE preparation',
+  courseId = 'jee-complete',
+}) => {
   const router = useRouter();
   const { isEnrolled, enroll } = useEnrollment();
-  const alreadyEnrolled = isEnrolled(MAIN_COURSE.id);
+  const alreadyEnrolled = isEnrolled(courseId);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleConfirmEnrollment = () => {
+  const handleConfirmEnrollment = async () => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      enroll(MAIN_COURSE.id);
-      setIsSubmitting(false);
-      setSuccess(true);
-    }, 600);
+    await enroll(courseId);
+    setIsSubmitting(false);
+    setSuccess(true);
   };
 
   return (
@@ -57,7 +63,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({ isOpen, onClos
               <Badge variant="emerald" className="px-3 py-1">Already Enrolled ✓</Badge>
               <h3 className="text-xl font-extrabold text-white">You already have access to this course</h3>
               <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                Your single course enrollment unlocks both video lectures in Learn and Daily Practice Problems in Practice.
+                Your course enrollment unlocks both video lectures in Learn and Daily Practice Problems in Practice.
               </p>
             </div>
 
@@ -88,20 +94,20 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({ isOpen, onClos
             </div>
           </div>
         ) : success ? (
-          /* STATE 2: ENROLLMENT SUCCESSFUL */
+          /* STATE 2: ENROLLMENT SUCCESS */
           <div className="space-y-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+            <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+              <Sparkles className="w-8 h-8" />
             </div>
 
             <div className="space-y-2">
-              <Badge variant="emerald" className="px-3 py-1">✓ Enrollment Successful</Badge>
-              <h3 className="text-xl font-extrabold text-white">Congratulations, Ankit!</h3>
+              <Badge variant="blue" className="px-3 py-1">Enrollment Complete</Badge>
+              <h3 className="text-xl font-extrabold text-white">Welcome to the Course!</h3>
               <p className="text-xs text-slate-300">
                 You now have full access to Learn lectures and Practice DPPs for:
               </p>
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-blue-400">
-                {MAIN_COURSE.title}
+                {courseTitle}
               </div>
             </div>
 
@@ -141,8 +147,8 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({ isOpen, onClos
 
             <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
               <Badge variant="blue">JEE Main & Advanced 2025</Badge>
-              <h4 className="font-bold text-base text-slate-100">{MAIN_COURSE.title}</h4>
-              <p className="text-xs text-slate-400">{MAIN_COURSE.subtitle}</p>
+              <h4 className="font-bold text-base text-slate-100">{courseTitle}</h4>
+              <p className="text-xs text-slate-400">{courseSubtitle}</p>
 
               <div className="pt-2 border-t border-slate-900 flex justify-between items-center text-xs">
                 <span className="text-slate-400">Course Price:</span>

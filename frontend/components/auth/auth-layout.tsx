@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { ShieldCheck, Sparkles, BookOpen } from 'lucide-react';
 
 export interface AuthLayoutProps {
@@ -18,9 +19,30 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, isAdmin = fals
           
           {/* LEFT DESKTOP BRAND PANEL (Hidden on mobile, visible on lg screens 1024px+) */}
           <div className="hidden lg:flex lg:col-span-6 xl:col-span-7 flex-col justify-center space-y-8 pr-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/95 flex items-center justify-center p-2 shadow-xl shadow-blue-500/15 border border-slate-700/60 flex-shrink-0">
+                <Image
+                  src="/images/logo-icon.png"
+                  alt="Adept Eduverse"
+                  width={46}
+                  height={46}
+                  className="object-contain"
+                  priority
+                />
+              </div>
+              <div>
+                <span className="font-extrabold text-2xl tracking-tight text-white block">
+                  ADEPT <span className="text-blue-500">EDUVERSE</span>
+                </span>
+                <span className="text-[11px] uppercase font-bold tracking-widest text-rose-400 block -mt-0.5">
+                  A SKILLFUL LEARNING
+                </span>
+              </div>
+            </div>
+
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-950/60 border border-blue-800/60 text-blue-400 text-xs font-semibold w-max">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>ANKIT JEE Platform 2025</span>
+              <span>AdeptEduverse Platform 2025</span>
             </div>
 
             <div className="space-y-3 max-w-xl">
@@ -96,7 +118,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, isAdmin = fals
 
       {/* Responsive Footer */}
       <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-900">
-        © 2025 ANKIT JEE Learning Platform. All rights reserved.
+        © 2025 AdeptEduverse Learning Platform. All rights reserved.
       </footer>
     </div>
   );

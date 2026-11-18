@@ -6,11 +6,13 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-ankit-jee-dev-secret-key-change-in-prod-!@#$%')
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-adepteduverse-dev-secret-key-change-in-prod-!@#$%')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',') if h.strip()]
+
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -26,7 +28,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
 
-    # ANKIT JEE Apps
+    # AdeptEduverse Apps
     'apps.core',
     'apps.accounts',
     'apps.academics',
@@ -36,6 +38,7 @@ INSTALLED_APPS = [
     'apps.progress',
     'apps.materials',
     'apps.analytics',
+    'apps.adminpanel',
 ]
 
 MIDDLEWARE = [
@@ -71,7 +74,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Configuration
-POSTGRES_DB = config('POSTGRES_DB', default='ankit_jee')
+POSTGRES_DB = config('POSTGRES_DB', default='adepteduverse')
 POSTGRES_USER = config('POSTGRES_USER', default='postgres')
 POSTGRES_PASSWORD = config('POSTGRES_PASSWORD', default='postgres')
 POSTGRES_HOST = config('POSTGRES_HOST', default='postgres')
@@ -119,19 +122,25 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '10/minute',
+        'register': '10/minute',
+    },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
 
 # Swagger Documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'ANKIT JEE API',
-    'DESCRIPTION': 'Modular REST API for ANKIT JEE EdTech Platform',
+    'TITLE': 'AdeptEduverse API',
+    'DESCRIPTION': 'Modular REST API for AdeptEduverse EdTech Platform',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
@@ -150,5 +159,5 @@ CELERY_TIMEZONE = TIME_ZONE
 R2_ACCOUNT_ID = config('R2_ACCOUNT_ID', default='')
 R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID', default='')
 R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY', default='')
-R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='ankit-jee-storage')
+R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='adepteduverse-storage')
 R2_ENDPOINT = config('R2_ENDPOINT', default='')

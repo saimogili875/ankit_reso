@@ -19,7 +19,7 @@ def health_check(request):
 
     return Response({
         'status': 'healthy' if db_ok else 'degraded',
-        'service': 'ANKIT JEE Backend API',
+        'service': 'AdeptEduverse Backend API',
         'database_connected': db_ok,
         'environment': 'production' if not request.is_secure() else 'development'
     })

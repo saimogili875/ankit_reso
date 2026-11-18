@@ -1,5 +1,5 @@
 import React from 'react';
-import { GraduationCap, Shield } from 'lucide-react';
+import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 
 export interface AuthHeaderProps {
@@ -13,16 +13,23 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({ title, subtitle, isAdmin
     <div className="space-y-4 text-center sm:text-left">
       {/* Brand Header & Role Badge */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 border border-blue-400/30">
-            {isAdmin ? <Shield className="w-5 h-5 text-indigo-100" /> : <GraduationCap className="w-5 h-5 text-white" />}
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-white/95 flex items-center justify-center p-1.5 shadow-lg shadow-blue-500/20 border border-slate-700/60 flex-shrink-0">
+            <Image
+              src="/images/logo-icon.png"
+              alt="Adept Eduverse Logo"
+              width={36}
+              height={36}
+              className="object-contain"
+              priority
+            />
           </div>
           <div>
             <span className="font-extrabold text-lg tracking-tight text-white flex items-center gap-1">
-              ANKIT <span className="text-blue-500">JEE</span>
+              ADEPT <span className="text-blue-500">EDUVERSE</span>
             </span>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block -mt-1">
-              {isAdmin ? 'ADMIN PORTAL' : 'STUDENT PORTAL'}
+            <span className="text-[10px] uppercase font-bold tracking-widest text-rose-400 block -mt-0.5">
+              {isAdmin ? 'ADMIN PORTAL' : 'A SKILLFUL LEARNING'}
             </span>
           </div>
         </div>

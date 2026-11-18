@@ -7,7 +7,7 @@ class UserAdmin(BaseUserAdmin):
     list_display = ('email', 'username', 'first_name', 'last_name', 'role', 'is_staff')
     list_filter = ('role', 'is_staff', 'is_superuser', 'is_active')
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('ANKIT JEE Info', {'fields': ('role', 'phone_number', 'is_verified')}),
+        ('AdeptEduverse Info', {'fields': ('role', 'phone_number', 'is_verified')}),
     )
 
 @admin.register(StudentProfile)

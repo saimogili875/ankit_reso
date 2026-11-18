@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { HeroCarousel } from '@/components/home/hero-carousel';
+import { TodayScheduleWidget } from '@/components/home/today-schedule-widget';
 import { QuickAccess } from '@/components/home/quick-access';
 import { JEESubjects } from '@/components/home/jee-subjects';
 import { ContinueLearning } from '@/components/home/continue-learning';
@@ -14,17 +15,22 @@ export default function HomePage() {
         <HeroCarousel />
       </section>
 
-      {/* 2. QUICK ACCESS (Learn, Practice, Tests, Analysis, Doubt Solver) */}
+      {/* 2. TODAY'S SCHEDULE & LIVE NOW BANNER */}
+      <section>
+        <TodayScheduleWidget />
+      </section>
+
+      {/* 3. QUICK ACCESS (Learn, Practice, Tests, Analysis, Doubt Solver) */}
       <section>
         <QuickAccess />
       </section>
 
-      {/* 3. YOUR JEE SUBJECTS (Physics, Chemistry, Mathematics) */}
+      {/* 4. YOUR JEE SUBJECTS (Physics, Chemistry, Mathematics) */}
       <section>
         <JEESubjects />
       </section>
 
-      {/* 4. CONTINUE LEARNING (Pick up where you left off) */}
+      {/* 5. CONTINUE LEARNING (Pick up where you left off) */}
       <section>
         <ContinueLearning />
       </section>
