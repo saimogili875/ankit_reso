@@ -53,10 +53,11 @@ def build_playback_urls(video: Video, user: User) -> Dict[str, Any]:
     and poster URLs routed through the Cloudflare Worker streaming domain.
     """
     token = generate_playback_token(str(video.id), str(user.id))
-    streaming_domain = getattr(settings, 'VIDEO_STREAMING_DOMAIN', '').strip().rstrip('/')
+    streaming_domain = getattr(settings, 'VIDEO_STREAMING_DOMAIN', '').strip()
 
     if streaming_domain:
-        base_prefix = f"https://{streaming_domain}/{token}/videos/{video.id}"
+        domain = streaming_domain.replace('https://', '').replace('http://', '').strip('/')
+        base_prefix = f"https://{domain}/{token}/videos/{video.id}"
         manifest_url = f"{base_prefix}/master.m3u8"
         vtt_url = f"{base_prefix}/thumbnails.vtt" if video.vtt_key else None
         poster_url = f"{base_prefix}/poster.jpg" if video.poster_key else None

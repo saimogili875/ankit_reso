@@ -356,7 +356,10 @@ def reap_stuck_video_processing_jobs():
         vid.status = Video.Status.QUEUED
         vid.error_message = "Automatically recovered after processing timeout."
         vid.save(update_fields=['status', 'error_message'])
-        transcode_video_hls_task.delay(str(vid.id))
+        try:
+            transcode_video_hls_task.delay(str(vid.id))
+        except Exception as e:
+            logger.warning(f"Could not enqueue reaped task immediately: {e}")
         requeued_count += 1
 
     return f"Reaped {requeued_count} stuck video jobs."

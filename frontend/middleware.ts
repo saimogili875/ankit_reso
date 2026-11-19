@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = [
+  '/',
+  '/landing',
   '/login',
   '/register',
   '/forgot-password',
@@ -31,8 +33,8 @@ export function middleware(request: NextRequest) {
   }
 
   // Check if current route is a public route
-  const isPublicRoute = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  const isPublicRoute = PUBLIC_PATHS.some((path) =>
+    path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)
   );
 
   // Read session indicators from cookies

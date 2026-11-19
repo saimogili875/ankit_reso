@@ -667,4 +667,31 @@ class LiveWebhookView(APIView):
                 live_class.recording_url = file_url
                 live_class.save(update_fields=['recording_status', 'recording_url'])
 
+                # LiveKit Egress pipeline integration: create VideoAsset from egress file & queue HLS transcode
+                try:
+                    from apps.content.models import Video
+                    from apps.content.tasks import transcode_video_hls_task
+
+                    egress_r2_key = ''
+                    if file_res:
+                        egress_r2_key = getattr(file_res[0], 'filename', '') or getattr(file_res[0], 'location', '')
+                    if not egress_r2_key:
+                        egress_r2_key = f"recordings/{live_class.room_name}.mp4"
+
+                    video_asset, v_created = Video.objects.update_or_create(
+                        original_key=egress_r2_key,
+                        defaults={
+                            'title': f"Recording: {live_class.title}",
+                            'description': f"Live class recording for {live_class.title}",
+                            'video_source_type': Video.VideoSourceType.CLOUD,
+                            'status': Video.Status.QUEUED,
+                            'duration_seconds': duration,
+                            'is_published': False,  # Draft status until admin publishes
+                        }
+                    )
+                    transcode_video_hls_task.delay(str(video_asset.id))
+                    logger.info(f"Queued HLS transcode for LiveKit egress recording: VideoAsset {video_asset.id}")
+                except Exception as egress_err:
+                    logger.warning(f"Failed to queue HLS transcode for egress recording: {egress_err}")
+
         return Response({'status': 'ok', 'event': event_type}, status=status.HTTP_200_OK)

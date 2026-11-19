@@ -136,11 +136,17 @@ class RecentActivityView(APIView):
             mins_left = max(1, (duration - max_seen) // 60)
             target_lecture_id = str(lecture.id) if lecture else (str(video.id) if video else '')
 
+            topic_title = lecture.title if lecture else (video.title if video else 'Lecture Video')
+            sub_meta = f"{subject_name} • {chapter_name}"
+
             activities.append({
                 'id': str(vp.id),
                 'type': 'video',
-                'topicName': lecture.title if lecture else (video.title if video else 'Lecture Video'),
-                'subjectMeta': f"{subject_name} • {chapter_name}",
+                'title': topic_title,
+                'subtitle': sub_meta,
+                'progress_percent': percent,
+                'topicName': topic_title,
+                'subjectMeta': sub_meta,
                 'progressPercent': percent,
                 'durationLeft': 'Completed ✓' if vp.completed else f"{mins_left} mins left",
                 'lastPositionSeconds': vp.last_position_seconds,
@@ -154,12 +160,17 @@ class RecentActivityView(APIView):
         for att in attempts:
             chapter_name = att.dpp.chapter.name if att.dpp.chapter else 'Practice'
             subject_name = att.dpp.chapter.category.subject.name if att.dpp.chapter and att.dpp.chapter.category and att.dpp.chapter.category.subject else 'JEE'
+            dpp_title = att.dpp.title
+            dpp_sub = f"{subject_name} • {chapter_name}"
 
             activities.append({
                 'id': str(att.id),
                 'type': 'dpp',
-                'topicName': att.dpp.title,
-                'subjectMeta': f"{subject_name} • {chapter_name}",
+                'title': dpp_title,
+                'subtitle': dpp_sub,
+                'progress_percent': int(att.accuracy_percentage),
+                'topicName': dpp_title,
+                'subjectMeta': dpp_sub,
                 'progressPercent': int(att.accuracy_percentage),
                 'durationLeft': f"Score: {att.score}",
                 'timestamp': att.completed_at,

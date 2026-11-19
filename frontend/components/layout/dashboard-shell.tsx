@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
@@ -18,10 +18,23 @@ const AUTH_PATHS = [
   '/admin/login',
   '/admin/forgot-password',
   '/admin/reset-password',
+  '/landing',
 ];
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const hasSession = document.cookie.split(';').some((item) => {
+      const trimmed = item.trim();
+      return (
+        trimmed.startsWith('auth_session=') ||
+        trimmed.startsWith('sessionid=')
+      );
+    });
+    setIsAuthenticated(hasSession);
+  }, [pathname]);
 
   const isAuthPage = AUTH_PATHS.some(
     (path) =>
@@ -34,7 +47,10 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   // Admin pages have their own dedicated admin layout and header
   const isAdminPage = pathname?.startsWith('/admin');
 
-  if (isAuthPage || isAdminPage) {
+  // The landing page on /landing or / (for unauthenticated visitors) renders full-width without dashboard chrome
+  const isLanding = pathname === '/landing' || (pathname === '/' && isAuthenticated !== true);
+
+  if (isAuthPage || isAdminPage || isLanding) {
     return <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">{children}</div>;
   }
 

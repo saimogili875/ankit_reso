@@ -308,6 +308,21 @@ export function HlsVideoPlayer({
     }
   }, [manifestUrl, initialPositionSeconds]);
 
+  const handleRetry = useCallback(async () => {
+    setErrorMsg(null);
+    if (lectureId) {
+      try {
+        const data = await apiClient.get<{ manifest_url?: string }>(`/content/lectures/${lectureId}/playback/`);
+        if (data.manifest_url && hlsRef.current) {
+          hlsRef.current.loadSource(data.manifest_url);
+          hlsRef.current.startLoad();
+          return;
+        }
+      } catch {}
+    }
+    initPlayer();
+  }, [lectureId, initPlayer]);
+
   useEffect(() => {
     initPlayer();
     return () => {
@@ -592,7 +607,7 @@ export function HlsVideoPlayer({
           <p className="text-xs text-slate-400 max-w-sm">{errorMsg}</p>
           <button
             type="button"
-            onClick={initPlayer}
+            onClick={handleRetry}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md"
           >
             <RefreshCw className="w-4 h-4" />

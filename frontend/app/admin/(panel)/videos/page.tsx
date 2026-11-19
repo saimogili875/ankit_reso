@@ -27,6 +27,8 @@ import {
   Film,
   FileVideo,
   Check,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface RenditionInfo {
@@ -556,6 +558,22 @@ export default function AdminVideosPage() {
     }
   };
 
+  // Publish/Hide toggle action
+  const handleTogglePublish = async (video: VideoItem) => {
+    const newStatus = !(video.is_published ?? true);
+    try {
+      await apiClient.patch(`/admin-panel/videos/${video.id}/`, {
+        is_published: newStatus,
+      });
+      setVideos((prev) =>
+        prev.map((v) => (v.id === video.id ? { ...v, is_published: newStatus } : v))
+      );
+      setFormSuccess(`Video "${video.title}" ${newStatus ? 'published' : 'hidden'} successfully.`);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to update video publish status.');
+    }
+  };
+
   // Delete Action (removes DB record and purges all R2 objects)
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -972,6 +990,16 @@ export default function AdminVideosPage() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       {renderStatusBadge(vid)}
 
+                      {vid.is_published === false ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          HIDDEN
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          PUBLISHED
+                        </span>
+                      )}
+
                       {vid.is_free_preview && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           FREE PREVIEW
@@ -980,6 +1008,20 @@ export default function AdminVideosPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      {/* Publish / Hide Toggle */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTogglePublish(vid)}
+                        className={`border-slate-800 text-xs py-1 h-7 px-2 gap-1 ${
+                          vid.is_published === false ? 'hover:text-emerald-400' : 'hover:text-amber-400'
+                        }`}
+                        title={vid.is_published === false ? 'Publish to students' : 'Hide from students'}
+                      >
+                        {vid.is_published === false ? <Eye className="w-3 h-3 text-emerald-400" /> : <EyeOff className="w-3 h-3 text-amber-400" />}
+                        <span>{vid.is_published === false ? 'Publish' : 'Hide'}</span>
+                      </Button>
+
                       {/* Preview Button */}
                       <Button
                         variant="outline"
