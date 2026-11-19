@@ -20,10 +20,13 @@ export const JEESubjects: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    apiClient.get<ApiSubject[]>('/academics/subjects/')
+    apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>('/academics/subjects/')
       .then((data) => {
         if (!isMounted) return;
-        setSubjects(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.results) ? data.results : []);
+        setSubjects(list);
         setIsLoading(false);
       })
       .catch(() => {

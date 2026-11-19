@@ -54,11 +54,12 @@ export const QuickAccess: React.FC = () => {
     let isMounted = true;
     async function loadQuickAccess() {
       try {
-        const data = await apiClient.get<ApiQuickAccess[]>('/content/quick-access/');
+        const data = await apiClient.get<ApiQuickAccess[] | { results?: ApiQuickAccess[] }>('/content/quick-access/');
         if (!isMounted) return;
-        if (Array.isArray(data)) {
-          setItems(data.filter((i) => i.is_visible));
-        }
+        const list = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.results) ? data.results : []);
+        setItems(list.filter((i) => i.is_visible));
       } catch {
         if (isMounted) setItems([]);
       } finally {

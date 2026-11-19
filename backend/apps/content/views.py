@@ -378,6 +378,7 @@ class VideoListView(generics.ListAPIView):
 
 class HeroSlideListView(generics.ListAPIView):
     serializer_class = HeroSlideSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return HeroSlide.objects.filter(is_active=True).order_by('order', '-created_at')
@@ -385,6 +386,7 @@ class HeroSlideListView(generics.ListAPIView):
 
 class QuickAccessListView(generics.ListAPIView):
     serializer_class = QuickAccessItemSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return QuickAccessItem.objects.filter(is_visible=True).order_by('order', 'title')
@@ -392,6 +394,7 @@ class QuickAccessListView(generics.ListAPIView):
 
 class AnnouncementListView(generics.ListAPIView):
     serializer_class = AnnouncementSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return Announcement.objects.filter(is_active=True).order_by('-created_at')

@@ -58,10 +58,13 @@ export const HeroCarousel: React.FC = () => {
     let isMounted = true;
     async function fetchSlides() {
       try {
-        const data = await apiClient.get<ApiHeroSlide[]>('/content/hero-slides/');
+        const data = await apiClient.get<ApiHeroSlide[] | { results?: ApiHeroSlide[] }>('/content/hero-slides/');
         if (!isMounted) return;
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped: SlideData[] = data.map((item) => ({
+        const list = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.results) ? data.results : []);
+        if (list.length > 0) {
+          const mapped: SlideData[] = list.map((item) => ({
             id: item.id,
             badge: item.badge || 'JEE Preparation',
             title: item.title,

@@ -22,10 +22,13 @@ export const ContinueLearning: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    apiClient.get<ActivityItem[]>('/progress/recent/')
+    apiClient.get<ActivityItem[] | { results?: ActivityItem[] }>('/progress/recent/')
       .then((data) => {
         if (!isMounted) return;
-        setActivities(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.results) ? data.results : []);
+        setActivities(list);
         setIsLoading(false);
       })
       .catch(() => {
