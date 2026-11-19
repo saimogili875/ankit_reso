@@ -121,24 +121,31 @@ class RecentActivityView(APIView):
         activities = []
 
         # Recent video progress
-        vps = VideoProgress.objects.filter(user=user).select_related('video', 'video__lecture', 'video__lecture__chapter', 'video__lecture__chapter__category__subject').order_by('-updated_at')[:6]
+        vps = VideoProgress.objects.filter(user=user).select_related(
+            'video', 'lecture', 'video__lecture', 'lecture__chapter', 'lecture__chapter__category__subject'
+        ).order_by('-updated_at')[:6]
         for vp in vps:
-            lecture = vp.video.lecture if hasattr(vp.video, 'lecture') else None
-            chapter_name = lecture.chapter.name if lecture and lecture.chapter else 'General'
-            subject_name = lecture.chapter.category.subject.name if lecture and lecture.chapter and lecture.chapter.category and lecture.chapter.category.subject else 'JEE'
-            duration = max(60, vp.video.duration_seconds or 1800)
-            percent = 100 if vp.completed else min(99, int((vp.watched_seconds / duration) * 100))
-            mins_left = max(1, (duration - vp.watched_seconds) // 60)
+            lecture = vp.lecture or (vp.video.lecture if vp.video else None)
+            video = vp.video
+            chap = lecture.chapter if lecture else None
+            subject_name = chap.category.subject.name if (chap and chap.category and chap.category.subject) else 'JEE Prep'
+            chapter_name = chap.name if chap else 'Lecture Series'
+            duration = (video.duration_seconds if video else (lecture.duration_seconds if lecture else 1800)) or 1800
+            max_seen = max(vp.watched_seconds, vp.last_position_seconds)
+            percent = 100 if vp.completed else min(99, int((max_seen / duration) * 100))
+            mins_left = max(1, (duration - max_seen) // 60)
+            target_lecture_id = str(lecture.id) if lecture else (str(video.id) if video else '')
 
             activities.append({
                 'id': str(vp.id),
                 'type': 'video',
-                'topicName': lecture.title if lecture else vp.video.title,
+                'topicName': lecture.title if lecture else (video.title if video else 'Lecture Video'),
                 'subjectMeta': f"{subject_name} • {chapter_name}",
                 'progressPercent': percent,
-                'durationLeft': 'Completed' if vp.completed else f"{mins_left} mins left",
+                'durationLeft': 'Completed ✓' if vp.completed else f"{mins_left} mins left",
+                'lastPositionSeconds': vp.last_position_seconds,
                 'timestamp': vp.updated_at,
-                'href': f"/learn?lecture={vp.video.id}",
+                'href': f"/learn?lecture={target_lecture_id}",
                 'badgeVariant': 'blue',
             })
 
@@ -165,39 +172,79 @@ class RecentActivityView(APIView):
 
 
 class VideoProgressUpdateView(APIView):
+    """
+    Updates or creates VideoProgress for a student viewing a lecture.
+    Captures last_position_seconds (for instant resume), watched_seconds, and completion_percent.
+    Marks completed at >= 90%.
+    """
     def post(self, request):
         user = request.user
         video_id = request.data.get('video_id') or request.data.get('videoId')
         lecture_id = request.data.get('lecture_id') or request.data.get('lectureId')
-        watched_seconds = int(request.data.get('watched_seconds', 0))
+        last_position_seconds = int(request.data.get('last_position_seconds', request.data.get('lastPositionSeconds', 0)))
+        watched_seconds = int(request.data.get('watched_seconds', request.data.get('watchedSeconds', 0)))
+        completion_percent = float(request.data.get('completion_percent', request.data.get('completionPercent', 0.0)))
         completed = bool(request.data.get('completed', False))
 
         video = None
+        lecture = None
+
         if video_id:
             video = Video.objects.filter(id=video_id).first()
-        elif lecture_id:
-            video = Video.objects.filter(lecture_id=lecture_id).first()
+            if video and video.lecture:
+                lecture = video.lecture
+        if not video and lecture_id:
+            lecture = Lecture.objects.filter(id=lecture_id).first()
+            if lecture:
+                video = Video.objects.filter(lecture=lecture).first()
 
-        if not video:
-            return Response({'error': 'Video not found'}, status=status.HTTP_404_NOT_FOUND)
+        if not video and not lecture:
+            return Response({'error': 'Video or Lecture not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        duration = (video.duration_seconds if video else (lecture.duration_seconds if lecture else 0)) or 1
+
+        if completion_percent <= 0.0 and duration > 0 and (watched_seconds > 0 or last_position_seconds > 0):
+            max_seen = max(watched_seconds, last_position_seconds)
+            completion_percent = round((max_seen / duration) * 100, 2)
+
+        is_completed = completed or (completion_percent >= 90.0)
+
+        # Upsert single progress record
+        lookup = {'user': user}
+        if video:
+            lookup['video'] = video
+        elif lecture:
+            lookup['lecture'] = lecture
 
         vp, created = VideoProgress.objects.get_or_create(
-            user=user,
-            video=video,
+            **lookup,
             defaults={
+                'lecture': lecture,
+                'video': video,
+                'last_position_seconds': last_position_seconds,
                 'watched_seconds': watched_seconds,
-                'completed': completed,
+                'completion_percent': completion_percent,
+                'completed': is_completed,
             }
         )
         if not created:
+            if lecture and not vp.lecture:
+                vp.lecture = lecture
+            if video and not vp.video:
+                vp.video = video
+            vp.last_position_seconds = last_position_seconds
             vp.watched_seconds = max(vp.watched_seconds, watched_seconds)
-            if completed:
+            vp.completion_percent = max(float(vp.completion_percent), completion_percent)
+            if is_completed or vp.completion_percent >= 90.0:
                 vp.completed = True
             vp.save()
 
         return Response({
             'message': 'Progress saved',
-            'video_id': str(video.id),
+            'video_id': str(video.id) if video else None,
+            'lecture_id': str(lecture.id) if lecture else None,
+            'last_position_seconds': vp.last_position_seconds,
             'watched_seconds': vp.watched_seconds,
+            'completion_percent': float(vp.completion_percent),
             'completed': vp.completed,
         }, status=status.HTTP_200_OK)

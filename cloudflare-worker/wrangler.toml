@@ -1,0 +1,13 @@
+name = "adepteduverse-video-streamer"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+# Bind Cloudflare R2 bucket holding private HLS files
+[[r2_buckets]]
+binding = "VIDEO_BUCKET"
+bucket_name = "adepteduverse-storage"
+
+# Environment variables
+[vars]
+ALLOWED_ORIGIN = "*"
+# Note: VIDEO_STREAMING_SECRET should be set via `wrangler secret put VIDEO_STREAMING_SECRET`

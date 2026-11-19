@@ -198,6 +198,52 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ROUTES = {
+    'apps.content.tasks.transcode_video_hls_task': {'queue': 'video'},
+}
+
+# Video Transcoding & HLS Streaming Profiles (FFmpeg Tuning)
+# Optimized for text sharpness and small equation legibility in lecture videos
+VIDEO_PROFILES = {
+    '360p': {
+        'width': 640,
+        'height': 360,
+        'bitrate': '700k',
+        'maxrate': '750k',
+        'bufsize': '1400k',
+        'crf': 22,
+    },
+    '480p': {
+        'width': 854,
+        'height': 480,
+        'bitrate': '1200k',
+        'maxrate': '1300k',
+        'bufsize': '2400k',
+        'crf': 21,
+    },
+    '720p': {
+        'width': 1280,
+        'height': 720,
+        'bitrate': '2200k',
+        'maxrate': '2400k',
+        'bufsize': '4400k',
+        'crf': 20,
+    },
+    '1080p': {
+        'width': 1920,
+        'height': 1080,
+        'bitrate': '4000k',
+        'maxrate': '4400k',
+        'bufsize': '8000k',
+        'crf': 20,
+    },
+}
+
+ENABLE_1080P = config('ENABLE_1080P', default=False, cast=bool)
+HLS_SEGMENT_DURATION = config('HLS_SEGMENT_DURATION', default=6, cast=int)
+VIDEO_STREAMING_DOMAIN = config('VIDEO_STREAMING_DOMAIN', default='') # e.g. video.adepteduverse.com
+VIDEO_STREAMING_SECRET = config('VIDEO_STREAMING_SECRET', default=SECRET_KEY)
+DELETE_ORIGINAL_AFTER_PROCESSING = config('DELETE_ORIGINAL_AFTER_PROCESSING', default=False, cast=bool)
 
 # Redis Cache Backend
 CACHES = {

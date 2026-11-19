@@ -2,16 +2,46 @@ from django.db import models
 from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
 from apps.content.models import Video
+from apps.academics.models import Lecture
 from apps.questions.models import Question, DPP
 
 class VideoProgress(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_progress')
-    video = models.ForeignKey(Video, on_delete=models.CASCADE)
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='progress_records', null=True, blank=True)
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name='progress_records', null=True, blank=True)
     watched_seconds = models.IntegerField(default=0)
+    last_position_seconds = models.IntegerField(default=0)
+    completion_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     completed = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('user', 'video')
+        indexes = [
+            models.Index(fields=['user', 'lecture']),
+            models.Index(fields=['user', 'updated_at']),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate completion_percent if duration is available
+        total_duration = 0
+        if self.video and self.video.duration_seconds > 0:
+            total_duration = self.video.duration_seconds
+        elif self.lecture and getattr(self.lecture, 'duration_seconds', 0) > 0:
+            total_duration = self.lecture.duration_seconds
+
+        if total_duration > 0 and self.watched_seconds > 0:
+            calculated_pct = min(100.0, (self.watched_seconds / total_duration) * 100)
+            if self.completion_percent == 0 or calculated_pct > float(self.completion_percent):
+                self.completion_percent = round(calculated_pct, 2)
+
+        # Auto-mark completed at 90%
+        if float(self.completion_percent) >= 90.0:
+            self.completed = True
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        target = self.lecture.title if self.lecture else (self.video.title if self.video else 'Video')
+        return f"Progress for {self.user.email} on {target}: {self.completion_percent}% ({'Completed' if self.completed else 'In Progress'})"
 
 class QuestionAttempt(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='question_attempts')

@@ -6,12 +6,18 @@ from .models import (
 )
 
 class VideoSerializer(serializers.ModelSerializer):
+    lecture_title = serializers.CharField(source='lecture.title', read_only=True)
+    chapter_name = serializers.CharField(source='lecture.chapter.name', read_only=True)
+
     class Meta:
         model = Video
         fields = [
-            'id', 'lecture', 'topic', 'title', 'description', 
-            'duration_seconds', 'video_source_type', 'youtube_video_id', 
-            'r2_object_key', 'thumbnail_key', 'is_free_preview'
+            'id', 'lecture', 'lecture_title', 'chapter_name', 'topic', 'title', 'description', 
+            'duration_seconds', 'video_source_type', 'status', 'processing_progress', 'error_message',
+            'original_key', 'hls_manifest_key', 'poster_key', 'sprite_key', 'vtt_key',
+            'source_width', 'source_height', 'source_fps', 'file_size', 'renditions',
+            'youtube_video_id', 'r2_object_key', 'thumbnail_key', 'is_free_preview',
+            'is_published', 'processed_at', 'created_at'
         ]
 
 class HeroSlideSerializer(serializers.ModelSerializer):
@@ -153,12 +159,18 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class VideoSerializer(serializers.ModelSerializer):
+    lecture_title = serializers.CharField(source='lecture.title', read_only=True)
+    chapter_name = serializers.CharField(source='lecture.chapter.name', read_only=True)
+
     class Meta:
         model = Video
         fields = [
-            'id', 'lecture', 'topic', 'title', 'description', 
-            'duration_seconds', 'video_source_type', 'youtube_video_id', 
-            'r2_object_key', 'thumbnail_key', 'is_free_preview'
+            'id', 'lecture', 'lecture_title', 'chapter_name', 'topic', 'title', 'description', 
+            'duration_seconds', 'video_source_type', 'status', 'processing_progress', 'error_message',
+            'original_key', 'hls_manifest_key', 'poster_key', 'sprite_key', 'vtt_key',
+            'source_width', 'source_height', 'source_fps', 'file_size', 'renditions',
+            'youtube_video_id', 'r2_object_key', 'thumbnail_key', 'is_free_preview',
+            'is_published', 'processed_at', 'created_at'
         ]
 
 class HeroSlideSerializer(serializers.ModelSerializer):

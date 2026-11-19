@@ -7,10 +7,18 @@ class Video(TimeStampedModel):
     """
     Video entity supporting both YOUTUBE and CLOUD (Cloudflare R2) storage backends.
     Belongs to a Lecture (and optionally a Topic).
+    Supports multi-rendition HLS transcoding (360p, 480p, 720p, 1080p).
     """
     class VideoSourceType(models.TextChoices):
         YOUTUBE = 'YOUTUBE', 'YouTube Video'
         CLOUD = 'CLOUD', 'Cloudflare R2 Hosted'
+
+    class Status(models.TextChoices):
+        UPLOADED = 'UPLOADED', 'Original Uploaded'
+        QUEUED = 'QUEUED', 'Queued for Transcoding'
+        PROCESSING = 'PROCESSING', 'Processing HLS'
+        READY = 'READY', 'Ready for Playback'
+        FAILED = 'FAILED', 'Transcoding Failed'
 
     lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name='videos', null=True, blank=True)
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='videos', null=True, blank=True)
@@ -22,20 +30,66 @@ class Video(TimeStampedModel):
         choices=VideoSourceType.choices,
         default=VideoSourceType.YOUTUBE
     )
-    
+
+    # Processing lifecycle and state
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.READY
+    )
+    processing_progress = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
+
+    # Cloudflare R2 Keys
+    original_key = models.CharField(max_length=500, blank=True, null=True, help_text="R2 key of original uploaded MP4")
+    r2_object_key = models.CharField(max_length=500, blank=True, null=True, help_text="Legacy or direct object key")
+    hls_manifest_key = models.CharField(max_length=500, blank=True, null=True, help_text="R2 key to master.m3u8")
+    poster_key = models.CharField(max_length=500, blank=True, null=True, help_text="R2 key to poster.jpg")
+    sprite_key = models.CharField(max_length=500, blank=True, null=True, help_text="R2 key to thumbnail sprite sheet")
+    vtt_key = models.CharField(max_length=500, blank=True, null=True, help_text="R2 key to thumbnails.vtt seek cue file")
+    thumbnail_key = models.CharField(max_length=500, blank=True, null=True)
+
+    # Technical metadata
+    source_width = models.IntegerField(null=True, blank=True)
+    source_height = models.IntegerField(null=True, blank=True)
+    source_fps = models.FloatField(null=True, blank=True)
+    file_size = models.BigIntegerField(null=True, blank=True, help_text="Size in bytes of original video")
+    renditions = models.JSONField(default=list, blank=True, help_text="List of generated HLS renditions")
+    processed_at = models.DateTimeField(null=True, blank=True)
+
     # Store YouTube video ID or full URL if YOUTUBE
     youtube_video_id = models.CharField(max_length=100, blank=True, null=True)
 
-    # Store Cloudflare R2 file/object reference key if CLOUD
-    r2_object_key = models.CharField(max_length=500, blank=True, null=True)
-
-    # Thumbnail storage reference (R2 key or external URL)
-    thumbnail_key = models.CharField(max_length=500, blank=True, null=True)
-
     is_free_preview = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"[{self.video_source_type}] {self.title}"
+        return f"[{self.video_source_type}][{self.status}] {self.title}"
+
+
+class VideoPlaybackStat(TimeStampedModel):
+    """
+    Lightweight telemetry and Quality of Experience (QoE) metric logs collected from student players.
+    """
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='playback_stats')
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='playback_stats')
+    lecture = models.ForeignKey(Lecture, on_delete=models.SET_NULL, null=True, blank=True, related_name='playback_stats')
+    time_to_first_frame_ms = models.IntegerField(null=True, blank=True)
+    startup_time_ms = models.IntegerField(null=True, blank=True)
+    rebuffer_count = models.IntegerField(default=0)
+    total_rebuffer_duration_ms = models.IntegerField(default=0)
+    selected_quality = models.CharField(max_length=50, blank=True)
+    errors = models.JSONField(default=list, blank=True)
+    device_info = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Stat for Video #{self.video_id} by {self.user.email if self.user else 'Anon'} ({self.selected_quality})"
 
 
 class HeroSlide(TimeStampedModel):

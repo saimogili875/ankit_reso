@@ -52,6 +52,12 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      - key: VIDEO_STREAMING_DOMAIN
+        sync: false
+      - key: VIDEO_STREAMING_SECRET
+        generateValue: true
+      - key: ENABLE_1080P
+        value: "false"
       - key: ENVIRONMENT
         value: "production"
 
@@ -62,7 +68,7 @@ services:
     region: oregon
     plan: standard
     buildCommand: "cd backend && pip install -r requirements.txt"
-    startCommand: "cd backend && celery -A config worker -l info --concurrency 4"
+    startCommand: "cd backend && celery -A config worker -Q celery,default -l info --concurrency 4"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.0"
@@ -133,7 +139,85 @@ services:
           name: ankit-reso-api
           envVarKey: SENTRY_DSN
 
-  # 3. Celery Beat (15-min Live Reminders & Abandoned Room Cleaner)
+  # 3. Dedicated Celery Video Transcoding Worker (FFmpeg HLS Pipeline)
+  - type: worker
+    name: ankit-reso-celery-video-worker
+    runtime: python
+    region: oregon
+    plan: standard
+    buildCommand: "./scripts/install_ffmpeg.sh && cd backend && pip install -r requirements.txt"
+    startCommand: "export PATH=$HOME/bin:$PATH && cd backend && celery -A config worker -Q video -l info --concurrency 2"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DJANGO_SETTINGS_MODULE
+        value: "config.settings.prod"
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: DATABASE_URL
+      - key: CONN_MAX_AGE
+        value: "600"
+      - key: DISABLE_SERVER_SIDE_CURSORS
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ankit-reso-redis
+          property: connectionString
+      - key: R2_ACCOUNT_ID
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: R2_ACCOUNT_ID
+      - key: R2_ACCESS_KEY_ID
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: R2_ACCESS_KEY_ID
+      - key: R2_SECRET_ACCESS_KEY
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: R2_SECRET_ACCESS_KEY
+      - key: R2_BUCKET_NAME
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: R2_BUCKET_NAME
+      - key: R2_ENDPOINT
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: R2_ENDPOINT
+      - key: VIDEO_STREAMING_DOMAIN
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: VIDEO_STREAMING_DOMAIN
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: VIDEO_STREAMING_SECRET
+      - key: ENABLE_1080P
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: ENABLE_1080P
+      - key: SENTRY_DSN
+        fromService:
+          type: web
+          name: ankit-reso-api
+          envVarKey: SENTRY_DSN
+
+  # 4. Celery Beat (Periodic Maintenance & Abandoned Video Cleaners)
   - type: worker
     name: ankit-reso-celery-beat
     runtime: python
@@ -182,7 +266,7 @@ services:
           name: ankit-reso-api
           envVarKey: SENTRY_DSN
 
-  # 4. Managed Redis (Cache & Celery Broker)
+  # 5. Managed Redis (Cache & Celery Broker)
   - type: redis
     name: ankit-reso-redis
     region: oregon

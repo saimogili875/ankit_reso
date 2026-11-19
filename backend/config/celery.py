@@ -18,6 +18,14 @@ app.conf.beat_schedule = {
         'task': 'apps.live.tasks.auto_end_abandoned_rooms',
         'schedule': 600.0,
     },
+    'reap-stuck-video-jobs-every-15-mins': {
+        'task': 'apps.content.tasks.reap_stuck_video_processing_jobs',
+        'schedule': 900.0,
+    },
+    'clean-orphan-video-uploads-daily': {
+        'task': 'apps.content.tasks.cleanup_orphan_uploads',
+        'schedule': 86400.0,
+    },
 }
 
 @app.task(bind=True, ignore_result=True)

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useEnrollment } from '@/hooks/use-enrollment';
 import { apiClient } from '@/lib/api-client';
+import { HlsVideoPlayer } from '@/components/video/hls-player';
 import {
   BookOpen,
   CheckCircle2,
@@ -64,7 +65,16 @@ export default function LearnPage() {
   const [subjects, setSubjects] = useState<ApiSubject[]>([]);
   const [chapters, setChapters] = useState<ApiChapter[]>([]);
   const [lectures, setLectures] = useState<ApiLecture[]>([]);
-  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
+  const [playbackData, setPlaybackData] = useState<{
+    video_id?: string;
+    manifest_url?: string;
+    vtt_url?: string;
+    poster_url?: string;
+    youtube_video_id?: string;
+    last_position_seconds?: number;
+    duration_seconds?: number;
+    completed?: boolean;
+  } | null>(null);
   const [completedLectures, setCompletedLectures] = useState<Record<string, boolean>>({});
 
   // Loading states
@@ -149,22 +159,48 @@ export default function LearnPage() {
     };
   }, [selectedChapter]);
 
-  // 4. Fetch Video URL when lecture is active
+  // 4. Fetch Secure Playback data when lecture is active
   useEffect(() => {
     if (!activeLecture) {
-      setResolvedVideoUrl('');
+      setPlaybackData(null);
       return;
     }
 
     let isMounted = true;
     setIsLoadingVideo(true);
-    apiClient.get<{ video_url?: string; r2_url?: string }>(`/content/lectures/${activeLecture.id}/video/`)
+    apiClient.get<{
+      video_id?: string;
+      manifest_url?: string;
+      vtt_url?: string;
+      poster_url?: string;
+      youtube_video_id?: string;
+      last_position_seconds?: number;
+      duration_seconds?: number;
+      completed?: boolean;
+    }>(`/content/lectures/${activeLecture.id}/playback/`)
       .then((data) => {
         if (!isMounted) return;
-        setResolvedVideoUrl(data?.video_url || data?.r2_url || '');
+        setPlaybackData(data);
+        if (data.completed) {
+          setCompletedLectures((prev) => ({ ...prev, [activeLecture.id]: true }));
+        }
       })
-      .catch((err) => {
-        console.warn('Failed to load lecture video:', err);
+      .catch(() => {
+        // Fallback to legacy endpoint if playback not yet available
+        apiClient.get<{ video_url?: string; r2_url?: string }>(`/content/lectures/${activeLecture.id}/video/`)
+          .then((fallback) => {
+            if (!isMounted) return;
+            const url = fallback?.video_url || fallback?.r2_url || '';
+            const isYt = url.includes('youtube.com') || url.includes('youtu.be');
+            setPlaybackData({
+              video_id: activeLecture.id,
+              manifest_url: isYt ? undefined : url,
+              youtube_video_id: isYt ? url : undefined,
+            });
+          })
+          .catch(() => {
+            if (isMounted) setPlaybackData(null);
+          });
       })
       .finally(() => {
         if (isMounted) setIsLoadingVideo(false);
@@ -297,24 +333,32 @@ export default function LearnPage() {
       ) : activeLecture && selectedChapter ? (
         /* VIEW 6: VIDEO PLAYER VIEW */
         <div className="space-y-6 max-w-5xl mx-auto">
-          <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl aspect-video relative group flex items-center justify-center">
+          <div className="w-full">
             {isLoadingVideo ? (
-              <div className="flex flex-col items-center gap-2 text-slate-400">
+              <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl aspect-video flex flex-col items-center justify-center gap-2 text-slate-400">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                <span className="text-xs">Loading video stream...</span>
+                <span className="text-xs">Connecting to secure video stream...</span>
               </div>
-            ) : resolvedVideoUrl ? (
-              <video
-                src={resolvedVideoUrl}
-                controls
-                autoPlay
+            ) : playbackData && (playbackData.manifest_url || playbackData.youtube_video_id) ? (
+              <HlsVideoPlayer
+                videoId={playbackData.video_id}
+                lectureId={activeLecture.id}
+                title={activeLecture.title}
+                manifestUrl={playbackData.manifest_url}
+                youtubeVideoId={playbackData.youtube_video_id}
+                posterUrl={playbackData.poster_url}
+                vttUrl={playbackData.vtt_url}
+                initialPositionSeconds={playbackData.last_position_seconds || 0}
+                durationSeconds={playbackData.duration_seconds || activeLecture.duration_seconds}
                 onEnded={handleVideoEnded}
-                className="w-full h-full object-contain"
-              >
-                Your browser does not support video playback.
-              </video>
+                onProgressUpdate={(watched, lastPos, pct) => {
+                  if (pct >= 90) {
+                    setCompletedLectures((prev) => ({ ...prev, [activeLecture.id]: true }));
+                  }
+                }}
+              />
             ) : (
-              <div className="text-center p-8 space-y-2">
+              <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl aspect-video flex flex-col items-center justify-center text-center p-8 space-y-2">
                 <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
                 <p className="text-sm font-semibold text-slate-200">No video media linked to this lecture yet</p>
                 <p className="text-xs text-slate-400">Content faculty will link the lecture video shortly.</p>

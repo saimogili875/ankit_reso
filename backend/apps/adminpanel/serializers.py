@@ -318,15 +318,19 @@ class AdminLectureSerializer(serializers.ModelSerializer):
 
 class AdminVideoSerializer(serializers.ModelSerializer):
     lecture_title = serializers.CharField(source='lecture.title', read_only=True)
+    chapter_name = serializers.CharField(source='lecture.chapter.name', read_only=True)
     topic_name = serializers.CharField(source='topic.name', read_only=True)
 
     class Meta:
         model = Video
         fields = [
-            'id', 'lecture', 'lecture_title', 'topic', 'topic_name',
+            'id', 'lecture', 'lecture_title', 'chapter_name', 'topic', 'topic_name',
             'title', 'description', 'duration_seconds', 'video_source_type',
+            'status', 'processing_progress', 'error_message',
+            'original_key', 'hls_manifest_key', 'poster_key', 'sprite_key', 'vtt_key',
+            'source_width', 'source_height', 'source_fps', 'file_size', 'renditions',
             'youtube_video_id', 'r2_object_key', 'thumbnail_key',
-            'is_free_preview', 'created_at', 'updated_at'
+            'is_free_preview', 'is_published', 'processed_at', 'created_at', 'updated_at'
         ]
 
     def validate(self, data):
@@ -347,8 +351,10 @@ class AdminVideoSerializer(serializers.ModelSerializer):
             data['youtube_video_id'] = extract_youtube_id(raw_youtube)
         elif v_type == Video.VideoSourceType.CLOUD:
             r2_key = data.get('r2_object_key', getattr(self.instance, 'r2_object_key', None))
-            if not r2_key or not str(r2_key).strip():
-                raise serializers.ValidationError({"r2_object_key": "Cloudflare R2 object key is required for Cloud hosted videos."})
+            orig_key = data.get('original_key', getattr(self.instance, 'original_key', None))
+            hls_key = data.get('hls_manifest_key', getattr(self.instance, 'hls_manifest_key', None))
+            if not (r2_key or orig_key or hls_key):
+                raise serializers.ValidationError({"r2_object_key": "Cloudflare R2 object key or video file is required for Cloud hosted videos."})
 
         return data
 
