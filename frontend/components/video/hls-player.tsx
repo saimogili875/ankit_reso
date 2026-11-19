@@ -155,12 +155,12 @@ export function HlsVideoPlayer({
     [videoId, lectureId, duration, onProgressUpdate]
   );
 
-  // 3. Periodic Progress Saver (every 15s while playing)
+  // 3. Periodic Progress Saver (every 30s while playing - cuts DB write load by 50% while preserving accuracy via pause/seek/visibility handlers)
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
       reportProgress();
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [isPlaying, reportProgress]);
 

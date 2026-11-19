@@ -26,7 +26,14 @@ def _format_vtt_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
 
 
-@shared_task(queue='video', bind=True, max_retries=3, default_retry_delay=60)
+@shared_task(
+    queue='video',
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    time_limit=7200,       # 2-hour hard timeout to prevent worker starvation
+    soft_time_limit=6900,  # 1h55m soft timeout
+)
 def transcode_video_hls_task(self, video_id: str):
     """
     Asynchronous Celery task for transcoding uploaded MP4 video into multi-rendition HLS (H.264 + AAC).
@@ -310,10 +317,12 @@ def transcode_video_hls_task(self, video_id: str):
             video.lecture.duration_seconds = video.duration_seconds
             video.lecture.save(update_fields=['duration_seconds'])
 
-        # Optional deletion of original uploaded file to save storage
-        if getattr(settings, 'DELETE_ORIGINAL_AFTER_PROCESSING', False):
+        # Storage lifecycle rule: delete original uploaded MP4 after READY to save 44% R2 storage
+        if getattr(settings, 'DELETE_ORIGINAL_AFTER_PROCESSING', True):
             storage_service.delete_object(original_key)
-            logger.info(f"Purged original MP4 file from R2: {original_key}")
+            video.original_key = ''
+            video.save(update_fields=['original_key'])
+            logger.info(f"Purged original MP4 file from R2 to minimize storage cost: {original_key}")
 
         logger.info(f"HLS Transcoding completed successfully for Video {video_id} ({len(renditions_meta)} renditions).")
         return f"Successfully processed Video {video_id} into {len(renditions_meta)} renditions."

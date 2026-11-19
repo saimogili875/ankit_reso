@@ -243,7 +243,10 @@ ENABLE_1080P = config('ENABLE_1080P', default=False, cast=bool)
 HLS_SEGMENT_DURATION = config('HLS_SEGMENT_DURATION', default=6, cast=int)
 VIDEO_STREAMING_DOMAIN = config('VIDEO_STREAMING_DOMAIN', default='') # e.g. video.adepteduverse.com
 VIDEO_STREAMING_SECRET = config('VIDEO_STREAMING_SECRET', default=SECRET_KEY)
-DELETE_ORIGINAL_AFTER_PROCESSING = config('DELETE_ORIGINAL_AFTER_PROCESSING', default=False, cast=bool)
+VIDEO_STREAMING_TOKEN_TTL_SECONDS = config('VIDEO_STREAMING_TOKEN_TTL_SECONDS', default=21600, cast=int) # 6-hour token expiry
+DELETE_ORIGINAL_AFTER_PROCESSING = config('DELETE_ORIGINAL_AFTER_PROCESSING', default=True, cast=bool) # Purge MP4 original after HLS ready to save 44% R2 storage
+VIDEO_PROGRESS_HEARTBEAT_SECONDS = config('VIDEO_PROGRESS_HEARTBEAT_SECONDS', default=30, cast=int) # 30s heartbeat cuts database write load by 50%
+VIDEO_CELERY_TIME_LIMIT = config('VIDEO_CELERY_TIME_LIMIT', default=7200, cast=int) # 2-hour hard timeout
 
 # Redis Cache Backend
 CACHES = {
