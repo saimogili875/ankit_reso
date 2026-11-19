@@ -32,6 +32,7 @@ class CourseClassesView(APIView):
 class SubjectListView(generics.ListAPIView):
     serializer_class = SubjectSerializer
     queryset = Subject.objects.all().order_by('name')
+    pagination_class = None
 
 class ClassSubjectsView(APIView):
     def get(self, request, pk):

@@ -399,6 +399,7 @@ class AnnouncementListView(generics.ListAPIView):
 
 class StudentDoubtListView(generics.ListCreateAPIView):
     serializer_class = DoubtSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return Doubt.objects.filter(student=self.request.user).order_by('-created_at')

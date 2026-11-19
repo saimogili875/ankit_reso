@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
 
 interface SubjectOption {
-  id: number;
+  id: string | number;
   name: string;
 }
 
@@ -28,13 +28,23 @@ interface DoubtRecord {
   title: string;
   question_text: string;
   image_url?: string | null;
-  subject?: number;
+  subject?: string | number;
   subject_name?: string;
   status: 'OPEN' | 'RESOLVED';
   reply_text?: string | null;
   replied_by_name?: string | null;
   replied_at?: string | null;
   created_at: string;
+}
+
+function extractArray<T>(data: unknown): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null && 'results' in data) {
+    const res = (data as { results: unknown }).results;
+    if (Array.isArray(res)) return res as T[];
+  }
+  return [];
 }
 
 export default function DoubtSolverPage() {
@@ -54,13 +64,16 @@ export default function DoubtSolverPage() {
     setIsLoading(true);
     try {
       const [dRes, sRes] = await Promise.all([
-        apiClient.get<DoubtRecord[]>('/doubts/my/'),
-        apiClient.get<SubjectOption[]>('/academics/subjects/').catch(() => []),
+        apiClient.get<DoubtRecord[] | { results: DoubtRecord[] }>('/doubts/my/').catch(() => []),
+        apiClient.get<SubjectOption[] | { results: SubjectOption[] }>('/academics/subjects/').catch(() => []),
       ]);
-      setDoubts(dRes || []);
-      setSubjects(sRes || []);
-      if (sRes && sRes.length > 0 && !subjectId) {
-        setSubjectId(String(sRes[0].id));
+      const loadedDoubts = extractArray<DoubtRecord>(dRes);
+      const loadedSubjects = extractArray<SubjectOption>(sRes);
+
+      setDoubts(loadedDoubts);
+      setSubjects(loadedSubjects);
+      if (loadedSubjects.length > 0 && !subjectId) {
+        setSubjectId(String(loadedSubjects[0].id));
       }
     } catch {
       setFeedback({ type: 'error', message: 'Failed to load your doubts.' });
@@ -84,7 +97,7 @@ export default function DoubtSolverPage() {
     try {
       await apiClient.post('/doubts/', {
         title: title.trim(),
-        subject: Number(subjectId),
+        subject: subjectId,
         question_text: questionText.trim(),
         image_url: imageUrl.trim() || null,
       });
@@ -174,7 +187,7 @@ export default function DoubtSolverPage() {
                 onChange={(e) => setSubjectId(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
               >
-                {subjects.map((s) => (
+                {(subjects || []).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>
@@ -235,7 +248,7 @@ export default function DoubtSolverPage() {
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
           <span>Your Submitted Doubts</span>
-          <span className="text-xs text-slate-400 font-normal">({doubts.length})</span>
+          <span className="text-xs text-slate-400 font-normal">({doubts?.length || 0})</span>
         </h2>
 
         {isLoading ? (
@@ -243,7 +256,7 @@ export default function DoubtSolverPage() {
             <Loader2 className="w-5 h-5 animate-spin text-brand-400" />
             <span className="text-xs">Loading your doubt history...</span>
           </div>
-        ) : doubts.length === 0 ? (
+        ) : (doubts?.length || 0) === 0 ? (
           <Card className="p-8 text-center bg-slate-900/40 border-slate-800">
             <p className="text-sm font-medium text-slate-300">You haven&apos;t asked any doubts yet</p>
             <p className="text-xs text-slate-500 mt-1">
@@ -252,7 +265,7 @@ export default function DoubtSolverPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {doubts.map((d) => (
+            {(doubts || []).map((d) => (
               <Card key={d.id} className="p-5 bg-slate-900/50 border-slate-800 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">

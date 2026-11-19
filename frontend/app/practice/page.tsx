@@ -113,10 +113,16 @@ export default function PracticePage() {
   useEffect(() => {
     let isMounted = true;
     setIsLoadingSubjects(true);
-    apiClient.get<ApiSubject[]>('/academics/subjects/')
+    apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>('/academics/subjects/')
       .then((data) => {
         if (!isMounted) return;
-        setSubjects(Array.isArray(data) ? data : []);
+        if (Array.isArray(data)) {
+          setSubjects(data);
+        } else if (data && Array.isArray(data.results)) {
+          setSubjects(data.results);
+        } else {
+          setSubjects([]);
+        }
       })
       .catch((err) => {
         console.warn('Failed to load subjects:', err);
