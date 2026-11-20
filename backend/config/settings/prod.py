@@ -6,6 +6,9 @@ DEBUG = False
 SECRET_KEY = config('SECRET_KEY', default='prod-secret-key-must-be-set-in-environment-variables')
 
 ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='ankit-reso.onrender.com,.onrender.com').split(',') if h.strip()]
+for _h in ['ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']:
+    if _h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_h)
 
 # WhiteNoise Static Files Storage for Production
 STORAGES = {

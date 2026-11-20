@@ -11,7 +11,10 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-adepteduverse-dev-sec
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,ankit-reso.onrender.com,.onrender.com').split(',') if h.strip()]
+for _h in ['ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']:
+    if _h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_h)
 
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()]
 

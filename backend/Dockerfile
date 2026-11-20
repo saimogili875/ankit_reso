@@ -3,6 +3,7 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc files & buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 
 WORKDIR /app
 
@@ -28,4 +29,4 @@ RUN SECRET_KEY=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
 EXPOSE 8000
 
 # Default command to run migrations and start gunicorn WSGI server
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate --noinput; gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
