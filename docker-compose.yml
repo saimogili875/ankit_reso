@@ -58,6 +58,14 @@ services:
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
       - R2_BUCKET_NAME=${R2_BUCKET_NAME}
       - R2_ENDPOINT=${R2_ENDPOINT}
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-ANKIT JEE <no-reply@adepteduverse.com>}
+      - TEXTBEE_API_KEY=${TEXTBEE_API_KEY}
+      - TEXTBEE_DEVICE_ID=${TEXTBEE_DEVICE_ID}
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +91,14 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-ANKIT JEE <no-reply@adepteduverse.com>}
+      - TEXTBEE_API_KEY=${TEXTBEE_API_KEY}
+      - TEXTBEE_DEVICE_ID=${TEXTBEE_DEVICE_ID}
     depends_on:
       backend:
         condition: service_started

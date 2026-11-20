@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   '/landing',
   '/login',
   '/register',
+  '/signup',
   '/forgot-password',
   '/reset-password',
   '/admin/login',
@@ -51,12 +52,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Authenticated users visiting /login or /register redirect to their appropriate home
-  if (isAuthenticated && (pathname === '/login' || pathname === '/register')) {
+  // 2. Authenticated users visiting /login or /register or /signup redirect to their appropriate home
+  if (isAuthenticated && (pathname === '/login' || pathname === '/register' || pathname === '/signup')) {
     if (userRole === 'ADMIN') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // 3. Admin routes require ADMIN role. A student attempting to open /admin/* goes to /

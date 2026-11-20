@@ -103,7 +103,7 @@ function LoginForm() {
       setIsLoading(false);
       setSuccessMessage('Successfully signed in! Redirecting...');
 
-      const targetPath = portal === 'admin' || response.user?.is_admin ? '/admin' : '/';
+      const targetPath = portal === 'admin' || response.user?.is_admin ? '/admin' : '/dashboard';
       setTimeout(() => {
         router.push(targetPath);
       }, 500);
@@ -193,9 +193,9 @@ function LoginForm() {
           className="space-y-4"
         >
           <AuthInput
-            label={isAdmin ? 'Administrator Email' : 'Email or Mobile Number'}
+            label={isAdmin ? 'Administrator Email' : 'Username, Gmail or Mobile'}
             type={isAdmin ? 'email' : 'text'}
-            placeholder={isAdmin ? 'admin@adepteduverse.com' : 'student@example.com or 9876543210'}
+            placeholder={isAdmin ? 'admin@adepteduverse.com' : 'Username, student@gmail.com, or 9876543210'}
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             icon={isAdmin ? ShieldCheck : Mail}
@@ -269,7 +269,7 @@ function LoginForm() {
             <>
               Don’t have an account?{' '}
               <Link
-                href="/register"
+                href="/signup"
                 className="text-blue-400 hover:text-blue-300 font-semibold transition-colors inline-flex items-center gap-1"
               >
                 Create account

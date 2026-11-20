@@ -15,12 +15,39 @@ export interface User {
   id: string;
   email: string;
   username: string;
+  full_name?: string;
   first_name: string;
   last_name: string;
   role: Role;
+  phone?: string;
   phone_number?: string;
   is_verified: boolean;
+  is_email_verified?: boolean;
+  is_phone_verified?: boolean;
+  is_admin?: boolean;
   student_profile?: StudentProfile;
+}
+
+export interface OtpSendResponse {
+  message: string;
+  cooldown?: number;
+  error?: string;
+}
+
+export interface OtpVerifyResponse {
+  verified: boolean;
+  email_token?: string;
+  phone_token?: string;
+  reset_token?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface SignupResponse {
+  message: string;
+  user_id: string;
+  username: string;
+  email: string;
 }
 
 export interface Subject {

@@ -185,6 +185,10 @@ REST_FRAMEWORK = {
         'user': '120/minute',
         'login': '10/minute',
         'register': '10/minute',
+        'signup': '10/minute',
+        'otp_send': '5/minute',
+        'otp_verify': '15/minute',
+        'password_reset': '5/minute',
         'test_submit': '15/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -316,3 +320,20 @@ LOGGING = {
         },
     },
 }
+
+# Email Backend & SMTP Configuration
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend' if (DEBUG or not config('EMAIL_HOST_USER', default='')) else 'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='ANKIT JEE <no-reply@adepteduverse.com>')
+
+# TextBee SMS Gateway Configuration
+TEXTBEE_API_KEY = config('TEXTBEE_API_KEY', default='')
+TEXTBEE_DEVICE_ID = config('TEXTBEE_DEVICE_ID', default='')
+

@@ -158,6 +158,42 @@ The backend abstraction module inside `backend/storage/service.py` provides clea
 
 ---
 
+## 🔐 OTP Authentication, Email SMTP & TextBee SMS Setup
+
+ANKIT JEE features dual-channel OTP verification for user registrations, password resets, and contact updates.
+
+### 1. Email Verification (SMTP)
+Emails are dispatched via Celery using Django's SMTP backend. To configure with **Gmail App Password** or any SMTP provider (Brevo, Resend):
+```env
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your_email@gmail.com
+EMAIL_HOST_PASSWORD=your_16_character_app_password
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=ANKIT JEE <no-reply@adepteduverse.com>
+```
+*In `DEBUG=True` mode, if `EMAIL_HOST_USER` is empty, emails automatically log to the terminal console without sending real emails.*
+
+### 2. SMS Gateway Setup (TextBee)
+Mobile SMS OTPs are routed through the **TextBee Gateway API** via an Android device gateway.
+1. Sign up on [TextBee](https://textbee.dev/) and install the TextBee Android app on your gateway phone.
+2. Grant SMS permissions and note your **API Key** and **Device ID**.
+3. Add credentials to `.env`:
+```env
+TEXTBEE_API_KEY=your_textbee_api_key_here
+TEXTBEE_DEVICE_ID=your_textbee_device_id_here
+```
+*In `DEBUG=True` mode, if `TEXTBEE_API_KEY` is empty, SMS OTPs automatically mock-print to terminal stdout for zero-cost local development and testing.*
+
+### 3. Testing the Auth Flow Locally
+Run the backend test suite:
+```bash
+python manage.py test apps.accounts.tests
+```
+
+
+---
+
 ## 🌐 API Architecture
 
 - `/api/health/`: System and database health status
