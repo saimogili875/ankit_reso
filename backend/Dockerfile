@@ -21,8 +21,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source code
 COPY . /app/
 
+RUN SECRET_KEY=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
+    python manage.py collectstatic --noinput
+
 # Expose Django REST server port
 EXPOSE 8000
 
-# Default command to run gunicorn WSGI server
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Default command to run migrations and start gunicorn WSGI server
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
