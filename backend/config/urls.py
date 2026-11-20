@@ -21,6 +21,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # System & Health
+    path('', health_check, name='health-check-root'),
+    path('health/', health_check, name='health-check-short'),
+    path('health', health_check, name='health-check-no-slash'),
     path('api/health/', health_check, name='health-check'),
 
     # OpenAPI Schema & Docs

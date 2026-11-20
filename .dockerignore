@@ -1,0 +1,34 @@
+# Version control
+.git/
+.gitignore
+
+# Environment & secret files
+.env
+.env.*
+!.env.example
+
+# Frontend (Next.js is hosted separately on Vercel)
+frontend/
+node_modules/
+
+# Python / Django runtime and cache artifacts
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/*.so
+.Python
+backend/venv/
+backend/env/
+venv/
+env/
+ENV/
+backend/staticfiles/
+backend/media/
+backend/db.sqlite3
+backups/
+
+# Logs & OS artifacts
+*.log
+**/*.log
+.DS_Store
+Thumbs.db
