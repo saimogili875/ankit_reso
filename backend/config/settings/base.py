@@ -24,6 +24,14 @@ for _origin in ['https://adepteduverse.com', 'https://www.adepteduverse.com', 'h
     if _origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_origin)
 
+DEFAULT_CORS_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default=DEFAULT_CORS_ORIGINS).split(',') if origin.strip()]
+for _origin in ['https://adepteduverse.com', 'https://www.adepteduverse.com', 'https://ankit-reso.onrender.com', 'http://localhost:3000', 'http://127.0.0.1:3000']:
+    if _origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_origin)
+
+CORS_ALLOW_CREDENTIALS = True
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -192,30 +200,27 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Redis & Cache Backend
-REDIS_URL = config('REDIS_URL', default=None)
-REDIS_HOST = config('REDIS_HOST', default='localhost')
+REDIS_URL = config('REDIS_URL', default='redis://redis:6379/0')
+REDIS_HOST = config('REDIS_HOST', default='redis')
 REDIS_PORT = config('REDIS_PORT', default='6379')
 
-if REDIS_URL:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': REDIS_URL,
-            'TIMEOUT': 300,
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'IGNORE_EXCEPTIONS': True,
         }
     }
-    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
-    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
-else:
-    # Safe fallback to in-memory LocMemCache when REDIS_URL is not set (e.g. Render standalone web service)
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'adept-locmem-cache',
-        }
-    }
-    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='memory://')
-    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='cache+locmem://')
+}
+
+SESSION_ENGINE = config('SESSION_ENGINE', default='django.contrib.sessions.backends.cache')
+SESSION_CACHE_ALIAS = 'default'
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
