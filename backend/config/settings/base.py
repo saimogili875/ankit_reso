@@ -11,12 +11,18 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-adepteduverse-dev-sec
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,ankit-reso.onrender.com,.onrender.com').split(',') if h.strip()]
-for _h in ['ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']:
+# Host & CSRF Configuration
+DEFAULT_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,localhost,127.0.0.1,testserver'
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default=DEFAULT_ALLOWED_HOSTS).split(',') if h.strip()]
+for _h in ['adepteduverse.com', 'www.adepteduverse.com', 'ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1', 'testserver']:
     if _h not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_h)
 
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()]
+DEFAULT_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_CSRF_ORIGINS).split(',') if origin.strip()]
+for _origin in ['https://adepteduverse.com', 'https://www.adepteduverse.com', 'https://ankit-reso.onrender.com']:
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
 # Application definition
 INSTALLED_APPS = [
@@ -80,8 +86,16 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Configuration
 DATABASE_URL = config('DATABASE_URL', default=None)
-CONN_MAX_AGE = config('CONN_MAX_AGE', default=600, cast=int)
-DISABLE_SERVER_SIDE_CURSORS = config('DISABLE_SERVER_SIDE_CURSORS', default=True, cast=bool)
+CONN_MAX_AGE = config('CONN_MAX_AGE', default=60, cast=int)
+POSTGRES_HOST = config('POSTGRES_HOST', default='localhost')
+POSTGRES_PORT = config('POSTGRES_PORT', default='5432')
+
+# Detect if using Supabase or PgBouncer transaction pooler (port 6543)
+is_pooler = False
+if DATABASE_URL:
+    is_pooler = ':6543' in DATABASE_URL or 'pooler' in DATABASE_URL.lower()
+
+DISABLE_SERVER_SIDE_CURSORS = config('DISABLE_SERVER_SIDE_CURSORS', default=is_pooler, cast=bool)
 
 if DATABASE_URL:
     try:
@@ -94,7 +108,7 @@ if DATABASE_URL:
                 ssl_require=True,
             )
         }
-        if DISABLE_SERVER_SIDE_CURSORS:
+        if DISABLE_SERVER_SIDE_CURSORS or is_pooler:
             DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
     except ImportError:
         parsed_db = urlparse(DATABASE_URL)
@@ -107,28 +121,16 @@ if DATABASE_URL:
                 'HOST': parsed_db.hostname or '',
                 'PORT': str(parsed_db.port) if parsed_db.port else '5432',
                 'CONN_MAX_AGE': CONN_MAX_AGE,
-                'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+                'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS or is_pooler,
                 'OPTIONS': {'sslmode': 'require'},
             }
         }
 else:
-    POSTGRES_DB = config('POSTGRES_DB', default='adepteduverse')
-    POSTGRES_USER = config('POSTGRES_USER', default='postgres')
-    POSTGRES_PASSWORD = config('POSTGRES_PASSWORD', default='postgres')
-    POSTGRES_HOST = config('POSTGRES_HOST', default='postgres')
-    POSTGRES_PORT = config('POSTGRES_PORT', default='5432')
-
+    # Safe local fallback to SQLite when DATABASE_URL is not set
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': POSTGRES_DB,
-            'USER': POSTGRES_USER,
-            'PASSWORD': POSTGRES_PASSWORD,
-            'HOST': POSTGRES_HOST,
-            'PORT': POSTGRES_PORT,
-            'CONN_MAX_AGE': CONN_MAX_AGE,
-            'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
-            'OPTIONS': {'sslmode': 'require'},
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -189,16 +191,32 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# Redis & Celery
+# Redis & Cache Backend
 REDIS_URL = config('REDIS_URL', default=None)
-REDIS_HOST = config('REDIS_HOST', default='redis')
+REDIS_HOST = config('REDIS_HOST', default='localhost')
 REDIS_PORT = config('REDIS_PORT', default='6379')
 
-if not REDIS_URL:
-    REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'TIMEOUT': 300,
+        }
+    }
+    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
+    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
+else:
+    # Safe fallback to in-memory LocMemCache when REDIS_URL is not set (e.g. Render standalone web service)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'adept-locmem-cache',
+        }
+    }
+    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='memory://')
+    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='cache+locmem://')
 
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -252,15 +270,6 @@ VIDEO_STREAMING_TOKEN_TTL_SECONDS = config('VIDEO_STREAMING_TOKEN_TTL_SECONDS', 
 DELETE_ORIGINAL_AFTER_PROCESSING = config('DELETE_ORIGINAL_AFTER_PROCESSING', default=True, cast=bool) # Purge MP4 original after HLS ready to save 44% R2 storage
 VIDEO_PROGRESS_HEARTBEAT_SECONDS = config('VIDEO_PROGRESS_HEARTBEAT_SECONDS', default=30, cast=int) # 30s heartbeat cuts database write load by 50%
 VIDEO_CELERY_TIME_LIMIT = config('VIDEO_CELERY_TIME_LIMIT', default=7200, cast=int) # 2-hour hard timeout
-
-# Redis Cache Backend
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_URL,
-        'TIMEOUT': 300,
-    }
-}
 
 # Cloudflare R2 Credentials & Storage Configuration
 R2_ACCOUNT_ID = config('R2_ACCOUNT_ID', default='')

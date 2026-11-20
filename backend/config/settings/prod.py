@@ -1,12 +1,14 @@
 from .base import *
 
-DEBUG = False
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-# Production MUST provide a secure SECRET_KEY in environment variables
-SECRET_KEY = config('SECRET_KEY', default='prod-secret-key-must-be-set-in-environment-variables')
+# Production SECRET_KEY: Read from environment
+SECRET_KEY = config('SECRET_KEY', default=SECRET_KEY)
 
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='ankit-reso.onrender.com,.onrender.com').split(',') if h.strip()]
-for _h in ['ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']:
+# Host Configuration: Read from ALLOWED_HOSTS env var
+DEFAULT_PROD_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,localhost,127.0.0.1,testserver'
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default=DEFAULT_PROD_ALLOWED_HOSTS).split(',') if h.strip()]
+for _h in ['adepteduverse.com', 'www.adepteduverse.com', 'ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1', 'testserver']:
     if _h not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_h)
 
@@ -35,12 +37,16 @@ if FRONTEND_URL and FRONTEND_URL not in cors_origins:
 CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
+DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com'
 csrf_origins = [
     origin.strip() for origin in config(
         'CSRF_TRUSTED_ORIGINS',
-        default='https://adepteduverse.com,https://app.adepteduverse.com'
+        default=DEFAULT_PROD_CSRF_ORIGINS
     ).split(',') if origin.strip()
 ]
+for _origin in ['https://adepteduverse.com', 'https://www.adepteduverse.com', 'https://ankit-reso.onrender.com']:
+    if _origin not in csrf_origins:
+        csrf_origins.append(_origin)
 if FRONTEND_URL and FRONTEND_URL not in csrf_origins:
     csrf_origins.append(FRONTEND_URL)
 
@@ -60,6 +66,7 @@ CSRF_COOKIE_HTTPONLY = False
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+SECURE_REDIRECT_EXEMPT = [r'^healthz', r'^health', r'^$', r'^api/health']
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'

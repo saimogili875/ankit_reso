@@ -7,7 +7,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from apps.core.views import health_check
+from apps.core.views import health_check, healthz, health_deep
 from apps.content.views import AnnouncementListView, StudentDoubtListView
 from apps.content.schedule_views import (
     ScheduleListView,
@@ -21,10 +21,19 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # System & Health
-    path('', health_check, name='health-check-root'),
-    path('health/', health_check, name='health-check-short'),
-    path('health', health_check, name='health-check-no-slash'),
-    path('api/health/', health_check, name='health-check'),
+    # Lightweight checks (200 OK without DB/Redis load)
+    path('', healthz, name='root'),
+    path('healthz', healthz, name='healthz-no-slash'),
+    path('healthz/', healthz, name='healthz'),
+    path('health', healthz, name='health-no-slash'),
+    path('health/', healthz, name='health'),
+    path('api/healthz/', healthz, name='api-healthz'),
+
+    # Deep checks (verifies Database and Redis/Cache; returns 503 if failing)
+    path('health/deep', health_deep, name='health-deep-no-slash'),
+    path('health/deep/', health_deep, name='health-deep'),
+    path('api/health/', health_deep, name='health-check'),
+    path('api/health/deep/', health_deep, name='api-health-deep'),
 
     # OpenAPI Schema & Docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
