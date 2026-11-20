@@ -31,5 +31,5 @@ RUN SECRET_KEY=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
 EXPOSE 10000
 EXPOSE 8000
 
-# Run database migrations on start and launch Gunicorn binding to 0.0.0.0:$PORT
-CMD ["sh", "-c", "python manage.py migrate --noinput; gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 3 --timeout 120"]
+# Run database migrations on start, ensure admin user exists, and launch Gunicorn binding to 0.0.0.0:$PORT
+CMD ["sh", "-c", "python manage.py migrate --noinput; python manage.py ensure_admin; gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 3 --timeout 120"]

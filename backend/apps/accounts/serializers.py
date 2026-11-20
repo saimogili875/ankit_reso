@@ -24,7 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'is_verified', 'is_email_verified', 'is_phone_verified', 'is_admin']
 
     def get_is_admin(self, obj):
-        return bool(obj.role == User.Role.ADMIN or obj.is_superuser)
+        return bool(str(obj.role).upper() == User.Role.ADMIN or obj.is_superuser or obj.is_staff)
 
 
 # --- OTP Serializers ---
@@ -244,11 +244,15 @@ class LoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled. Please contact support.")
 
-        is_admin_user = (user.role == User.Role.ADMIN or user.is_superuser)
+        is_admin_user = (str(user.role).upper() == User.Role.ADMIN or user.is_superuser or user.is_staff)
 
         if portal == 'admin':
             if not is_admin_user:
                 raise serializers.ValidationError(GENERIC_ERROR)
+            if user.role != User.Role.ADMIN or not user.is_staff:
+                user.role = User.Role.ADMIN
+                user.is_staff = True
+                user.save(update_fields=['role', 'is_staff'])
         elif portal == 'student':
             if is_admin_user:
                 raise serializers.ValidationError("Use Admin login")

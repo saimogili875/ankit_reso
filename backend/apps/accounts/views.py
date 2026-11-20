@@ -203,9 +203,12 @@ class LoginView(APIView):
                 'user': user_data
             }, status=status.HTTP_200_OK)
 
+            from django.conf import settings
+            cookie_samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
+            cookie_secure = getattr(settings, 'SESSION_COOKIE_SECURE', False)
             max_age = 1209600 if remember_me else None
-            response.set_cookie('user_role', user.role, max_age=max_age, samesite='Lax', secure=False, httponly=False)
-            response.set_cookie('auth_session', '1', max_age=max_age, samesite='Lax', secure=False, httponly=False)
+            response.set_cookie('user_role', user.role, max_age=max_age, samesite=cookie_samesite, secure=cookie_secure, httponly=False)
+            response.set_cookie('auth_session', '1', max_age=max_age, samesite=cookie_samesite, secure=cookie_secure, httponly=False)
             return response
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
