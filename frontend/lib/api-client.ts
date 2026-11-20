@@ -21,6 +21,43 @@ export function buildApiUrl(endpoint: string): string {
   return `${API_BASE_URL}${cleanEndpoint}`;
 }
 
+// Track in-flight redirects to prevent infinite redirection loops
+let isRedirecting = false;
+
+const PUBLIC_PATHS = [
+  '/',
+  '/landing',
+  '/login',
+  '/register',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/admin/login',
+  '/admin/forgot-password',
+  '/admin/reset-password',
+];
+
+/**
+ * Single source of truth for clearing authentication cookies on the frontend domain.
+ */
+export function clearAuthCookies(): void {
+  if (typeof document === 'undefined') return;
+  const pastDate = 'Thu, 01 Jan 1970 00:00:00 GMT';
+  document.cookie = `auth_session=; path=/; expires=${pastDate}; SameSite=Lax`;
+  document.cookie = `user_role=; path=/; expires=${pastDate}; SameSite=Lax`;
+  document.cookie = `sessionid=; path=/; expires=${pastDate}; SameSite=Lax`;
+}
+
+/**
+ * Single source of truth for setting frontend-domain session state cookies for Next.js middleware.
+ */
+export function setAuthCookies(role: string, rememberMe = false): void {
+  if (typeof document === 'undefined') return;
+  const maxAge = rememberMe ? '; max-age=1209600' : '';
+  document.cookie = `auth_session=1; path=/; SameSite=Lax${maxAge}`;
+  document.cookie = `user_role=${role}; path=/; SameSite=Lax${maxAge}`;
+}
+
 let cachedCsrfToken: string | null = null;
 let csrfFetchPromise: Promise<string | null> | null = null;
 
@@ -159,20 +196,43 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
       const formatted = formatApiError(errorData, response.status);
 
       // Handle 401/403 redirects according to authentication policy
-      const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register') || endpoint.includes('/auth/csrf');
+      const isAuthCheckEndpoint = endpoint.includes('/auth/me');
+      const isAuthEndpoint =
+        endpoint.includes('/auth/login') ||
+        endpoint.includes('/auth/register') ||
+        endpoint.includes('/auth/signup') ||
+        endpoint.includes('/auth/csrf') ||
+        isAuthCheckEndpoint;
+
       if (typeof window !== 'undefined' && !isAuthEndpoint) {
+        const currentPath = window.location.pathname;
+        const isPublicRoute = PUBLIC_PATHS.some((path) =>
+          path === '/' ? currentPath === '/' : currentPath === path || currentPath.startsWith(`${path}/`)
+        );
+
         if (response.status === 401) {
-          // Clear session cookies and redirect to login
-          document.cookie = 'auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+          clearAuthCookies();
+          if (!isPublicRoute && !isRedirecting) {
+            isRedirecting = true;
             window.location.href = '/login';
           }
         } else if (response.status === 403) {
-          if (window.location.pathname.startsWith('/admin')) {
+          const detail = (typeof errorData?.detail === 'string' ? errorData.detail : '').toLowerCase();
+          const isCredentialIssue =
+            detail.includes('credentials') ||
+            detail.includes('not provided') ||
+            detail.includes('not authenticated') ||
+            detail.includes('authentication credentials');
+
+          if (isCredentialIssue) {
+            clearAuthCookies();
+            if (!isPublicRoute && !isRedirecting) {
+              isRedirecting = true;
+              window.location.href = '/login';
+            }
+          } else if (currentPath.startsWith('/admin') && !isRedirecting) {
+            isRedirecting = true;
             window.location.href = '/';
-          } else if (!window.location.pathname.startsWith('/login')) {
-            window.location.href = '/login';
           }
         }
       }
@@ -206,10 +266,7 @@ export const apiClient = {
     } catch {
       // ignore
     } finally {
-      if (typeof document !== 'undefined') {
-        document.cookie = 'auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      }
+      clearAuthCookies();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }

@@ -198,18 +198,10 @@ class LoginView(APIView):
                 request.session.set_expiry(0)       # browser session
 
             user_data = UserSerializer(user).data
-            response = Response({
+            return Response({
                 'message': 'Login successful',
                 'user': user_data
             }, status=status.HTTP_200_OK)
-
-            from django.conf import settings
-            cookie_samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
-            cookie_secure = getattr(settings, 'SESSION_COOKIE_SECURE', False)
-            max_age = 1209600 if remember_me else None
-            response.set_cookie('user_role', user.role, max_age=max_age, samesite=cookie_samesite, secure=cookie_secure, httponly=False)
-            response.set_cookie('auth_session', '1', max_age=max_age, samesite=cookie_samesite, secure=cookie_secure, httponly=False)
-            return response
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -324,9 +316,18 @@ class ResetPasswordView(APIView):
 # ==========================================
 
 class CurrentUserView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    """
+    Returns current user profile. AllowAny for GET so client can inspect session
+    status without triggering 401/403 loops. Mutating operations (PATCH) require authentication.
+    """
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'authenticated': False, 'user': None}, status=status.HTTP_200_OK)
         serializer = UserSerializer(request.user)
         return Response({'authenticated': True, 'user': serializer.data}, status=status.HTTP_200_OK)
 

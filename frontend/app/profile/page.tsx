@@ -19,6 +19,7 @@ import {
   Target,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 
 interface UserData {
   id: string;
@@ -38,6 +39,7 @@ interface UserData {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: authUser, isLoading: authLoading, refresh } = useAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -51,28 +53,21 @@ export default function ProfilePage() {
   const [targetYear, setTargetYear] = useState('2025');
   const [bio, setBio] = useState('');
 
-  const loadUser = async () => {
-    try {
-      const data = await apiClient.get<{ authenticated: boolean; user: UserData }>('/auth/me/');
-      if (data && data.user) {
-        setUser(data.user);
-        setFirstName(data.user.first_name || '');
-        setLastName(data.user.last_name || '');
-        setPhoneNumber(data.user.phone_number || '');
-        setTargetExam(data.user.student_profile?.target_exam || 'JEE Main & Advanced');
-        setTargetYear(String(data.user.student_profile?.target_year || 2025));
-        setBio(data.user.student_profile?.bio || '');
+  useEffect(() => {
+    if (!authLoading) {
+      if (authUser) {
+        const u = authUser as unknown as UserData;
+        setUser(u);
+        setFirstName(u.first_name || '');
+        setLastName(u.last_name || '');
+        setPhoneNumber(u.phone_number || '');
+        setTargetExam(u.student_profile?.target_exam || 'JEE Main & Advanced');
+        setTargetYear(String(u.student_profile?.target_year || 2025));
+        setBio(u.student_profile?.bio || '');
       }
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load profile data.' });
-    } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadUser();
-  }, []);
+  }, [authUser, authLoading]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +86,7 @@ export default function ProfilePage() {
 
       if (res && res.user) {
         setUser(res.user);
+        await refresh();
         setFeedback({ type: 'success', message: 'Profile settings saved to database successfully!' });
       }
     } catch {

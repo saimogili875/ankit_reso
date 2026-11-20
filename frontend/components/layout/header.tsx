@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Bell, ChevronDown, GraduationCap, CheckCircle, AlertTriangle, Info, ExternalLink, User, LogOut } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 
 interface Announcement {
   id: string;
@@ -31,26 +32,10 @@ interface NotificationResponse {
   notifications: NotificationItem[];
 }
 
-interface CurrentUserResponse {
-  authenticated: boolean;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    first_name: string;
-    last_name: string;
-    role: string;
-    is_admin: boolean;
-    student_profile?: {
-      target_exam?: string;
-      target_year?: number;
-    } | null;
-  } | null;
-}
 
 export const Header: React.FC = () => {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<CurrentUserResponse['user'] | null>(null);
+  const { user: currentUser } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -65,15 +50,11 @@ export const Header: React.FC = () => {
 
     async function loadData() {
       try {
-        const [meRes, annRes, notifRes] = await Promise.all([
-          apiClient.get<CurrentUserResponse>('/auth/me/'),
+        const [annRes, notifRes] = await Promise.all([
           apiClient.get<Announcement[]>('/announcements/').catch(() => []),
           apiClient.get<NotificationResponse>('/notifications/').catch(() => null),
         ]);
         if (isMounted) {
-          if (meRes?.authenticated && meRes.user) {
-            setCurrentUser(meRes.user);
-          }
           if (Array.isArray(annRes)) {
             setAnnouncements(annRes);
           }

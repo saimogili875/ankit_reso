@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import './landing.css';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { AuthProvider } from '@/hooks/use-auth';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} antialiased bg-slate-950 text-slate-100`}>
-        <DashboardShell>{children}</DashboardShell>
+        <AuthProvider>
+          <DashboardShell>{children}</DashboardShell>
+        </AuthProvider>
       </body>
     </html>
   );

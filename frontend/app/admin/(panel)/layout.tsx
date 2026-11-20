@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -28,18 +28,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-interface CurrentUserResponse {
-  authenticated: boolean;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    first_name: string;
-    last_name: string;
-    role: string;
-    is_admin: boolean;
-  } | null;
-}
 
 const adminNav = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
@@ -61,49 +49,21 @@ const adminNav = [
 export default function AdminPanelLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [adminUser, setAdminUser] = useState<CurrentUserResponse['user'] | null>(null);
+  const { user: adminUser, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function checkAdminAuth() {
-      try {
-        const data = await apiClient.get<CurrentUserResponse>('/auth/me/');
-        if (!isMounted) return;
-
-        if (!data.authenticated || !data.user || !data.user.is_admin) {
-          router.replace('/login?role=admin');
-          return;
-        }
-
-        setAdminUser(data.user);
-        setIsLoading(false);
-      } catch {
-        if (!isMounted) return;
+    if (!isLoading) {
+      if (!adminUser || !adminUser.is_admin) {
         router.replace('/login?role=admin');
       }
     }
-
-    checkAdminAuth();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
+  }, [adminUser, isLoading, router]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    try {
-      await apiClient.post('/auth/logout/');
-    } catch {
-      // Proceed with redirection even if network fails
-    } finally {
-      router.push('/login?role=admin');
-    }
+    await logout();
   };
 
   if (isLoading) {

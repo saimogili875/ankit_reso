@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
+import { useAuth } from '@/hooks/use-auth';
 
 export interface DashboardShellProps {
   children: React.ReactNode;
@@ -23,18 +24,7 @@ const AUTH_PATHS = [
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const hasSession = document.cookie.split(';').some((item) => {
-      const trimmed = item.trim();
-      return (
-        trimmed.startsWith('auth_session=') ||
-        trimmed.startsWith('sessionid=')
-      );
-    });
-    setIsAuthenticated(hasSession);
-  }, [pathname]);
+  const { isAuthenticated } = useAuth();
 
   const isAuthPage = AUTH_PATHS.some(
     (path) =>

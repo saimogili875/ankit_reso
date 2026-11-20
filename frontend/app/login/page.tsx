@@ -11,13 +11,15 @@ import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { FormMessage } from '@/components/auth/form-message';
 import { Mail, ShieldCheck, Lock, ArrowRight, GraduationCap } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, setAuthCookies } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 
 type PortalRole = 'student' | 'admin';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user: authUser, isLoading: authLoading, refresh } = useAuth();
 
   const roleParam = searchParams.get('role');
   const initialRole: PortalRole = roleParam?.toLowerCase() === 'admin' ? 'admin' : 'student';
@@ -33,6 +35,14 @@ function LoginForm() {
 
   const studentTabRef = useRef<HTMLButtonElement>(null);
   const adminTabRef = useRef<HTMLButtonElement>(null);
+
+  // If already authenticated according to /auth/me/, redirect away from login
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      const target = authUser.is_admin ? '/admin' : '/dashboard';
+      router.replace(target);
+    }
+  }, [authUser, authLoading, router]);
 
   useEffect(() => {
     if (roleParam?.toLowerCase() === 'admin') {
@@ -96,9 +106,8 @@ function LoginForm() {
 
       // Set client session cookies for Next.js middleware and immediate state
       const role = response.user?.role || (response.user?.is_admin ? 'ADMIN' : 'STUDENT');
-      const maxAge = rememberMe ? '; max-age=1209600' : '';
-      document.cookie = `auth_session=1; path=/; SameSite=Lax${maxAge}`;
-      document.cookie = `user_role=${role}; path=/; SameSite=Lax${maxAge}`;
+      setAuthCookies(role, rememberMe);
+      await refresh();
 
       setIsLoading(false);
       setSuccessMessage('Successfully signed in! Redirecting...');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
@@ -23,11 +23,13 @@ import {
   BarChart2,
   AtSign,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, clearAuthCookies } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 import type { User, OtpSendResponse, OtpVerifyResponse } from '@/types';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user: authUser, isLoading: authLoading, refresh, logout } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -73,41 +75,30 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, [phoneCooldown]);
 
-  // Load User Data
-  const loadUser = useCallback(async () => {
-    try {
-      const res = await apiClient.get<{ authenticated: boolean; user: User }>('/auth/me/');
-      if (res && res.user) {
-        setUser(res.user);
-        setFullName(res.user.full_name || `${res.user.first_name || ''} ${res.user.last_name || ''}`.trim());
-        setUsername(res.user.username || '');
-        setTargetExam(res.user.student_profile?.target_exam || 'BOTH');
-        setTargetYear(String(res.user.student_profile?.target_year || 2025));
-        setBio(res.user.student_profile?.bio || '');
+  // Sync User Data from Auth Context
+  useEffect(() => {
+    if (!authLoading) {
+      if (authUser) {
+        const u = authUser as unknown as User;
+        setUser(u);
+        setFullName(u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim());
+        setUsername(u.username || '');
+        setTargetExam(u.student_profile?.target_exam || 'BOTH');
+        setTargetYear(String(u.student_profile?.target_year || 2025));
+        setBio(u.student_profile?.bio || '');
+        setIsLoading(false);
       } else {
         router.push('/login');
       }
-    } catch {
-      router.push('/login');
-    } finally {
-      setIsLoading(false);
     }
-  }, [router]);
-
-  useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+  }, [authUser, authLoading, router]);
 
   // Handle Logout
   const handleLogout = async () => {
     try {
-      await apiClient.post('/auth/logout/', {});
+      await logout();
     } catch {
-      // Ignore
-    } finally {
-      document.cookie = 'auth_session=; path=/; max-age=0';
-      document.cookie = 'user_role=; path=/; max-age=0';
-      document.cookie = 'sessionid=; path=/; max-age=0';
+      clearAuthCookies();
       router.push('/login');
     }
   };
@@ -222,6 +213,7 @@ export default function DashboardPage() {
 
       const res = await apiClient.patch<{ message: string; user: User }>('/auth/me/', payload);
       setUser(res.user);
+      await refresh();
       setSuccessMessage('Profile updated successfully.');
       setIsEditing(false);
       setIsChangingEmail(false);

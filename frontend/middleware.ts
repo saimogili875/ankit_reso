@@ -43,6 +43,16 @@ export function middleware(request: NextRequest) {
   const userRole = request.cookies.get('user_role')?.value;
   const isAuthenticated = Boolean(sessionCookie?.value);
 
+  // Note on Architecture & Cookie Writers:
+  // In our split-domain deployment (Next.js on Vercel/Render, Django API on Render),
+  // cookies written by the backend API domain are not visible to Next.js middleware.
+  // The frontend helper (setAuthCookies / clearAuthCookies) is the sole authoritative writer
+  // for auth_session and user_role cookies on the frontend origin.
+  // We explicitly do NOT redirect authenticated users away from /login or /register inside
+  // middleware based on cookies alone: stale client cookies would cause an infinite redirect
+  // loop if the backend session had expired. Instead, login/page.tsx inspects live /auth/me/
+  // state via useAuth() before performing client-side navigation.
+
   // 1. Unauthenticated users trying to access protected routes redirect to login
   if (!isAuthenticated && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url);
@@ -52,15 +62,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Authenticated users visiting /login or /register or /signup redirect to their appropriate home
-  if (isAuthenticated && (pathname === '/login' || pathname === '/register' || pathname === '/signup')) {
-    if (userRole === 'ADMIN') {
-      return NextResponse.redirect(new URL('/admin', request.url));
-    }
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  // 3. Admin routes require ADMIN role. A student attempting to open /admin/* goes to /
+  // 2. Admin routes require ADMIN role (UX-level guard; backend IsAdminRole enforces security)
   if (pathname.startsWith('/admin')) {
     if (userRole !== 'ADMIN') {
       return NextResponse.redirect(new URL('/', request.url));
