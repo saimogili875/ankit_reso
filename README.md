@@ -205,7 +205,32 @@ python manage.py test apps.accounts.tests
 - `/api/tests/`: Mock tests & test attempt management
 - `/api/progress/`: Student progress metrics
 - `/api/materials/`: Study material & PDF notes metadata
+- `/api/banners/`: Admin-managed promotional banners & public slider feed
 - `/api/analytics/`: Detailed performance analytics
+
+---
+
+## 🎨 Admin-Managed Banner Slider System
+
+The platform includes dynamic promotional image carousels for the Homepage hero and Login portal.
+
+### Features
+- **Admin Studio** at `/admin/banners` with canvas-based cropping (16:9, 4:3, 1:1, free presets), 90° rotation, zoom, and client-side WebP compression.
+- **Pillow Image Processing**: Auto-resizes to max 1600px width, strips EXIF metadata, and converts to high-efficiency WebP format.
+- **Cloudflare R2 Storage**: Uploads securely to R2 bucket with automated fallback to local media for local dev.
+- **Individual Slide Timing**: Each slide can be assigned its own display duration (2 to 30 seconds).
+- **Placement & Quota**: Targeted placement (`home`, `login`, or `both`) with strict validation limiting active slides to 10 per placement.
+- **Smooth Frontend Slider**: Responsive auto-advance with touch gestures/swipe, hover pause, and `prefers-reduced-motion` compliance.
+
+### Cloudflare R2 Environment Variables
+Ensure the following variables are configured in production (e.g., Render / backend `.env`):
+```env
+R2_ACCOUNT_ID=your_cloudflare_account_id
+R2_ACCESS_KEY_ID=your_r2_access_key_id
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+R2_BUCKET_NAME=your_r2_bucket_name
+R2_PUBLIC_URL=https://pub-xxxxxx.r2.dev # or custom CDN domain
+```
 
 ---
 

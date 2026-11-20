@@ -24,6 +24,7 @@ import {
   Calendar,
   GraduationCap,
   BarChart2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -45,6 +46,7 @@ const adminNav = [
   { label: 'Courses & Batches', href: '/admin/courses', icon: GraduationCap },
   { label: 'Schedule', href: '/admin/schedule', icon: Calendar },
   { label: 'Home & Slides', href: '/admin/home', icon: Sliders },
+  { label: 'Banner Sliders', href: '/admin/banners', icon: ImageIcon },
   { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree },
   { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle },
   { label: 'Videos & Media', href: '/admin/videos', icon: Video },

@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { ShieldCheck, Sparkles, BookOpen } from 'lucide-react';
+import { BannerSlider } from '@/components/banners/BannerSlider';
 
 export interface AuthLayoutProps {
   children: React.ReactNode;
@@ -106,11 +107,20 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, isAdmin = fals
               </div>
               <span>Physics, Chemistry & Mathematics syllabus coverage</span>
             </div>
+
+            {/* Left Panel Promotional Banner Slider */}
+            <div className="w-full max-w-lg pt-4">
+              <BannerSlider placement="login" />
+            </div>
           </div>
 
           {/* RIGHT AUTH CARD CONTAINER (Responsive 100% width on mobile 360-412px, centered col-span-5/6 on desktop) */}
-          <div className="col-span-1 lg:col-span-6 xl:col-span-5 flex justify-center w-full">
+          <div className="col-span-1 lg:col-span-6 xl:col-span-5 flex flex-col items-center justify-center w-full">
             {children}
+            {/* Mobile-only compact banner slider placed below the auth card */}
+            <div className="w-full max-w-md mt-6 lg:hidden">
+              <BannerSlider placement="login" isCompact />
+            </div>
           </div>
 
         </div>

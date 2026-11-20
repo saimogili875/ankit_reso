@@ -939,13 +939,14 @@
 
 .portrait-halo {
   position: relative;
-  width: 330px;
-  height: 330px;
+  width: 320px;
+  height: 320px;
   border-radius: 50%;
   padding: 10px;
   background: radial-gradient(circle, rgba(216, 185, 122, 0.25) 0%, transparent 70%);
   border: 1px solid var(--border-gold);
   box-shadow: 0 0 50px rgba(216, 185, 122, 0.2);
+  margin-bottom: 24px;
 }
 
 .teacher-pic {
@@ -953,7 +954,7 @@
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 20%;
+  object-position: center 30%;
   border: 2px solid var(--gold-400);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   display: block;
@@ -961,20 +962,23 @@
 
 .iit-seal-badge {
   position: absolute;
-  bottom: 30px;
-  right: 15px;
+  bottom: 6px;
+  right: -8px;
   background: linear-gradient(135deg, #0e274e 0%, #07152b 100%);
   border: 2px solid var(--gold-400);
   border-radius: var(--radius-full);
-  padding: 10px 18px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(216, 185, 122, 0.3);
+  z-index: 10;
+  white-space: nowrap;
 }
 
 .seal-icon {
   color: var(--gold-400);
+  flex-shrink: 0;
 }
 
 .seal-text-group {
@@ -996,8 +1000,10 @@
 }
 
 .teacher-caption {
-  margin-top: 24px;
+  margin-top: 4px;
   text-align: center;
+  position: relative;
+  z-index: 5;
 }
 
 .teacher-name {
@@ -1572,6 +1578,19 @@
 
   .teacher-portrait-box {
     margin: 0 auto;
+  }
+
+  .portrait-halo {
+    width: min(290px, 80vw);
+    height: min(290px, 80vw);
+    padding: 8px;
+    margin-bottom: 24px;
+  }
+
+  .iit-seal-badge {
+    bottom: 2px;
+    right: -4px;
+    padding: 6px 14px;
   }
 
   .teacher-content h2 {

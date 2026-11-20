@@ -69,6 +69,7 @@ urlpatterns = [
     path('api/materials/', include('apps.materials.urls')),
     path('api/analytics/', include('apps.analytics.urls')),
     path('api/admin-panel/', include('apps.adminpanel.urls')),
+    path('api/banners/', include('apps.banners.urls')),
 ]
 
 if settings.DEBUG:

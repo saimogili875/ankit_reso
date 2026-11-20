@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { GraduationCap } from 'lucide-react';
+import { BannerSlider } from '@/components/banners/BannerSlider';
 
 interface FAQItemData {
   question: string;
@@ -93,7 +95,7 @@ export const LandingPage: React.FC = () => {
             </ul>
 
             <div className="nav-actions">
-              <Link href="/login" className="login-link" title="Student Portal Login">
+              <Link href="/login" className="login-link" title="Login" aria-label="Login">
                 <svg
                   width="16"
                   height="16"
@@ -108,7 +110,7 @@ export const LandingPage: React.FC = () => {
                   <polyline points="10 17 15 12 10 7" />
                   <line x1="15" y1="12" x2="3" y2="12" />
                 </svg>
-                Student Login
+                Login
               </Link>
               <a
                 className="landing-btn btn-primary btn-sm"
@@ -156,7 +158,7 @@ export const LandingPage: React.FC = () => {
             Frequently Asked Questions
           </a>
           <Link href="/login" className="mobile-link" onClick={closeMobileMenu}>
-            Student Portal Login
+            Login
           </Link>
           <a
             href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Adept%20Eduverse%20classes"
@@ -260,81 +262,9 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Glass Hero Card */}
-            <div className="hero-card">
-              <div className="card-header-bar">
-                <div className="card-title">
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  Live Class Schedule
-                </div>
-                <div className="live-indicator">
-                  <span className="live-dot"></span>
-                  Active Session
-                </div>
-              </div>
-
-              <div className="schedule-list">
-                <div className="schedule-row">
-                  <div className="schedule-info">
-                    <span className="schedule-label">Evening Batch</span>
-                    <span className="schedule-name">Class 11 &amp; 12 Live</span>
-                  </div>
-                  <span className="schedule-time">Mon–Sat, 6:30–8:30 pm</span>
-                </div>
-
-                <div className="schedule-row">
-                  <div className="schedule-info">
-                    <span className="schedule-label">Morning Accelerated</span>
-                    <span className="schedule-name">Droppers Immersion</span>
-                  </div>
-                  <span className="schedule-time">Mon–Sat, 9 am–12 noon</span>
-                </div>
-
-                <div className="schedule-row">
-                  <div className="schedule-info">
-                    <span className="schedule-label">Evaluation Benchmark</span>
-                    <span className="schedule-name">Weekly Mock Test</span>
-                  </div>
-                  <span className="schedule-time">Sunday Morning</span>
-                </div>
-
-                <div className="schedule-row">
-                  <div className="schedule-info">
-                    <span className="schedule-label">24/7 Digital Vault</span>
-                    <span className="schedule-name">Missed a Class?</span>
-                  </div>
-                  <span className="schedule-time">HD Recording in Hours</span>
-                </div>
-              </div>
-
-              <div className="hero-card-footer">
-                <div>
-                  <p style={{ color: 'var(--text-white)', fontWeight: 600 }}>Direct Faculty Interaction</p>
-                  <p>Doubt clearing in every live lecture</p>
-                </div>
-                <a
-                  className="landing-btn btn-whatsapp btn-sm"
-                  href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Adept%20Eduverse%20classes"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Ask on WhatsApp
-                </a>
-              </div>
+            {/* Right Hero Promotional Banner Slider */}
+            <div className="hero-banner-container w-full">
+              <BannerSlider placement="home" />
             </div>
           </div>
 
@@ -588,29 +518,27 @@ export const LandingPage: React.FC = () => {
           <div className="landing-wrap teacher-grid">
             <div className="teacher-portrait-box">
               <div className="portrait-halo">
+                {/* TODO: Source image ankit-sir-headshot.jpg is 304x304 (below 600x600). Supply a sharper high-resolution (600x600+) photo for optimal 2x display */}
                 <Image
                   src="/images/ankit-sir-headshot.jpg"
                   alt="Ankit Kumar, B.Tech IIT Kharagpur – Founder Adept Eduverse"
-                  width={310}
-                  height={310}
+                  width={600}
+                  height={600}
                   className="teacher-pic"
                   priority
                 />
-              </div>
-
-              <div className="iit-seal-badge">
-                <svg className="seal-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10h2v4h-2zm0 6h2v2h-2z" />
-                </svg>
-                <div className="seal-text-group">
-                  <span className="seal-title">IIT Kharagpur</span>
-                  <span className="seal-sub">B.Tech Engineering Alumnus</span>
+                <div className="iit-seal-badge">
+                  <GraduationCap className="seal-icon" width={22} height={22} />
+                  <div className="seal-text-group">
+                    <span className="seal-title">IIT Kharagpur</span>
+                    <span className="seal-sub">B.Tech Engineering Alumnus</span>
+                  </div>
                 </div>
               </div>
 
               <div className="teacher-caption">
                 <div className="teacher-name">Ankit Kumar</div>
-                <div className="teacher-deg">B.Tech, IIT Kharagpur · JEE Math Specialist</div>
+                <div className="teacher-deg">B.Tech, IIT Kharagpur | JEE Math Specialist</div>
               </div>
             </div>
 
@@ -1047,7 +975,7 @@ export const LandingPage: React.FC = () => {
           WhatsApp Desk
         </a>
         <Link href="/login" className="landing-btn btn-primary">
-          Student Login
+          Login
         </Link>
       </div>
     </div>

@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'apps.materials',
     'apps.analytics',
     'apps.adminpanel',
+    'apps.banners',
 ]
 
 MIDDLEWARE = [
