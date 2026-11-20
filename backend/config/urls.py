@@ -8,6 +8,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from apps.core.views import health_check, healthz, health_deep
+from apps.accounts.views import CSRFTokenView
 from apps.content.views import AnnouncementListView, StudentDoubtListView
 from apps.content.schedule_views import (
     ScheduleListView,
@@ -21,24 +22,31 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # System & Health
-    # Lightweight checks (200 OK without DB/Redis load)
+    # Lightweight checks (200 OK without DB/Redis load, accepts GET & HEAD)
     path('', healthz, name='root'),
     path('healthz', healthz, name='healthz-no-slash'),
     path('healthz/', healthz, name='healthz'),
     path('health', healthz, name='health-no-slash'),
     path('health/', healthz, name='health'),
+    path('api/health', healthz, name='api-health-no-slash'),
+    path('api/health/', healthz, name='api-health'),
+    path('api/healthz', healthz, name='api-healthz-no-slash'),
     path('api/healthz/', healthz, name='api-healthz'),
 
     # Deep checks (verifies Database and Redis/Cache; returns 503 if failing)
     path('health/deep', health_deep, name='health-deep-no-slash'),
     path('health/deep/', health_deep, name='health-deep'),
-    path('api/health/', health_deep, name='health-check'),
+    path('api/health/deep', health_deep, name='api-health-deep-no-slash'),
     path('api/health/deep/', health_deep, name='api-health-deep'),
 
     # OpenAPI Schema & Docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # CSRF Token Endpoints (both /api/auth/csrf/ and /auth/csrf/ supported)
+    path('api/auth/csrf/', CSRFTokenView.as_view(), name='api-auth-csrf'),
+    path('auth/csrf/', CSRFTokenView.as_view(), name='auth-csrf-legacy'),
 
     # Application API endpoints
     path('api/auth/', include('apps.accounts.urls')),

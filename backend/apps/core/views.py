@@ -1,5 +1,8 @@
 import os
 import logging
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -9,17 +12,18 @@ from django.db import connection
 logger = logging.getLogger(__name__)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
+@csrf_exempt
+@require_http_methods(["GET", "HEAD"])
 def healthz(request):
     """
-    Lightweight health probe that returns 200 OK immediately without
-    touching PostgreSQL or Redis. Used by Render or Kubernetes for liveness checks.
+    Lightweight health probe that returns {"status": "ok"} immediately without
+    touching PostgreSQL or Redis. Used by Render or Kubernetes for liveness/health probes.
+    Accepts both GET and HEAD requests.
     """
-    return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+    return JsonResponse({'status': 'ok'}, status=200)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 @permission_classes([AllowAny])
 def health_deep(request):
     """
@@ -92,4 +96,4 @@ def health_deep(request):
 
 
 # Alias for backwards compatibility
-health_check = health_deep
+health_check = healthz

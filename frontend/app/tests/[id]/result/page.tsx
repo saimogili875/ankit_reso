@@ -18,7 +18,7 @@ import {
   ChevronRight,
   Zap,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, API_BASE_URL } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -488,7 +488,7 @@ export default function TestResultPage() {
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2.5">
           <a
-            href={`${process.env.NEXT_PUBLIC_API_URL}/tests/attempts/${attemptId}/report.pdf`}
+            href={`${API_BASE_URL}/tests/attempts/${attemptId}/report.pdf`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all shadow-sm"

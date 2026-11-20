@@ -1,4 +1,25 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+import axios from 'axios';
+
+// Ensure global Axios default uses withCredentials for cross-origin requests
+axios.defaults.withCredentials = true;
+
+const rawBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').trim().replace(/\/+$/, '');
+export const API_BASE_URL = rawBaseUrl.endsWith('/api') ? rawBaseUrl : `${rawBaseUrl}/api`;
+
+/**
+ * Builds a standardized API URL ensuring /api prefix is present without duplicates.
+ */
+export function buildApiUrl(endpoint: string): string {
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    return endpoint;
+  }
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (cleanEndpoint.startsWith('/api/')) {
+    const origin = API_BASE_URL.replace(/\/api$/, '');
+    return `${origin}${cleanEndpoint}`;
+  }
+  return `${API_BASE_URL}${cleanEndpoint}`;
+}
 
 let cachedCsrfToken: string | null = null;
 let csrfFetchPromise: Promise<string | null> | null = null;
@@ -23,7 +44,7 @@ export async function fetchCsrfToken(): Promise<string | null> {
 
   csrfFetchPromise = (async () => {
     try {
-      const url = `${API_BASE_URL}/auth/csrf/`;
+      const url = buildApiUrl('/auth/csrf/');
       const res = await fetch(url, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -102,9 +123,7 @@ export function formatApiError(errorData: Record<string, unknown> | null | undef
 }
 
 export async function apiFetch<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = endpoint.startsWith('http')
-    ? endpoint
-    : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const url = buildApiUrl(endpoint);
 
   const method = (options.method || 'GET').toUpperCase();
 

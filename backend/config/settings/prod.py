@@ -25,30 +25,56 @@ STORAGES = {
 # Frontend URL support for split deployment (e.g. Vercel)
 FRONTEND_URL = config('FRONTEND_URL', default='').strip()
 
-cors_origins = [
-    origin.strip() for origin in config(
-        'CORS_ALLOWED_ORIGINS',
-        default='https://adepteduverse.com,https://app.adepteduverse.com'
-    ).split(',') if origin.strip()
-]
-if FRONTEND_URL and FRONTEND_URL not in cors_origins:
-    cors_origins.append(FRONTEND_URL)
+def _normalize_origin(url: str) -> str:
+    url = url.strip()
+    if not url:
+        return ""
+    if not (url.startswith('http://') or url.startswith('https://')):
+        return f"https://{url}"
+    return url.rstrip('/')
+
+DEFAULT_PROD_CORS_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+raw_cors = config('CORS_ALLOWED_ORIGINS', default=DEFAULT_PROD_CORS_ORIGINS)
+cors_origins = [_normalize_origin(o) for o in raw_cors.split(',') if _normalize_origin(o)]
+
+if FRONTEND_URL:
+    norm_frontend = _normalize_origin(FRONTEND_URL)
+    if norm_frontend and norm_frontend not in cors_origins:
+        cors_origins.append(norm_frontend)
+
+for _origin in [
+    'https://adepteduverse.com',
+    'https://www.adepteduverse.com',
+    'https://app.adepteduverse.com',
+    'https://ankit-reso.onrender.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]:
+    if _origin not in cors_origins:
+        cors_origins.append(_origin)
 
 CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
-DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com'
-csrf_origins = [
-    origin.strip() for origin in config(
-        'CSRF_TRUSTED_ORIGINS',
-        default=DEFAULT_PROD_CSRF_ORIGINS
-    ).split(',') if origin.strip()
-]
-for _origin in ['https://adepteduverse.com', 'https://www.adepteduverse.com', 'https://ankit-reso.onrender.com']:
+DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+raw_csrf = config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_PROD_CSRF_ORIGINS)
+csrf_origins = [_normalize_origin(o) for o in raw_csrf.split(',') if _normalize_origin(o)]
+
+if FRONTEND_URL:
+    norm_frontend = _normalize_origin(FRONTEND_URL)
+    if norm_frontend and norm_frontend not in csrf_origins:
+        csrf_origins.append(norm_frontend)
+
+for _origin in [
+    'https://adepteduverse.com',
+    'https://www.adepteduverse.com',
+    'https://app.adepteduverse.com',
+    'https://ankit-reso.onrender.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]:
     if _origin not in csrf_origins:
         csrf_origins.append(_origin)
-if FRONTEND_URL and FRONTEND_URL not in csrf_origins:
-    csrf_origins.append(FRONTEND_URL)
 
 CSRF_TRUSTED_ORIGINS = csrf_origins
 

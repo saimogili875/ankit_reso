@@ -42,11 +42,17 @@ def _dispatch_email_otp(email: str, otp: str, purpose: str):
 class CSRFTokenView(APIView):
     """
     Returns the CSRF token in JSON and sets the CSRF cookie on the client response.
+    Supports GET and HEAD requests.
     """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         return Response({'csrfToken': get_token(request)}, status=status.HTTP_200_OK)
+
+    def head(self, request):
+        # Generates/refreshes CSRF cookie and returns 200 OK headers
+        get_token(request)
+        return Response(status=status.HTTP_200_OK)
 
 
 # ==========================================
