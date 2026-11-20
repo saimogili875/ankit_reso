@@ -8,7 +8,8 @@ from apps.academics.models import (
 )
 from apps.content.models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
-    LiveClass, LiveAttendance, ScheduleEvent, Notification
+    ScheduleEvent, Notification,
+    LandingBanner, LandingBannerSettings
 )
 from apps.questions.models import (
     Question, QuestionOption, PYQ, DPP, DPPQuestion
@@ -709,47 +710,10 @@ class AdminStudentSerializer(serializers.ModelSerializer):
         return round((total_correct / total_ans) * 100, 1) if total_ans > 0 else 0.0
 
 
-class AdminLiveClassSerializer(serializers.ModelSerializer):
-    course_title = serializers.CharField(source='course.title', read_only=True)
-    subject_name = serializers.CharField(source='subject.name', read_only=True)
-    chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    attendances_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = LiveClass
-        fields = [
-            'id', 'course', 'course_title', 'title', 'description',
-            'subject', 'subject_name', 'chapter', 'chapter_name',
-            'teacher', 'start_time', 'end_time', 'platform', 'join_url',
-            'status', 'room_name', 'max_students', 'chat_enabled', 'student_mic_policy',
-            'recording_status', 'recording_url', 'recording_published', 'is_recording_published',
-            'recording_lecture', 'peak_concurrent_users', 'total_attendees_count',
-            'attendances_count', 'created_at', 'updated_at'
-        ]
-
-    def get_attendances_count(self, obj):
-        return obj.attendances.count()
-
-
-class AdminLiveAttendanceSerializer(serializers.ModelSerializer):
-    student_email = serializers.CharField(source='student.email', read_only=True)
-    student_name = serializers.SerializerMethodField()
-    live_class_title = serializers.CharField(source='live_class.title', read_only=True)
-
-    class Meta:
-        model = LiveAttendance
-        fields = ['id', 'live_class', 'live_class_title', 'student', 'student_name', 'student_email', 'joined_at']
-
-    def get_student_name(self, obj):
-        name = f"{obj.student.first_name} {obj.student.last_name}".strip()
-        return name or obj.student.username
-
-
 class AdminScheduleEventSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.title', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    live_class_title = serializers.CharField(source='live_class.title', read_only=True)
     test_title = serializers.CharField(source='test.title', read_only=True)
     dpp_title = serializers.CharField(source='dpp.title', read_only=True)
     lecture_title = serializers.CharField(source='lecture.title', read_only=True)
@@ -760,7 +724,6 @@ class AdminScheduleEventSerializer(serializers.ModelSerializer):
             'id', 'course', 'course_title', 'event_type', 'title', 'description',
             'subject', 'subject_name', 'chapter', 'chapter_name',
             'start_time', 'end_time', 'link',
-            'live_class', 'live_class_title',
             'test', 'test_title',
             'dpp', 'dpp_title',
             'lecture', 'lecture_title',
@@ -783,5 +746,33 @@ class AdminRankPredictorSerializer(serializers.ModelSerializer):
     class Meta:
         model = RankPredictor
         fields = '__all__'
+
+
+class AdminLandingBannerSerializer(serializers.ModelSerializer):
+    image_display_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LandingBanner
+        fields = [
+            'id', 'title', 'caption', 'image', 'image_url', 'image_display_url',
+            'link_url', 'show_from', 'show_until', 'order', 'is_active',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_image_display_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image_url or ''
+
+
+class AdminLandingBannerSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandingBannerSettings
+        fields = ['display_count']
+
 
 

@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
-    LiveClass, LiveAttendance, ScheduleEvent, Notification
+    ScheduleEvent, Notification,
+    LandingBanner, LandingBannerSettings
 )
 
 class VideoSerializer(serializers.ModelSerializer):
@@ -60,33 +61,10 @@ class DoubtSerializer(serializers.ModelSerializer):
         return name or obj.replied_by.username
 
 
-class LiveClassSerializer(serializers.ModelSerializer):
-    course_title = serializers.CharField(source='course.title', read_only=True)
-    subject_name = serializers.CharField(source='subject.name', read_only=True)
-    chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    is_attended = serializers.SerializerMethodField()
-
-    class Meta:
-        model = LiveClass
-        fields = [
-            'id', 'course', 'course_title', 'title', 'description',
-            'subject', 'subject_name', 'chapter', 'chapter_name',
-            'teacher', 'start_time', 'end_time', 'platform', 'join_url',
-            'status', 'recording_url', 'recording_published', 'is_attended', 'created_at'
-        ]
-
-    def get_is_attended(self, obj):
-        request = self.context.get('request')
-        if not request or not request.user or not request.user.is_authenticated:
-            return False
-        return obj.attendances.filter(student=request.user).exists()
-
-
 class ScheduleEventSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.title', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    live_class = LiveClassSerializer(read_only=True)
     status_label = serializers.SerializerMethodField()
     is_attended = serializers.SerializerMethodField()
     is_completed = serializers.SerializerMethodField()
@@ -97,40 +75,21 @@ class ScheduleEventSerializer(serializers.ModelSerializer):
             'id', 'course', 'course_title', 'event_type', 'title', 'description',
             'subject', 'subject_name', 'chapter', 'chapter_name',
             'start_time', 'end_time', 'link',
-            'live_class', 'test', 'dpp', 'lecture',
+            'test', 'dpp', 'lecture',
             'status_label', 'is_attended', 'is_completed',
             'is_published', 'created_at'
         ]
 
     def get_status_label(self, obj):
         now = timezone.now()
-        if obj.event_type == ScheduleEvent.EventType.LIVE_CLASS:
-            if obj.live_class and obj.live_class.status == LiveClass.Status.LIVE:
-                return 'Live now'
-            elif obj.live_class and obj.live_class.status == LiveClass.Status.ENDED:
-                return 'Done'
-            elif obj.live_class and obj.live_class.status == LiveClass.Status.CANCELLED:
-                return 'Cancelled'
-            elif obj.start_time <= now <= (obj.end_time or obj.start_time):
-                return 'Live now'
-            elif obj.start_time > now:
-                return 'Upcoming'
-            else:
-                return 'Done'
+        if obj.end_time and now > obj.end_time:
+            return 'Done' if self.get_is_completed(obj) else 'Missed'
+        elif obj.start_time > now:
+            return 'Upcoming'
         else:
-            if obj.end_time and now > obj.end_time:
-                return 'Done' if self.get_is_completed(obj) else 'Missed'
-            elif obj.start_time > now:
-                return 'Upcoming'
-            else:
-                return 'Active'
+            return 'Active'
 
     def get_is_attended(self, obj):
-        request = self.context.get('request')
-        if not request or not request.user or not request.user.is_authenticated:
-            return False
-        if obj.live_class:
-            return obj.live_class.attendances.filter(student=request.user).exists()
         return False
 
     def get_is_completed(self, obj):
@@ -211,3 +170,30 @@ class DoubtSerializer(serializers.ModelSerializer):
             return None
         name = f"{obj.replied_by.first_name} {obj.replied_by.last_name}".strip()
         return name or obj.replied_by.username
+
+
+class LandingBannerSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LandingBanner
+        fields = [
+            'id', 'title', 'caption', 'image_url', 'link_url',
+            'show_from', 'show_until', 'order', 'is_active', 'created_at'
+        ]
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image_url or ''
+
+
+class LandingBannerSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandingBannerSettings
+        fields = ['display_count']
+
+

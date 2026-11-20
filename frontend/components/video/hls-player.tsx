@@ -147,7 +147,9 @@ export function HlsVideoPlayer({
 
       if (forceKeepalive && typeof navigator !== 'undefined' && navigator.sendBeacon) {
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        navigator.sendBeacon('/api/progress/video/', blob);
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+        const beaconUrl = apiBase.endsWith('/api') ? `${apiBase}/progress/video/` : `${apiBase}/api/progress/video/`;
+        navigator.sendBeacon(beaconUrl, blob);
       } else {
         apiClient.post('/progress/video/', payload).catch(() => {});
       }

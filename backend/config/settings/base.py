@@ -40,11 +40,11 @@ INSTALLED_APPS = [
     'apps.materials',
     'apps.analytics',
     'apps.adminpanel',
-    'apps.live',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -88,6 +88,7 @@ if DATABASE_URL:
                 DATABASE_URL,
                 conn_max_age=CONN_MAX_AGE,
                 conn_health_checks=True,
+                ssl_require=True,
             )
         }
         if DISABLE_SERVER_SIDE_CURSORS:
@@ -104,6 +105,7 @@ if DATABASE_URL:
                 'PORT': str(parsed_db.port) if parsed_db.port else '5432',
                 'CONN_MAX_AGE': CONN_MAX_AGE,
                 'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+                'OPTIONS': {'sslmode': 'require'},
             }
         }
 else:
@@ -123,6 +125,7 @@ else:
             'PORT': POSTGRES_PORT,
             'CONN_MAX_AGE': CONN_MAX_AGE,
             'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+            'OPTIONS': {'sslmode': 'require'},
         }
     }
 
@@ -169,7 +172,6 @@ REST_FRAMEWORK = {
         'user': '120/minute',
         'login': '10/minute',
         'register': '10/minute',
-        'live_token': '30/minute',
         'test_submit': '15/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -263,11 +265,6 @@ R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID', default='')
 R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY', default='')
 R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='adepteduverse-storage')
 R2_ENDPOINT = config('R2_ENDPOINT', default='')
-
-# LiveKit Configuration
-LIVEKIT_URL = config('LIVEKIT_URL', default='wss://livekit.local.demo')
-LIVEKIT_API_KEY = config('LIVEKIT_API_KEY', default='devkey')
-LIVEKIT_API_SECRET = config('LIVEKIT_API_SECRET', default='secret_32_characters_minimum_length_key_for_security!')
 
 # Structured Logging
 LOGGING = {

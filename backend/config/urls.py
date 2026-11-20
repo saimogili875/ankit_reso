@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -10,7 +12,6 @@ from apps.content.views import AnnouncementListView, StudentDoubtListView
 from apps.content.schedule_views import (
     ScheduleListView,
     ScheduleTodayView,
-    LiveClassJoinView,
     NotificationListView,
     NotificationMarkReadView,
 )
@@ -36,7 +37,6 @@ urlpatterns = [
     path('api/courses/<str:pk>/', CourseDetailView.as_view(), name='courses-detail'),
     path('api/schedule/', ScheduleListView.as_view(), name='schedule-list'),
     path('api/schedule/today/', ScheduleTodayView.as_view(), name='schedule-today'),
-    path('api/live-classes/<str:pk>/join/', LiveClassJoinView.as_view(), name='live-classes-join'),
     path('api/notifications/', NotificationListView.as_view(), name='notifications-list'),
     path('api/notifications/mark-all-read/', NotificationMarkReadView.as_view(), {'pk': 'all'}, name='notifications-mark-all-read'),
     path('api/notifications/<str:pk>/read/', NotificationMarkReadView.as_view(), name='notifications-mark-read'),
@@ -49,5 +49,8 @@ urlpatterns = [
     path('api/materials/', include('apps.materials.urls')),
     path('api/analytics/', include('apps.analytics.urls')),
     path('api/admin-panel/', include('apps.adminpanel.urls')),
-    path('api/live/', include('apps.live.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

@@ -488,7 +488,7 @@ export default function TestResultPage() {
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2.5">
           <a
-            href={`http://127.0.0.1:8000/api/tests/attempts/${attemptId}/report.pdf`}
+            href={`${process.env.NEXT_PUBLIC_API_URL}/tests/attempts/${attemptId}/report.pdf`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all shadow-sm"

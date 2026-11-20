@@ -8,7 +8,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('content', '0004_liveclass_notification_scheduleevent_liveattendance'),
-        ('live', '__first__'),
     ]
 
     operations = [
@@ -28,10 +27,9 @@ class Migration(migrations.Migration):
             model_name='liveclass',
             name='subject',
         ),
-        migrations.AlterField(
+        migrations.RemoveField(
             model_name='scheduleevent',
             name='live_class',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='schedule_events', to='live.liveclass'),
         ),
         migrations.DeleteModel(
             name='LiveAttendance',

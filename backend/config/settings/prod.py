@@ -5,7 +5,17 @@ DEBUG = False
 # Production MUST provide a secure SECRET_KEY in environment variables
 SECRET_KEY = config('SECRET_KEY', default='prod-secret-key-must-be-set-in-environment-variables')
 
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='*').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='ankit-reso.onrender.com,.onrender.com').split(',') if h.strip()]
+
+# WhiteNoise Static Files Storage for Production
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Frontend URL support for split deployment (e.g. Vercel)
 FRONTEND_URL = config('FRONTEND_URL', default='').strip()

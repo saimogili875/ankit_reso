@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   CalendarDays,
   Clock,
-  Video,
   FileText,
   Target,
   PlayCircle,
@@ -24,32 +23,11 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 
-interface LiveClassData {
-  id: string;
-  course: string;
-  course_title: string;
-  title: string;
-  description?: string;
-  subject?: string;
-  subject_name?: string;
-  chapter?: string;
-  chapter_name?: string;
-  teacher?: string;
-  start_time: string;
-  end_time?: string;
-  platform: 'YOUTUBE_LIVE' | 'ZOOM' | 'MEET' | 'OTHER';
-  join_url: string;
-  status: 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
-  recording_url?: string;
-  recording_published: boolean;
-  is_attended: boolean;
-}
-
 interface ScheduleEventItem {
   id: string;
   course: string;
   course_title: string;
-  event_type: 'LIVE_CLASS' | 'EXAM' | 'PRACTICE_DEADLINE' | 'RECORDED_CLASS' | 'OTHER';
+  event_type: 'EXAM' | 'PRACTICE_DEADLINE' | 'RECORDED_CLASS' | 'OTHER';
   title: string;
   description?: string;
   subject?: string;
@@ -59,11 +37,10 @@ interface ScheduleEventItem {
   start_time: string;
   end_time?: string;
   link?: string;
-  live_class?: LiveClassData | null;
   test?: string | null;
   dpp?: string | null;
   lecture?: string | null;
-  status_label: 'Upcoming' | 'Live now' | 'Done' | 'Missed' | 'Cancelled' | 'Active';
+  status_label: 'Upcoming' | 'Done' | 'Missed' | 'Cancelled' | 'Active';
   is_attended: boolean;
   is_completed: boolean;
 }
@@ -81,12 +58,6 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'past'>('today');
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-
-  // Calendar / filter state for upcoming
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
-  const [currentMonthDate, setCurrentMonthDate] = useState<Date>(new Date());
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -108,47 +79,10 @@ export default function SchedulePage() {
     fetchSchedule();
   }, []);
 
-  const handleJoinLive = async (event: ScheduleEventItem) => {
-    const liveClassId = event.live_class?.id || (event.event_type === 'LIVE_CLASS' ? event.id : null);
-    if (!liveClassId) return;
-
-    setJoiningId(liveClassId);
-    try {
-      await apiClient.post<{ join_url: string }>(`/live-classes/${liveClassId}/join/`);
-
-      // Update attendance locally
-      setScheduleData((prev) => {
-        if (!prev) return prev;
-        const markAttended = (items: ScheduleEventItem[]) =>
-          items.map((item) => {
-            if (item.id === event.id || item.live_class?.id === liveClassId) {
-              return {
-                ...item,
-                is_attended: true,
-                live_class: item.live_class
-                  ? { ...item.live_class, is_attended: true }
-                  : undefined,
-              };
-            }
-            return item;
-          });
-        return {
-          ...prev,
-          today: markAttended(prev.today),
-          upcoming: markAttended(prev.upcoming),
-          past: markAttended(prev.past),
-        };
-      });
-
-      // Navigate into the in-app LiveKit classroom
-      window.location.href = `/live/${liveClassId}`;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unable to record attendance or join class.';
-      alert(msg);
-    } finally {
-      setJoiningId(null);
-    }
-  };
+  // Calendar / filter state for upcoming
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
+  const [currentMonthDate, setCurrentMonthDate] = useState<Date>(new Date());
 
   const formatTime = (isoString?: string) => {
     if (!isoString) return '';
@@ -238,7 +172,7 @@ export default function SchedulePage() {
           No Enrolled Courses Found
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-lg mx-auto mb-8 leading-relaxed">
-          Your schedule only reflects the live lectures, exams, and daily DPP deadlines for courses
+          Your schedule only reflects the lectures, exams, and daily DPP deadlines for courses
           you are officially enrolled in. Enroll in a course to access your personalized timetable.
         </p>
         <Link
@@ -256,13 +190,6 @@ export default function SchedulePage() {
 
   const renderTypeBadge = (eventType: ScheduleEventItem['event_type']) => {
     switch (eventType) {
-      case 'LIVE_CLASS':
-        return (
-          <Badge variant="rose" className="gap-1">
-            <Video className="w-3 h-3" />
-            Live Class
-          </Badge>
-        );
       case 'EXAM':
         return (
           <Badge variant="purple" className="gap-1">
@@ -295,17 +222,6 @@ export default function SchedulePage() {
   };
 
   const renderStatusBadge = (event: ScheduleEventItem) => {
-    const isLive = event.status_label === 'Live now';
-
-    if (isLive) {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          Live Now
-        </span>
-      );
-    }
-
     if (event.status_label === 'Upcoming') {
       return (
         <Badge variant="blue">
@@ -340,17 +256,10 @@ export default function SchedulePage() {
   };
 
   const renderEventCard = (event: ScheduleEventItem) => {
-    const isLive = event.status_label === 'Live now';
-    const isJoining = joiningId === (event.live_class?.id || event.id);
-
     return (
       <div
         key={event.id}
-        className={`p-5 rounded-2xl border transition-all ${
-          isLive
-            ? 'bg-slate-900/90 border-rose-500/40 shadow-lg shadow-rose-950/20 ring-1 ring-rose-500/20'
-            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-        }`}
+        className="p-5 rounded-2xl border transition-all bg-slate-900 border-slate-800 hover:border-slate-700"
       >
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           {/* Main Info */}
@@ -386,61 +295,18 @@ export default function SchedulePage() {
               </p>
             )}
 
-            {/* Time slot & teacher */}
+            {/* Time slot */}
             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-1">
               <span className="flex items-center gap-1.5 font-medium text-slate-200">
                 <Clock className="w-3.5 h-3.5 text-blue-400" />
                 {formatDate(event.start_time)}, {formatTime(event.start_time)}
                 {event.end_time ? ` – ${formatTime(event.end_time)}` : ''}
               </span>
-              {event.live_class?.teacher && (
-                <span className="text-slate-400">
-                  Instructor: <span className="text-slate-200 font-semibold">{event.live_class.teacher}</span>
-                </span>
-              )}
-              {event.live_class?.platform && (
-                <span className="text-slate-400">
-                  Platform: <span className="text-slate-200 uppercase">{event.live_class.platform.replace('_', ' ')}</span>
-                </span>
-              )}
             </div>
           </div>
 
           {/* Action Button */}
           <div className="flex sm:flex-col items-center sm:items-end justify-end gap-2.5 pt-2 sm:pt-0 shrink-0">
-            {/* Live Class Join Button */}
-            {(event.event_type === 'LIVE_CLASS' || event.live_class) && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleJoinLive(event)}
-                  disabled={isJoining}
-                  className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    isLive
-                      ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 animate-pulse'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                  }`}
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  {isJoining ? 'Joining...' : isLive ? 'Join Live Now' : 'Join Session'}
-                  <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
-                </button>
-
-                {/* Published Recording Link */}
-                {event.live_class?.recording_published && event.live_class.recording_url && (
-                  <a
-                    href={event.live_class.recording_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-950/60 hover:bg-blue-900/60 text-blue-300 border border-blue-800 flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <PlayCircle className="w-3.5 h-3.5" />
-                    Watch Recording
-                  </a>
-                )}
-              </>
-            )}
-
             {/* Exam / Test action */}
             {event.event_type === 'EXAM' && (
               <Link
@@ -460,6 +326,28 @@ export default function SchedulePage() {
               >
                 <Target className="w-3.5 h-3.5" />
                 {event.is_completed ? 'Practice Again' : 'Solve DPP'}
+              </Link>
+            )}
+
+            {/* Recorded Class release */}
+            {event.event_type === 'RECORDED_CLASS' && (
+              <Link
+                href={event.link || '/learn'}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 transition-colors shadow-md shadow-blue-600/20"
+              >
+                <PlayCircle className="w-3.5 h-3.5" />
+                Watch Lecture
+              </Link>
+            )}
+
+            {/* Generic other assignment or link */}
+            {event.event_type === 'OTHER' && event.link && (
+              <Link
+                href={event.link}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Open Link
               </Link>
             )}
 
@@ -502,11 +390,11 @@ export default function SchedulePage() {
               <CalendarDays className="w-5 h-5" />
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight">
-              Class Schedule & Live Sessions
+              Class Schedule & Timetable
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400">
-            Real-time live lectures, tests, assignments, and class recordings for your enrolled courses.
+            Lectures, tests, assignments, and class releases for your enrolled courses.
           </p>
         </div>
 
@@ -626,7 +514,7 @@ export default function SchedulePage() {
                 No Sessions Scheduled for Today
               </h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                You have no live classes, exams, or DPP deadlines scheduled for today. Check the
+                You have no classes, exams, or DPP deadlines scheduled for today. Check the
                 Upcoming tab to see what is scheduled ahead.
               </p>
             </div>
@@ -646,7 +534,7 @@ export default function SchedulePage() {
                 No Upcoming Events
               </h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                No scheduled live lectures or test deadlines found for the next 30 days. New classes
+                No scheduled lectures or test deadlines found for the next 30 days. New sessions
                 are scheduled weekly by faculty.
               </p>
             </div>

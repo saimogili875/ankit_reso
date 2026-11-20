@@ -227,6 +227,6 @@ Configure the following alert thresholds under **Cloudflare Dashboard $\to$ Noti
 ## 9. What Could Not Be Verified
 
 While code-level verification, mathematical models, unit tests, and local builds have completed successfully, the following items could not be tested directly in this environment:
-1. **Live 5,000 Concurrent Student Playback**: Could not simulate 2,000 simultaneous live client sessions hitting Cloudflare edge POPs from disparate Indian mobile networks (Jio, Airtel, Vi) without an external distributed load generator.
+1. **Distributed 5,000 Concurrent Student Playback**: Could not simulate 2,000 simultaneous live client sessions hitting Cloudflare edge POPs from disparate Indian mobile networks (Jio, Airtel, Vi) without an external distributed load generator.
 2. **AWS EC2 Spot Interruption Rate**: Spot pricing in `ap-south-1` was verified against published AWS pricing sheets as of November 2026, but exact spot reclamation frequency during peak weekday evening hours can vary with AWS regional demand.
 3. **Real-world Student Rendition Distribution**: The 20% (360p) / 50% (480p) / 30% (720p) mix is based on Indian edtech industry telemetry; actual distribution will depend on student device preferences and network quality.

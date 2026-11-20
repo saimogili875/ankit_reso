@@ -187,15 +187,11 @@ class Doubt(TimeStampedModel):
         return f"Doubt #{self.id} by {self.student.email} [{self.status}]"
 
 
-from apps.live.models import LiveClass, LiveAttendance
-
-
 class ScheduleEvent(TimeStampedModel):
     """
     Calendar and timetable items per course.
     """
     class EventType(models.TextChoices):
-        LIVE_CLASS = 'LIVE_CLASS', 'Live Class'
         EXAM = 'EXAM', 'Exam / Mock Test'
         PRACTICE_DEADLINE = 'PRACTICE_DEADLINE', 'Practice / DPP Deadline'
         RECORDED_CLASS = 'RECORDED_CLASS', 'Recorded Class Release'
@@ -212,7 +208,6 @@ class ScheduleEvent(TimeStampedModel):
     link = models.CharField(max_length=500, blank=True)
 
     # Auto-linking to related entities
-    live_class = models.ForeignKey(LiveClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='schedule_events')
     test = models.ForeignKey('tests.Test', on_delete=models.SET_NULL, null=True, blank=True, related_name='schedule_events')
     dpp = models.ForeignKey('questions.DPP', on_delete=models.SET_NULL, null=True, blank=True, related_name='schedule_events')
     lecture = models.ForeignKey(Lecture, on_delete=models.SET_NULL, null=True, blank=True, related_name='schedule_events')
@@ -231,7 +226,6 @@ class Notification(TimeStampedModel):
     Reminders and alert notifications for students.
     """
     class NotificationType(models.TextChoices):
-        LIVE_CLASS_REMINDER = 'LIVE_CLASS_REMINDER', 'Live Class Reminder'
         EXAM_REMINDER = 'EXAM_REMINDER', 'Exam Reminder'
         RECORDING_AVAILABLE = 'RECORDING_AVAILABLE', 'Recording Available'
         SCHEDULE_CHANGE = 'SCHEDULE_CHANGE', 'Schedule Change'
@@ -249,4 +243,54 @@ class Notification(TimeStampedModel):
 
     def __str__(self):
         return f"{self.title} [{self.notification_type}]"
+
+
+class LandingBanner(TimeStampedModel):
+    """
+    Admin-managed banner images shown on the public landing page hero area.
+    """
+    title = models.CharField(max_length=255, blank=True, default='')
+    caption = models.TextField(blank=True, default='')
+    image = models.ImageField(upload_to="landing/", null=True, blank=True)
+    image_url = models.CharField(max_length=500, blank=True, default='', help_text="Optional fallback image URL")
+    link_url = models.CharField(max_length=500, blank=True, default='')
+    show_from = models.DateTimeField(null=True, blank=True)
+    show_until = models.DateTimeField(null=True, blank=True)
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.title or f"Banner #{self.id}"
+
+
+class LandingBannerSettings(TimeStampedModel):
+    """
+    Singleton configuration for landing banner display count (1 or 2).
+    """
+    DISPLAY_COUNT_CHOICES = (
+        (1, '1 Banner'),
+        (2, '2 Banners'),
+    )
+    display_count = models.IntegerField(choices=DISPLAY_COUNT_CHOICES, default=1)
+
+    class Meta:
+        verbose_name = 'Landing Banner Settings'
+        verbose_name_plural = 'Landing Banner Settings'
+
+    def save(self, *args, **kwargs):
+        # Force single instance
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={'display_count': 1})
+        return obj
+
+    def __str__(self):
+        return f"Landing Banner Settings (Display: {self.display_count})"
+
 

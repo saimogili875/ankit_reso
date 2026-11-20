@@ -7,10 +7,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from apps.academics.models import Enrollment
-from .models import ScheduleEvent, LiveClass, LiveAttendance, Notification
+from .models import ScheduleEvent, Notification
 from .serializers import (
     ScheduleEventSerializer,
-    LiveClassSerializer,
     NotificationSerializer,
 )
 
@@ -47,7 +46,7 @@ class ScheduleListView(APIView):
             course_id__in=enrolled_course_ids,
             is_published=True
         ).select_related(
-            'course', 'subject', 'chapter', 'test', 'dpp', 'lecture', 'live_class'
+            'course', 'subject', 'chapter', 'test', 'dpp', 'lecture'
         )
 
         # 1. Today items (events starting or active today)
@@ -79,7 +78,7 @@ class ScheduleListView(APIView):
 
 class ScheduleTodayView(APIView):
     """
-    Returns today's schedule items plus any currently 'LIVE' session for Home banner.
+    Returns today's schedule items.
     """
     permission_classes = [IsAuthenticated]
 
@@ -103,68 +102,13 @@ class ScheduleTodayView(APIView):
             course_id__in=enrolled_course_ids,
             is_published=True,
             start_time__range=(start_of_today, end_of_today)
-        ).select_related('course', 'subject', 'chapter', 'live_class').order_by('start_time')
-
-        # Find any currently live class
-        live_now_class = LiveClass.objects.filter(
-            course_id__in=enrolled_course_ids,
-            status=LiveClass.Status.LIVE
-        ).first()
-
-        if not live_now_class:
-            # Check if there is a class whose scheduled time is now
-            live_now_class = LiveClass.objects.filter(
-                course_id__in=enrolled_course_ids,
-                status=LiveClass.Status.SCHEDULED,
-                start_time__lte=now,
-                end_time__gte=now
-            ).first()
+        ).select_related('course', 'subject', 'chapter').order_by('start_time')
 
         context = {'request': request}
 
         return Response({
             'events': ScheduleEventSerializer(today_events, many=True, context=context).data,
-            'live_now': LiveClassSerializer(live_now_class, context=context).data if live_now_class else None,
-        }, status=status.HTTP_200_OK)
-
-
-class LiveClassJoinView(APIView):
-    """
-    Student joins a live class:
-    - Enforces course enrollment
-    - Records LiveAttendance timestamp
-    - Returns join_url and class details
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        live_class = LiveClass.objects.filter(id=pk).first()
-        if not live_class:
-            return Response({'error': 'Live class not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        user = request.user
-        is_enrolled = Enrollment.objects.filter(
-            user=user,
-            course=live_class.course,
-            status='ACTIVE'
-        ).exists()
-
-        if not is_enrolled and not (user.is_staff or getattr(user, 'role', '') == 'ADMIN'):
-            return Response({
-                'error': f"You must be enrolled in '{live_class.course.title}' to join this live class."
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # Record attendance
-        LiveAttendance.objects.get_or_create(
-            live_class=live_class,
-            student=user
-        )
-
-        return Response({
-            'message': 'Attendance recorded successfully.',
-            'title': live_class.title,
-            'platform': live_class.platform,
-            'join_url': live_class.join_url,
+            'live_now': None,
         }, status=status.HTTP_200_OK)
 
 

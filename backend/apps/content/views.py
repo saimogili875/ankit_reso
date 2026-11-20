@@ -7,12 +7,15 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.utils import timezone
+from django.db.models import Q
 from storage.service import storage_service
 from apps.academics.models import Lecture
 from apps.accounts.permissions import IsAdminRole
 from .models import (
-    Video, HeroSlide, QuickAccessItem, Announcement, Doubt, VideoPlaybackStat
+    Video, HeroSlide, QuickAccessItem, Announcement, Doubt, VideoPlaybackStat,
+    LandingBanner, LandingBannerSettings
 )
 from .serializers import (
     VideoSerializer,
@@ -20,7 +23,10 @@ from .serializers import (
     QuickAccessItemSerializer,
     AnnouncementSerializer,
     DoubtSerializer,
+    LandingBannerSerializer,
+    LandingBannerSettingsSerializer,
 )
+from .chatbot_service import generate_chatbot_response
 
 logger = logging.getLogger(__name__)
 
@@ -444,3 +450,51 @@ class UploadPresignedUrlView(APIView):
             'file_key': f"{category}/{filename}",
             'category': category
         }, status=status.HTTP_200_OK)
+
+
+class LandingBannerListView(APIView):
+    """
+    Public AllowAny endpoint returning active landing banners within valid schedule window,
+    plus the landing display_count configuration (1 or 2).
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        now = timezone.now()
+        banners = LandingBanner.objects.filter(is_active=True).filter(
+            Q(show_from__isnull=True) | Q(show_from__lte=now),
+            Q(show_until__isnull=True) | Q(show_until__gte=now)
+        ).order_by('order', '-created_at')
+
+        settings = LandingBannerSettings.load()
+        serializer = LandingBannerSerializer(banners, many=True, context={'request': request})
+
+        return Response({
+            'display_count': settings.display_count,
+            'banners': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class ChatbotView(APIView):
+    """
+    Public AllowAny endpoint for the Swecha assistant.
+    Takes { message: str, history: list }.
+    Throttled and CSRF-safe.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'anon'
+
+    def post(self, request):
+        message = str(request.data.get('message', '')).strip()
+        if not message:
+            return Response({'error': 'Message content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        history = request.data.get('history', [])
+        if not isinstance(history, list):
+            history = []
+
+        reply = generate_chatbot_response(message, history)
+        return Response({'reply': reply}, status=status.HTTP_200_OK)
+

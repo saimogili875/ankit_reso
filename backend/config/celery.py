@@ -10,14 +10,6 @@ app.autodiscover_tasks()
 
 # Periodic Celery Beat Schedule
 app.conf.beat_schedule = {
-    'scan-live-class-reminders-every-minute': {
-        'task': 'apps.live.tasks.check_upcoming_live_class_reminders',
-        'schedule': 60.0,
-    },
-    'clean-abandoned-live-rooms-every-10-minutes': {
-        'task': 'apps.live.tasks.auto_end_abandoned_rooms',
-        'schedule': 600.0,
-    },
     'reap-stuck-video-jobs-every-15-mins': {
         'task': 'apps.content.tasks.reap_stuck_video_processing_jobs',
         'schedule': 900.0,

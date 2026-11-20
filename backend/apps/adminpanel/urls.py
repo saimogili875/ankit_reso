@@ -18,16 +18,18 @@ from .views import (
     AnnouncementViewSet,
     DoubtViewSet,
     StudentViewSet,
-    LiveClassViewSet,
     ScheduleEventViewSet,
     NotificationViewSet,
     TestAnalyticsViewSet,
     RankPredictorViewSet,
     SettingsViewSet,
     AdminUserViewSet,
+    LandingBannerViewSet,
+    LandingBannerSettingsView,
 )
 
 router = DefaultRouter()
+router.register('landing-banners', LandingBannerViewSet, basename='admin-landing-banners')
 router.register('hero-slides', HeroSlideViewSet, basename='admin-hero-slides')
 router.register('quick-access', QuickAccessViewSet, basename='admin-quick-access')
 router.register('subjects', SubjectViewSet, basename='admin-subjects')
@@ -45,13 +47,13 @@ router.register('materials', StudyMaterialViewSet, basename='admin-materials')
 router.register('announcements', AnnouncementViewSet, basename='admin-announcements')
 router.register('doubts', DoubtViewSet, basename='admin-doubts')
 router.register('students', StudentViewSet, basename='admin-students')
-router.register('live-classes', LiveClassViewSet, basename='admin-live-classes')
 router.register('schedule', ScheduleEventViewSet, basename='admin-schedule-events')
 router.register('notifications', NotificationViewSet, basename='admin-notifications')
 router.register('settings', SettingsViewSet, basename='admin-settings')
 router.register('admins', AdminUserViewSet, basename='admin-users')
 
 urlpatterns = [
+    path('landing-banner-settings/', LandingBannerSettingsView.as_view(), name='admin-landing-banner-settings'),
     path('overview/', OverviewView.as_view(), name='admin-overview'),
     path('options/', OptionsView.as_view(), name='admin-options'),
     path('', include(router.urls)),

@@ -4,6 +4,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Count, Q, Avg, Max, Min
 from django.utils import timezone
 
@@ -14,7 +15,8 @@ from apps.academics.models import (
 )
 from apps.content.models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
-    LiveClass, LiveAttendance, ScheduleEvent, Notification
+    ScheduleEvent, Notification,
+    LandingBanner, LandingBannerSettings
 )
 from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
 from apps.materials.models import StudyMaterial
@@ -42,11 +44,11 @@ from .serializers import (
     AdminAnnouncementSerializer,
     AdminDoubtSerializer,
     AdminStudentSerializer,
-    AdminLiveClassSerializer,
-    AdminLiveAttendanceSerializer,
     AdminScheduleEventSerializer,
     AdminNotificationSerializer,
     AdminRankPredictorSerializer,
+    AdminLandingBannerSerializer,
+    AdminLandingBannerSettingsSerializer,
     extract_youtube_id,
 )
 
@@ -71,7 +73,6 @@ class OverviewView(APIView):
             'materials_count': StudyMaterial.objects.count(),
             'open_doubts_count': Doubt.objects.filter(status='OPEN').count(),
             'announcements_count': Announcement.objects.filter(is_active=True).count(),
-            'live_classes_count': LiveClass.objects.count(),
             'schedule_events_count': ScheduleEvent.objects.count(),
         }
         return Response(data, status=status.HTTP_200_OK)
@@ -90,7 +91,7 @@ class OptionsView(APIView):
         courses = Course.objects.all().order_by('-created_at').values('id', 'title', 'slug')
         chapters = Chapter.objects.select_related('category__subject', 'academic_class').all().order_by('category__subject__name', 'name')
         lectures = Lecture.objects.select_related('chapter').all().order_by('chapter__name', 'lecture_number')
-        exams = Exam.objects.all().values('id', 'name', 'code')
+        exams = Exam.objects.all().values('id', 'name', 'slug')
 
         categories_data = [
             {
@@ -128,7 +129,6 @@ class OptionsView(APIView):
 
         tests = Test.objects.filter(is_published=True).values('id', 'title', 'test_type')
         dpps = DPP.objects.filter(is_published=True).values('id', 'title', 'chapter_id')
-        live_classes = LiveClass.objects.values('id', 'title', 'course_id', 'status')
 
         return Response({
             'subjects': list(subjects),
@@ -140,7 +140,6 @@ class OptionsView(APIView):
             'exams': list(exams),
             'tests': list(tests),
             'dpps': list(dpps),
-            'live_classes': list(live_classes),
         }, status=status.HTTP_200_OK)
 
 
@@ -590,126 +589,10 @@ class StudentViewSet(viewsets.ReadOnlyModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
-class LiveClassViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAdminRole]
-    serializer_class = AdminLiveClassSerializer
-    queryset = LiveClass.objects.select_related('course', 'subject', 'chapter').all().order_by('-start_time')
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['title', 'teacher', 'course__title', 'subject__name']
-
-    def perform_create(self, serializer):
-        live_class = serializer.save()
-        # Automatically create or sync a ScheduleEvent of type LIVE_CLASS
-        ScheduleEvent.objects.update_or_create(
-            live_class=live_class,
-            defaults={
-                'course': live_class.course,
-                'event_type': ScheduleEvent.EventType.LIVE_CLASS,
-                'title': f"LIVE: {live_class.title}",
-                'description': live_class.description or f"Live interactive session with {live_class.teacher}",
-                'subject': live_class.subject,
-                'chapter': live_class.chapter,
-                'start_time': live_class.start_time,
-                'end_time': live_class.end_time,
-                'link': live_class.join_url,
-                'is_published': True,
-            }
-        )
-
-    def perform_update(self, serializer):
-        live_class = serializer.save()
-        ScheduleEvent.objects.filter(live_class=live_class).update(
-            course=live_class.course,
-            title=f"LIVE: {live_class.title}",
-            description=live_class.description or f"Live interactive session with {live_class.teacher}",
-            subject=live_class.subject,
-            chapter=live_class.chapter,
-            start_time=live_class.start_time,
-            end_time=live_class.end_time,
-            link=live_class.join_url,
-        )
-
-    @action(detail=True, methods=['post'], url_path='publish-recording')
-    def publish_recording(self, request, pk=None):
-        live_class = self.get_object()
-        recording_url = request.data.get('recording_url', '').strip()
-        lecture_id = request.data.get('lecture_id')
-
-        if recording_url:
-            live_class.recording_url = recording_url
-        if not live_class.recording_url:
-            return Response({'error': 'recording_url is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        live_class.recording_published = True
-        live_class.status = LiveClass.Status.ENDED
-
-        if lecture_id:
-            try:
-                lecture = Lecture.objects.get(id=lecture_id)
-                live_class.recording_lecture = lecture
-                is_yt = 'youtube.com' in live_class.recording_url or 'youtu.be' in live_class.recording_url
-                Video.objects.get_or_create(
-                    lecture=lecture,
-                    title=f"Recording: {live_class.title}",
-                    defaults={
-                        'video_source_type': Video.VideoSourceType.YOUTUBE if is_yt else Video.VideoSourceType.CLOUD,
-                        'youtube_video_id': extract_youtube_id(live_class.recording_url) if is_yt else '',
-                        'r2_object_key': live_class.recording_url if not is_yt else '',
-                    }
-                )
-            except Lecture.DoesNotExist:
-                pass
-
-        live_class.save()
-
-        # Update or create schedule event for recorded class
-        ScheduleEvent.objects.create(
-            course=live_class.course,
-            event_type=ScheduleEvent.EventType.RECORDED_CLASS,
-            title=f"Recorded Class: {live_class.title}",
-            description=f"Class recording published for {live_class.title}",
-            subject=live_class.subject,
-            chapter=live_class.chapter,
-            start_time=timezone.now(),
-            link="/learn",
-            lecture=live_class.recording_lecture,
-            is_published=True,
-        )
-
-        # Notify enrolled students
-        enrolled_users = User.objects.filter(enrollments__course=live_class.course, enrollments__status='ACTIVE')
-        for user in enrolled_users:
-            Notification.objects.create(
-                user=user,
-                title="Recording available",
-                message=f"The recording for '{live_class.title}' has been published and is now available in your Learn section.",
-                notification_type=Notification.NotificationType.RECORDING_AVAILABLE,
-                link_url="/learn"
-            )
-
-        return Response(AdminLiveClassSerializer(live_class).data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['get'])
-    def attendance(self, request, pk=None):
-        live_class = self.get_object()
-        attendances = LiveAttendance.objects.filter(live_class=live_class).select_related('student')
-        data = [
-            {
-                'id': str(a.id),
-                'student_id': str(a.student.id),
-                'student_name': f"{a.student.first_name} {a.student.last_name}".strip() or a.student.username,
-                'student_email': a.student.email,
-                'joined_at': a.joined_at,
-            }
-            for a in attendances
-        ]
-        return Response(data, status=status.HTTP_200_OK)
-
-
 class ScheduleEventViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminScheduleEventSerializer
-    queryset = ScheduleEvent.objects.select_related('course', 'subject', 'chapter', 'test', 'dpp', 'lecture', 'live_class').all().order_by('-start_time')
+    queryset = ScheduleEvent.objects.select_related('course', 'subject', 'chapter', 'test', 'dpp', 'lecture').all().order_by('-start_time')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description', 'course__title', 'subject__name']
 
@@ -731,9 +614,6 @@ class ScheduleEventViewSet(viewsets.ModelViewSet):
             updated = True
         elif event.event_type == ScheduleEvent.EventType.RECORDED_CLASS and event.lecture and not event.link:
             event.link = '/learn'
-            updated = True
-        elif event.event_type == ScheduleEvent.EventType.LIVE_CLASS and event.live_class and not event.link:
-            event.link = event.live_class.join_url
             updated = True
         if updated:
             event.save()
@@ -1074,5 +954,48 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         user.save()
 
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class LandingBannerViewSet(viewsets.ModelViewSet):
+    """
+    Admin CRUD for landing page promotional banners with multipart image upload support.
+    """
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    serializer_class = AdminLandingBannerSerializer
+    queryset = LandingBanner.objects.all().order_by('order', '-created_at')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'caption']
+
+
+class LandingBannerSettingsView(APIView):
+    """
+    Admin GET/PUT endpoint for landing banner display settings (display_count).
+    """
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        settings_obj = LandingBannerSettings.load()
+        return Response({'display_count': settings_obj.display_count}, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        return self._update(request)
+
+    def patch(self, request):
+        return self._update(request)
+
+    def _update(self, request):
+        settings_obj = LandingBannerSettings.load()
+        display_count = request.data.get('display_count')
+        try:
+            val = int(display_count)
+            if val not in [1, 2]:
+                return Response({'error': 'display_count must be 1 or 2.'}, status=status.HTTP_400_BAD_REQUEST)
+            settings_obj.display_count = val
+            settings_obj.save()
+            return Response({'display_count': settings_obj.display_count}, status=status.HTTP_200_OK)
+        except (ValueError, TypeError):
+            return Response({'error': 'A valid integer (1 or 2) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 

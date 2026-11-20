@@ -43,7 +43,7 @@ interface CurrentUserResponse {
 const adminNav = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Courses & Batches', href: '/admin/courses', icon: GraduationCap },
-  { label: 'Schedule & Live', href: '/admin/schedule', icon: Calendar },
+  { label: 'Schedule', href: '/admin/schedule', icon: Calendar },
   { label: 'Home & Slides', href: '/admin/home', icon: Sliders },
   { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree },
   { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle },

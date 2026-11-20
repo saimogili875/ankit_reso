@@ -119,11 +119,9 @@ Full CRUD admin panel pages and DRF ViewSets controlling every piece of student-
 
 ---
 
-### PART 6: SCHEDULE & LIVE CLASSES ARCHITECTURE
+### PART 6: SCHEDULE & TIMETABLE ARCHITECTURE
 - **Backend Models (`backend/apps/content/models.py`)**:
-  - `LiveClass`: title, description, course, subject, chapter, teacher, start_time, end_time, platform (`YOUTUBE_LIVE` | `ZOOM` | `MEET` | `OTHER`), `join_url`, `status` (`SCHEDULED` | `LIVE` | `ENDED` | `CANCELLED`), `recording_url`, `recording_published`, `recording_lecture`.
-  - `LiveAttendance`: student, live_class, joined_at (records student attendance in the database).
-  - `ScheduleEvent`: course, event_type (`LIVE_CLASS` | `EXAM` | `PRACTICE_DEADLINE` | `RECORDED_CLASS` | `OTHER`), title, description, subject, chapter, start_time, end_time, link, auto-linking to test/dpp/lecture/live_class, is_published.
+  - `ScheduleEvent`: course, event_type (`EXAM` | `PRACTICE_DEADLINE` | `RECORDED_CLASS` | `OTHER`), title, description, subject, chapter, start_time, end_time, link, auto-linking to test/dpp/lecture, is_published.
   - `Notification`: user (null for broadcast), title, message, notification_type, link_url, is_read, created_at.
 - **Strict Course-Enrolled Isolation**:
   - `GET /api/schedule/` automatically checks the student's active enrollments in the database.
@@ -131,18 +129,14 @@ Full CRUD admin panel pages and DRF ViewSets controlling every piece of student-
   - Enrolled students receive only events belonging to their enrolled courses grouped into Today, Upcoming (next 30 days), and Past sessions.
 - **Student Schedule Page (`frontend/app/schedule/page.tsx`)**:
   - "Schedule" added to student left sidebar and mobile bottom navigation.
-  - **Today Tab**: Real-time list of today's live lectures, tests, and DPP submissions.
+  - **Today Tab**: Real-time list of today's lectures, tests, and DPP submissions.
   - **Upcoming Tab**: Next 30 days grouped by date with a full Month Calendar view switcher.
-  - **Past Tab**: Completed sessions with attendance history (`Attended ✓` / `Missed`) and links to watch recordings.
-  - Direct "Join Live Class" button: Calls `POST /api/live-classes/<id>/join/` (recording attendance in the backend database) before opening the stream link.
+  - **Past Tab**: Completed sessions with attendance/completion history (`Attended ✓` / `Completed` / `Finished`) and links to watch recordings or take tests.
 - **Home Integration**:
   - `TodayScheduleWidget` (`frontend/components/home/today-schedule-widget.tsx`):
-    - "LIVE NOW" banner: Pings when a live class is in progress with class details, instructor, and one-click join button.
     - "Today's Schedule" section: Lists today's upcoming lectures and deadlines with direct navigation to test, DPP, or lecture portals.
-- **Admin Schedule & Live Management (`frontend/app/admin/(panel)/schedule/page.tsx`)**:
-  - Tabbed interface for Live Classes and Schedule Events.
-  - Live Class Controls: "Go Live", "End Class", and "View Attendance" modal showing all students who joined with timestamps.
-  - "Publish Recording" Action: Attaches recording link, optionally attaches video lecture to curriculum, generates a recorded class schedule event, and automatically broadcasts a notification to all enrolled students.
+- **Admin Schedule Management (`frontend/app/admin/(panel)/schedule/page.tsx`)**:
+  - Timetable events management for course batches.
   - Schedule Event Creator: Auto-links exams to `/tests`, DPPs to `/practice`, and recorded lectures to `/learn`.
 
 ---
@@ -173,8 +167,7 @@ Full CRUD admin panel pages and DRF ViewSets controlling every piece of student-
 | `GET` | `/api/courses/<id>/` | `IsAuthenticated` | Course detail view |
 | `POST` | `/api/enrollment/enroll/` | `IsAuthenticated` | Enroll student (enforcing `allow_self_enrollment`) |
 | `GET` | `/api/schedule/` | `IsAuthenticated` | Enrolled student schedule (Today, Upcoming, Past) |
-| `GET` | `/api/schedule/today/` | `IsAuthenticated` | Today's schedule events & active live session |
-| `POST` | `/api/live-classes/<id>/join/` | `IsAuthenticated` | Enforces enrollment, records `LiveAttendance` in DB, returns join URL |
+| `GET` | `/api/schedule/today/` | `IsAuthenticated` | Today's schedule events |
 | `GET` | `/api/notifications/` | `IsAuthenticated` | Student notifications with unread count |
 | `POST` | `/api/notifications/mark-all-read/` | `IsAuthenticated` | Mark all student notifications as read |
 | `POST` | `/api/notifications/<id>/read/` | `IsAuthenticated` | Mark single notification as read |
@@ -306,8 +299,5 @@ Full CRUD admin panel pages and DRF ViewSets controlling every piece of student-
 5. `npm --prefix frontend run build`: All 36 routes compiled and statically rendered successfully with Edge middleware.
 6. **Automated Verification**:
    - Unenrolled student access to `/api/schedule/` → Returns `enrolled_courses_count: 0` with clean empty state prompt.
-   - Unenrolled student attempting to join live class `/api/live-classes/<id>/join/` → Blocked with `403 Forbidden`.
    - Enrolled student access to `/api/schedule/` → Returns today's active sessions, DPP deadlines, and exams.
-   - Student joining live class → Records attendance row in `LiveAttendance` DB table and returns join URL.
-   - Admin publishing live class recording → Sets `recording_published: true`, updates status to `ENDED`, and broadcasts `RECORDING_AVAILABLE` notification to enrolled students.
    - Student notifications: Bell displays unread badge; `POST /api/notifications/mark-all-read/` resets unread count.

@@ -27,7 +27,9 @@ def health_check(request):
         logger.error(f"Health check DB ping failed: {e}")
         db_ok = False
 
-    # 2. Ping Redis via Cache backend
+    # 2. Ping Redis via Cache backend (if configured)
+    import os
+    redis_configured = bool(os.environ.get('REDIS_URL'))
     redis_ok = False
     try:
         test_key = '_health_ping_check'
@@ -47,13 +49,15 @@ def health_check(request):
     except Exception:
         celery_ok = False
 
-    is_healthy = db_ok and redis_ok
+    # Database is required; Redis only causes 503 if explicitly configured in environment
+    is_healthy = db_ok and (redis_ok if redis_configured else True)
     http_status = status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
 
     return Response({
         'status': 'ok' if is_healthy else 'degraded',
         'db': db_ok,
         'redis': redis_ok,
+        'redis_configured': redis_configured,
         'celery': celery_ok,
         'version': '1.0.0',
     }, status=http_status)

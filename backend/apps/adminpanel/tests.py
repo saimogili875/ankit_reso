@@ -3,8 +3,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.accounts.models import User
 from apps.academics.models import Exam, Subject, Category, Chapter, Lecture, AcademicClass
-from apps.content.models import Video
+from apps.content.models import Video, LandingBanner, LandingBannerSettings
 from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
+from django.utils import timezone
+from datetime import timedelta
 
 
 class AdminPanelSecurityAndCrudTests(APITestCase):
@@ -299,3 +301,91 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         # 11th request within same minute from same IP
         res_throttled = self.client.post(url, {'email': 'test@example.com', 'password': 'wrong'})
         self.assertEqual(res_throttled.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_landing_banners_admin_crud_and_public_filtering(self):
+        # 1. Admin creates a scheduled banner in the future
+        self.client.force_authenticate(user=self.admin)
+        future_time = timezone.now() + timedelta(days=2)
+        res_create = self.client.post(reverse('admin-landing-banners-list'), {
+            'title': 'Future JEE Seminar',
+            'caption': 'Live webinar with Ankit Sir',
+            'image_url': 'https://example.com/banner.jpg',
+            'link_url': 'https://example.com/join',
+            'show_from': future_time.isoformat(),
+            'order': 1,
+            'is_active': True,
+        }, format='json')
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+        future_banner_id = res_create.data['id']
+
+        # 2. Admin creates a currently active banner
+        now_time = timezone.now()
+        res_create2 = self.client.post(reverse('admin-landing-banners-list'), {
+            'title': 'Admissions Open 2025-26',
+            'caption': 'Class 11 & 12 Evening Batch',
+            'image_url': 'https://example.com/active.jpg',
+            'link_url': 'https://example.com/enroll',
+            'show_from': (now_time - timedelta(days=1)).isoformat(),
+            'show_until': (now_time + timedelta(days=30)).isoformat(),
+            'order': 0,
+            'is_active': True,
+        }, format='json')
+        self.assertEqual(res_create2.status_code, status.HTTP_201_CREATED)
+
+        # 3. Public endpoint GET /api/content/landing-banners/ returns ONLY currently active banners
+        self.client.logout()
+        res_public = self.client.get(reverse('landing-banners'))
+        self.assertEqual(res_public.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_public.data['display_count'], 1)
+        public_titles = [b['title'] for b in res_public.data['banners']]
+        self.assertIn('Admissions Open 2025-26', public_titles)
+        self.assertNotIn('Future JEE Seminar', public_titles)
+
+        # 4. Admin updates landing-banner-settings display_count to 2
+        self.client.force_authenticate(user=self.admin)
+        res_settings = self.client.put(reverse('admin-landing-banner-settings'), {
+            'display_count': 2
+        }, format='json')
+        self.assertEqual(res_settings.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_settings.data['display_count'], 2)
+
+        # Public endpoint now reflects display_count = 2
+        self.client.logout()
+        res_public2 = self.client.get(reverse('landing-banners'))
+        self.assertEqual(res_public2.data['display_count'], 2)
+
+    def test_chatbot_endpoint_responses(self):
+        # 1. Chatbot handles batch timing query via keyword fallback
+        res1 = self.client.post(reverse('chatbot'), {
+            'message': 'What are the batch timings and schedule?',
+            'history': []
+        }, format='json')
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertIn('reply', res1.data)
+        self.assertIn('6:30 PM', res1.data['reply'])
+
+        # 2. Chatbot handles fee query without inventing fees (directs to WhatsApp)
+        res2 = self.client.post(reverse('chatbot'), {
+            'message': 'What is the fee for dropper course?',
+            'history': []
+        }, format='json')
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertIn('WhatsApp at +91 93825 57693', res2.data['reply'])
+
+        # 3. Empty message returns 400
+        res3 = self.client.post(reverse('chatbot'), {'message': ''}, format='json')
+        self.assertEqual(res3.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 4. Chatbot with mocked Anthropic API response
+        from unittest.mock import patch, MagicMock
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"content": [{"type": "text", "text": "Hello from Swecha powered by Claude!"}]}'
+        mock_response.__enter__.return_value = mock_response
+
+        with patch('os.environ.get') as mock_env, patch('urllib.request.urlopen', return_value=mock_response):
+            mock_env.side_effect = lambda k, default='': 'test-key' if k == 'ANTHROPIC_API_KEY' else default
+            from apps.content.chatbot_service import generate_chatbot_response
+            reply = generate_chatbot_response('Hello', [])
+            self.assertEqual(reply, 'Hello from Swecha powered by Claude!')
+
+

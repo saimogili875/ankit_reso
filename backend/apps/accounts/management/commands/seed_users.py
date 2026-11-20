@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from decouple import config
 from apps.accounts.models import User, StudentProfile
-from apps.content.models import HeroSlide, QuickAccessItem, Announcement, LiveClass, ScheduleEvent, Notification
+from apps.content.models import HeroSlide, QuickAccessItem, Announcement, ScheduleEvent, Notification
 from apps.academics.models import Subject, AcademicClass, Course, Exam, Category, Chapter
 from apps.questions.models import Question, QuestionOption
 from apps.tests.models import Test, TestSection, TestQuestion
@@ -181,37 +181,20 @@ class Command(BaseCommand):
         )
         adv_course.classes.add(c12)
 
-        # Initial Live Class and Schedule items for today (if none exist)
+        # Initial Schedule items for today (if none exist)
         now = timezone.now()
         physics_subj = Subject.objects.filter(slug='physics').first()
 
-        if LiveClass.objects.count() == 0:
-            lc = LiveClass.objects.create(
-                course=main_course,
-                title='Rotational Dynamics - Moment of Inertia & Rolling Motion',
-                description='Live conceptual derivation of Moment of Inertia for combined rolling bodies with live Q&A.',
-                subject=physics_subj,
-                teacher=admin_user,
-                teacher_name='Er. Ankit Sharma (IIT Bombay)',
-                start_time=now - timedelta(minutes=15),
-                end_time=now + timedelta(minutes=45),
-                platform=LiveClass.Platform.LIVEKIT,
-                room_name='room_live_rotational_dynamics',
-                status=LiveClass.Status.LIVE,
-                student_mic_policy=LiveClass.StudentMicPolicy.ON_REQUEST,
-                max_students=100,
-            )
-            # Create corresponding schedule event
+        if ScheduleEvent.objects.filter(event_type=ScheduleEvent.EventType.RECORDED_CLASS).count() == 0:
             ScheduleEvent.objects.create(
                 course=main_course,
-                event_type=ScheduleEvent.EventType.LIVE_CLASS,
-                title=f"LIVE: {lc.title}",
-                description=lc.description,
+                event_type=ScheduleEvent.EventType.RECORDED_CLASS,
+                title='Masterclass: Rotational Dynamics - Moment of Inertia',
+                description='Conceptual derivation of Moment of Inertia for combined rolling bodies.',
                 subject=physics_subj,
-                start_time=lc.start_time,
-                end_time=lc.end_time,
-                link=lc.join_url,
-                live_class=lc,
+                start_time=now - timedelta(minutes=15),
+                end_time=now + timedelta(minutes=45),
+                link='/learn',
                 is_published=True,
             )
 
@@ -243,10 +226,10 @@ class Command(BaseCommand):
 
         if Notification.objects.count() == 0:
             Notification.objects.create(
-                title='Live Class Starting Now',
-                message='Rotational Dynamics - Moment of Inertia & Rolling Motion is now LIVE. Join via your Schedule tab.',
-                notification_type=Notification.NotificationType.LIVE_CLASS_REMINDER,
-                link_url='/schedule',
+                title='Lecture Available',
+                message='Rotational Dynamics - Moment of Inertia & Rolling Motion is now available in your Learn section.',
+                notification_type=Notification.NotificationType.RECORDING_AVAILABLE,
+                link_url='/learn',
                 is_read=False,
             )
 

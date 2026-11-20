@@ -38,7 +38,7 @@ export default function HomePage() {
           <HeroCarousel />
         </section>
 
-        {/* 2. TODAY'S SCHEDULE & LIVE NOW BANNER */}
+        {/* 2. TODAY'S SCHEDULE */}
         <section>
           <TodayScheduleWidget />
         </section>
