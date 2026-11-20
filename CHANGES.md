@@ -25,7 +25,7 @@ This update completes end-to-end security hardening, role-based backend authoriz
 - **User Seeding (`python manage.py seed_users`)**:
   - Idempotent Django management command reading credentials securely from `.env`:
     - **Student**: `mogilisaikumar875@gmail.com` / `sai@123` (`role=STUDENT`, `is_verified=True`, with attached `StudentProfile`).
-    - **Admin**: `25311a05z9@cse.sreenidhi.edu.in` / `password` (`role=ADMIN`, `is_staff=True`, `is_superuser=True`, `is_verified=True`).
+    - **Admin**: `ankit@adepteduverse.com` / `Ank@247shbm` (`role=ADMIN`, `is_staff=True`, `is_superuser=True`, `is_verified=True`).
   - Strict portal validation: Admin cannot sign in on Student tab (`"Use Admin login"`), and Student cannot sign in on Admin tab (`"Invalid credentials. Please check your username and password."`).
 
 ---

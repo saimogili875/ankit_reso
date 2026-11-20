@@ -123,7 +123,7 @@ Run through these checks before releasing to students:
 - [ ] **Recorded Video Delivery**: Verify student can stream HLS and YouTube course lectures in Learn tab.
 - [ ] **CBT Test Engine**: Start and submit an exam attempt. Verify immediate score and analytics generation via Celery.
 - [ ] **Student Timetable**: Verify student schedule renders exams, DPP deadlines, and recorded releases.
-- [ ] **Admin Panel**: Login as Admin (`25311a05z9@cse.sreenidhi.edu.in`), navigate to `/admin`, manage questions, tests, courses, and timetable.
+- [ ] **Admin Panel**: Login as Admin (`ankit@adepteduverse.com`), navigate to `/admin`, manage questions, tests, courses, and timetable.
 
 ---
 

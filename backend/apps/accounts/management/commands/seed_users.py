@@ -16,8 +16,8 @@ class Command(BaseCommand):
         # 1. Read credentials from environment variables
         student_email = config('SEED_STUDENT_EMAIL', default='mogilisaikumar875@gmail.com').strip().lower()
         student_password = config('SEED_STUDENT_PASSWORD', default='sai@123')
-        admin_email = config('SEED_ADMIN_EMAIL', default='25311a05z9@cse.sreenidhi.edu.in').strip().lower()
-        admin_password = config('SEED_ADMIN_PASSWORD', default='password')
+        admin_email = config('SEED_ADMIN_EMAIL', default='ankit@adepteduverse.com').strip().lower()
+        admin_password = config('SEED_ADMIN_PASSWORD', default='Ank@247shbm')
 
         # 2. Seed Student User
         student_user, student_created = User.objects.get_or_create(

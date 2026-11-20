@@ -170,7 +170,7 @@ cd frontend && npm run dev
 ## 3. Verification & QA Checklist
 
 ### A. Multipart Upload to R2
-1. Log in as Admin (`25311a05z9@cse.sreenidhi.edu.in`) and visit `/admin/videos`.
+1. Log in as Admin (`ankit@adepteduverse.com`) and visit `/admin/videos`.
 2. Click **Upload or Add Video**.
 3. Select an MP4 file, choose a Target Lecture, and click **Start Upload**.
 4. Verify:
