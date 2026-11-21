@@ -58,9 +58,11 @@ INSTALLED_APPS = [
     'apps.analytics',
     'apps.adminpanel',
     'apps.banners',
+    'apps.payments',
 ]
 
 MIDDLEWARE = [
+    'apps.core.middleware.NormalizeSlashMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -359,4 +361,8 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='ANKIT JEE <no-reply@a
 # TextBee SMS Gateway Configuration
 TEXTBEE_API_KEY = config('TEXTBEE_API_KEY', default='')
 TEXTBEE_DEVICE_ID = config('TEXTBEE_DEVICE_ID', default='')
+
+# Razorpay Payment Gateway Configuration
+RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
+RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 

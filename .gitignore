@@ -64,3 +64,8 @@ pnpm-debug.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Media uploads & local test recordings
+*.mov
+*.mp4
+problem.mov

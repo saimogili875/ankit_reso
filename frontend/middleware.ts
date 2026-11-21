@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   '/admin/login',
   '/admin/forgot-password',
   '/admin/reset-password',
+  '/payment-test',
 ];
 
 export function middleware(request: NextRequest) {

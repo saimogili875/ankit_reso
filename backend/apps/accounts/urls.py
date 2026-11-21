@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from .views import (
     CSRFTokenView,
     CurrentUserView,
@@ -21,31 +21,31 @@ from .views import (
 
 urlpatterns = [
     # System & CSRF
-    path('csrf/', CSRFTokenView.as_view(), name='csrf'),
+    re_path(r'^csrf/?$', CSRFTokenView.as_view(), name='csrf'),
 
     # Profile & Session
-    path('me/', CurrentUserView.as_view(), name='current-user'),
-    path('me/change-email/send-otp/', SendProfileChangeEmailOtpView.as_view(), name='profile-change-email-send-otp'),
-    path('me/change-email/verify-otp/', VerifyProfileChangeEmailOtpView.as_view(), name='profile-change-email-verify-otp'),
-    path('me/change-phone/send-otp/', SendProfileChangePhoneOtpView.as_view(), name='profile-change-phone-send-otp'),
-    path('me/change-phone/verify-otp/', VerifyProfileChangePhoneOtpView.as_view(), name='profile-change-phone-verify-otp'),
+    re_path(r'^me/?$', CurrentUserView.as_view(), name='current-user'),
+    re_path(r'^me/change-email/send-otp/?$', SendProfileChangeEmailOtpView.as_view(), name='profile-change-email-send-otp'),
+    re_path(r'^me/change-email/verify-otp/?$', VerifyProfileChangeEmailOtpView.as_view(), name='profile-change-email-verify-otp'),
+    re_path(r'^me/change-phone/send-otp/?$', SendProfileChangePhoneOtpView.as_view(), name='profile-change-phone-send-otp'),
+    re_path(r'^me/change-phone/verify-otp/?$', VerifyProfileChangePhoneOtpView.as_view(), name='profile-change-phone-verify-otp'),
 
     # Signup OTP & Creation
-    path('signup/email/send-otp/', SendSignupEmailOtpView.as_view(), name='signup-email-send-otp'),
-    path('signup/email/verify-otp/', VerifySignupEmailOtpView.as_view(), name='signup-email-verify-otp'),
-    path('signup/phone/send-otp/', SendSignupPhoneOtpView.as_view(), name='signup-phone-send-otp'),
-    path('signup/phone/verify-otp/', VerifySignupPhoneOtpView.as_view(), name='signup-phone-verify-otp'),
-    path('signup/', SignupView.as_view(), name='signup'),
+    re_path(r'^signup/email/send-otp/?$', SendSignupEmailOtpView.as_view(), name='signup-email-send-otp'),
+    re_path(r'^signup/email/verify-otp/?$', VerifySignupEmailOtpView.as_view(), name='signup-email-verify-otp'),
+    re_path(r'^signup/phone/send-otp/?$', SendSignupPhoneOtpView.as_view(), name='signup-phone-send-otp'),
+    re_path(r'^signup/phone/verify-otp/?$', VerifySignupPhoneOtpView.as_view(), name='signup-phone-verify-otp'),
+    re_path(r'^signup/?$', SignupView.as_view(), name='signup'),
 
     # Legacy / Backward compatibility
-    path('register/', RegisterView.as_view(), name='register'),
+    re_path(r'^register/?$', RegisterView.as_view(), name='register'),
 
     # Login & Logout
-    path('login/', LoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(), name='logout'),
+    re_path(r'^login/?$', LoginView.as_view(), name='login'),
+    re_path(r'^logout/?$', LogoutView.as_view(), name='logout'),
 
     # Password Recovery (OTP-based)
-    path('password/forgot/', ForgotPasswordView.as_view(), name='password-forgot'),
-    path('password/reset/verify-otp/', VerifyResetOtpView.as_view(), name='password-reset-verify-otp'),
-    path('password/reset/', ResetPasswordView.as_view(), name='password-reset'),
+    re_path(r'^password/forgot/?$', ForgotPasswordView.as_view(), name='password-forgot'),
+    re_path(r'^password/reset/verify-otp/?$', VerifyResetOtpView.as_view(), name='password-reset-verify-otp'),
+    re_path(r'^password/reset/?$', ResetPasswordView.as_view(), name='password-reset'),
 ]

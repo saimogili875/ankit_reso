@@ -43,3 +43,7 @@ except (socket.error, Exception):
             'LOCATION': 'dev-locmem-cache',
         }
     }
+
+# In local dev, use cache backend for sessions to avoid slow remote DB roundtrips to Supabase
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'

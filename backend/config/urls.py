@@ -17,6 +17,7 @@ from apps.content.schedule_views import (
     NotificationMarkReadView,
 )
 from apps.academics.views import CourseListView, CourseDetailView
+from apps.payments.views import CreateOrderView, VerifyPaymentView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -70,6 +71,13 @@ urlpatterns = [
     path('api/analytics/', include('apps.analytics.urls')),
     path('api/admin-panel/', include('apps.adminpanel.urls')),
     path('api/banners/', include('apps.banners.urls')),
+
+    # Razorpay Standard Web Checkout Endpoints
+    path('api/create-order', CreateOrderView.as_view(), name='create-order-noslash'),
+    path('api/create-order/', CreateOrderView.as_view(), name='create-order'),
+    path('api/verify-payment', VerifyPaymentView.as_view(), name='verify-payment-noslash'),
+    path('api/verify-payment/', VerifyPaymentView.as_view(), name='verify-payment'),
+    path('api/payments/', include('apps.payments.urls')),
 ]
 
 if settings.DEBUG:

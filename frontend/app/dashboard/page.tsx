@@ -88,10 +88,21 @@ export default function DashboardPage() {
         setBio(u.student_profile?.bio || '');
         setIsLoading(false);
       } else {
-        router.push('/login');
+        // Only redirect to login if auth genuinely failed and user is not authenticated
+        const hasSession = typeof document !== 'undefined' && document.cookie.includes('auth_session=1');
+        if (!hasSession) {
+          router.push('/login');
+        } else {
+          // If auth_session cookie exists but authUser is null, try refreshing once
+          refresh().then((usr) => {
+            if (!usr) {
+              router.push('/login');
+            }
+          });
+        }
       }
     }
-  }, [authUser, authLoading, router]);
+  }, [authUser, authLoading, router, refresh]);
 
   // Handle Logout
   const handleLogout = async () => {

@@ -12,14 +12,14 @@ import { Button } from '@/components/ui/button';
 import { FormMessage } from '@/components/auth/form-message';
 import { Mail, ShieldCheck, Lock, ArrowRight, GraduationCap } from 'lucide-react';
 import { apiClient, setAuthCookies } from '@/lib/api-client';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth, AuthUser } from '@/hooks/use-auth';
 
 type PortalRole = 'student' | 'admin';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user: authUser, isLoading: authLoading, refresh } = useAuth();
+  const { user: authUser, isLoading: authLoading, setUser, refresh } = useAuth();
 
   const roleParam = searchParams.get('role');
   const initialRole: PortalRole = roleParam?.toLowerCase() === 'admin' ? 'admin' : 'student';
@@ -99,7 +99,7 @@ function LoginForm() {
         remember_me: rememberMe,
       };
 
-      const response = await apiClient.post<{ message: string; user: { is_admin: boolean; role: string } }>(
+      const response = await apiClient.post<{ message: string; user: AuthUser }>(
         '/auth/login/',
         payload
       );
@@ -107,15 +107,18 @@ function LoginForm() {
       // Set client session cookies for Next.js middleware and immediate state
       const role = response.user?.role || (response.user?.is_admin ? 'ADMIN' : 'STUDENT');
       setAuthCookies(role, rememberMe);
-      await refresh();
+      if (response.user) {
+        setUser(response.user);
+      }
+
+      // Synchronize auth state with backend session
+      await refresh().catch(() => null);
 
       setIsLoading(false);
       setSuccessMessage('Successfully signed in! Redirecting...');
 
       const targetPath = portal === 'admin' || response.user?.is_admin ? '/admin' : '/dashboard';
-      setTimeout(() => {
-        router.push(targetPath);
-      }, 500);
+      router.push(targetPath);
     } catch (err: unknown) {
       setIsLoading(false);
       const msg = err instanceof Error ? err.message : 'Login failed. Please verify your credentials.';

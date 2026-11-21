@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEnrollment } from '@/hooks/use-enrollment';
-import { CheckCircle2, Sparkles, BookOpen, Edit3, X } from 'lucide-react';
+import { CheckCircle2, Sparkles, BookOpen, Edit3, X, CreditCard, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { processRazorpayPayment } from '@/lib/razorpay';
 
 export interface EnrollmentModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   if (!isOpen) return null;
 
@@ -36,6 +38,25 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
     await enroll(courseId);
     setIsSubmitting(false);
     setSuccess(true);
+  };
+
+  const handleRazorpayPay = async () => {
+    setIsSubmitting(true);
+    setPaymentError('');
+    try {
+      await processRazorpayPayment({
+        amountPaise: 100, // ₹1.00
+        courseId,
+        description: `Enrollment: ${courseTitle}`,
+      });
+      await enroll(courseId).catch(() => null);
+      setSuccess(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Payment was not completed.';
+      setPaymentError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,18 +188,35 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+            {paymentError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{paymentError}</span>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
               <Button variant="outline" size="sm" onClick={onClose}>
                 Cancel
               </Button>
               <Button
-                variant="primary"
+                variant="outline"
                 size="sm"
                 onClick={handleConfirmEnrollment}
                 isLoading={isSubmitting}
-                className="font-bold px-5"
+                className="font-bold border-slate-700 text-slate-300 hover:text-white"
               >
-                Confirm Enrollment
+                Free Instant Access
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleRazorpayPay}
+                isLoading={isSubmitting}
+                className="font-bold px-4 bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shadow-lg shadow-emerald-900/30"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Pay ₹1 with Razorpay</span>
               </Button>
             </div>
           </div>

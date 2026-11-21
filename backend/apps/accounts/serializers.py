@@ -229,14 +229,14 @@ class LoginSerializer(serializers.Serializer):
         # Detect identifier type:
         # 1. Contains '@' -> Email
         if '@' in identifier:
-            user = User.objects.filter(email__iexact=identifier).first()
+            user = User.objects.select_related('student_profile').filter(email__iexact=identifier).first()
         # 2. Starts with '+' or is all digits -> Phone
         elif identifier.startswith('+') or identifier.replace('-', '').replace(' ', '').isdigit():
             norm_phone = normalize_phone(identifier)
-            user = User.objects.filter(phone=norm_phone).first() or User.objects.filter(phone_number=norm_phone).first()
+            user = User.objects.select_related('student_profile').filter(phone=norm_phone).first() or User.objects.select_related('student_profile').filter(phone_number=norm_phone).first()
         # 3. Otherwise -> Username
         else:
-            user = User.objects.filter(username__iexact=identifier).first()
+            user = User.objects.select_related('student_profile').filter(username__iexact=identifier).first()
 
         if not user or not user.check_password(password):
             raise serializers.ValidationError(GENERIC_ERROR)

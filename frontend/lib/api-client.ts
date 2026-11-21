@@ -13,7 +13,17 @@ export function buildApiUrl(endpoint: string): string {
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
   }
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  // Separate path and query string to strip any trailing slash before query parameters
+  const [pathname, ...queryParts] = cleanEndpoint.split('?');
+  const query = queryParts.length > 0 ? `?${queryParts.join('?')}` : '';
+  let normalizedPath = pathname;
+  if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
+    normalizedPath = normalizedPath.slice(0, -1);
+  }
+  cleanEndpoint = `${normalizedPath}${query}`;
+
   if (cleanEndpoint.startsWith('/api/')) {
     const origin = API_BASE_URL.replace(/\/api$/, '');
     return `${origin}${cleanEndpoint}`;
@@ -35,6 +45,7 @@ const PUBLIC_PATHS = [
   '/admin/login',
   '/admin/forgot-password',
   '/admin/reset-password',
+  '/payment-test',
 ];
 
 /**
