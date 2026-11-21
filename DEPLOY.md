@@ -95,6 +95,35 @@ The repository includes a production-ready `render.yaml` Blueprint file defining
 6. Click **Apply**.
 7. Render provisions Redis, runs DB migrations, collects static assets, and boots the API, Celery worker, and beat scheduler.
 
+### 3.2 Required Environment Variables
+
+The table below outlines all production environment variables, which services require them, and instructions on generating them.
+
+> [!IMPORTANT]
+> In `config/settings/prod.py`, `SECRET_KEY`, `VIDEO_STREAMING_SECRET`, and `REDIS_URL` are strictly validated at import time. If any of these are missing, or if `VIDEO_STREAMING_SECRET == SECRET_KEY`, the service raises `ImproperlyConfigured` and halts boot.
+
+| Variable | Which Services Need It | How to Generate / Configure | Description |
+|---|---|---|---|
+| `SECRET_KEY` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Generate via shell: `python -c "import secrets; print(secrets.token_urlsafe(50))"` (or generated automatically via `generateValue: true` on Blueprint). | Cryptographic signing key for Django sessions and security tokens. Must never equal `VIDEO_STREAMING_SECRET`. |
+| `VIDEO_STREAMING_SECRET` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Generate via shell: `python -c "import secrets; print(secrets.token_hex(32))"` (or generated automatically via `generateValue: true` on Blueprint). | 64-char hex secret used for HMAC-SHA256 signing of HLS streaming URLs. Must be distinct from `SECRET_KEY`. |
+| `REDIS_URL` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Automatically populated via `fromService: ankit-reso-redis` (or external URI: `rediss://default:<password>@<host>:<port>`). | Redis connection string used for caching, Celery task broker, rate limiting, and session storage. |
+| `DATABASE_URL` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Copy from Neon or Supabase pooled connection string (`port 6543`, `sslmode=require`). | PostgreSQL URI with PgBouncer session/transaction pooler. |
+| `ALLOWED_HOSTS` | `ankit-reso` (web) | Comma-separated list: `ankit-reso.onrender.com,api.adepteduverse.com`. | Whitelist of HTTP Host headers allowed by Django. |
+| `FRONTEND_URL` | `ankit-reso` (web) | URL of your frontend app: `https://ankit-reso.vercel.app`. | Base URL of frontend application for email links and CORS/CSRF inclusion. |
+| `CORS_ALLOWED_ORIGINS` | `ankit-reso` (web) | Comma-separated list: `https://ankit-reso.vercel.app,http://localhost:3000`. | Origins allowed to make credentialed cross-origin AJAX requests. |
+| `CSRF_TRUSTED_ORIGINS` | `ankit-reso` (web) | Comma-separated list: `https://ankit-reso.vercel.app`. | Origins allowed to submit unsafe HTTP requests (POST, PUT, DELETE). |
+| `R2_ACCOUNT_ID` | `ankit-reso` (web), `celery-worker`, `video-worker` | Cloudflare Dashboard → R2 → Account ID. | Cloudflare R2 Account Identifier. |
+| `R2_ACCESS_KEY_ID` | `ankit-reso` (web), `celery-worker`, `video-worker` | Cloudflare Dashboard → R2 → Manage API Tokens. | R2 S3-compatible Access Key ID. |
+| `R2_SECRET_ACCESS_KEY` | `ankit-reso` (web), `celery-worker`, `video-worker` | Cloudflare Dashboard → R2 → Manage API Tokens. | R2 S3-compatible Secret Access Key. |
+| `R2_BUCKET_NAME` | `ankit-reso` (web), `celery-worker`, `video-worker` | Bucket name created in R2 (e.g., `adepteduverse-storage`). | Storage bucket for videos, PDFs, banners, and DPP solutions. |
+| `R2_ENDPOINT` | `ankit-reso` (web), `celery-worker`, `video-worker` | `https://<account_id>.r2.cloudflarestorage.com`. | S3 API endpoint for Cloudflare R2. |
+| `VIDEO_STREAMING_DOMAIN` | `ankit-reso` (web), `video-worker` | Optional custom CDN domain (e.g. `video.adepteduverse.com`). | CDN prefix for serving signed HLS m3u8 playlists and TS segments. |
+| `ENABLE_1080P` | `ankit-reso` (web), `video-worker` | Set to `"true"` or `"false"` (default `"false"`). | Toggles 1080p encoding during Celery video transcoding. |
+| `ADMIN_EMAIL` | `ankit-reso` (web) | System admin email (e.g. `admin@adepteduverse.com`). | Seed admin email provisioned by `ensure_admin`. |
+| `ADMIN_PASSWORD` | `ankit-reso` (web) | Secure password for initial admin user. | Initial password provisioned by `ensure_admin`. |
+| `ADMIN_RESET_PASSWORD` | `ankit-reso` (web) | (Optional) Set to `"true"` only when an intentional admin password reset is needed. | Prevents overwriting changed admin passwords on deploys. |
+| `SENTRY_DSN` | All services (optional) | From Sentry Project Settings → Client Keys (DSN). | Error reporting and performance monitoring. |
+
 ---
 
 ## 4. Vercel Frontend Deployment

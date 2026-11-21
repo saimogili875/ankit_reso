@@ -79,6 +79,11 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SECRET_KEY
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: VIDEO_STREAMING_SECRET
       - key: DATABASE_URL
         fromService:
           type: web
@@ -123,11 +128,8 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SENTRY_DSN
-      - key: VIDEO_STREAMING_SECRET
-        fromService:
-          type: web
-          name: ankit-reso
-          envVarKey: VIDEO_STREAMING_SECRET
+      - key: ENVIRONMENT
+        value: "production"
 
   # 3. Dedicated Celery Video Transcoding Worker (FFmpeg HLS Pipeline)
   - type: worker
@@ -147,6 +149,11 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SECRET_KEY
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: VIDEO_STREAMING_SECRET
       - key: DATABASE_URL
         fromService:
           type: web
@@ -191,11 +198,6 @@ services:
           type: web
           name: ankit-reso
           envVarKey: VIDEO_STREAMING_DOMAIN
-      - key: VIDEO_STREAMING_SECRET
-        fromService:
-          type: web
-          name: ankit-reso
-          envVarKey: VIDEO_STREAMING_SECRET
       - key: ENABLE_1080P
         fromService:
           type: web
@@ -206,6 +208,8 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SENTRY_DSN
+      - key: ENVIRONMENT
+        value: "production"
 
   # 4. Celery Beat (Periodic Maintenance & Abandoned Video Cleaners)
   - type: worker
@@ -225,11 +229,20 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SECRET_KEY
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: VIDEO_STREAMING_SECRET
       - key: DATABASE_URL
         fromService:
           type: web
           name: ankit-reso
           envVarKey: DATABASE_URL
+      - key: CONN_MAX_AGE
+        value: "600"
+      - key: DISABLE_SERVER_SIDE_CURSORS
+        value: "true"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -240,11 +253,8 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SENTRY_DSN
-      - key: VIDEO_STREAMING_SECRET
-        fromService:
-          type: web
-          name: ankit-reso
-          envVarKey: VIDEO_STREAMING_SECRET
+      - key: ENVIRONMENT
+        value: "production"
 
   # 5. Managed Redis (Cache & Celery Broker)
   - type: redis
