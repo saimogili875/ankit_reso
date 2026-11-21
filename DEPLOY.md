@@ -88,6 +88,7 @@ The repository includes a production-ready `render.yaml` Blueprint file defining
    - `FRONTEND_URL`: Your Vercel frontend URL (e.g., `https://ankit-reso.vercel.app`).
    - `CORS_ALLOWED_ORIGINS`: `https://ankit-reso.vercel.app`
    - `CSRF_TRUSTED_ORIGINS`: `https://ankit-reso.vercel.app`
+   - `VIDEO_STREAMING_SECRET`: A secure, random 64-character secret used for HMAC signing of video streaming URLs. **Note**: Docker-based Render services must set it manually in the dashboard, since `render.yaml` `generateValue` only applies to Blueprint deploys.
    - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`.
    - `SENTRY_DSN`: (Optional) Your backend Sentry DSN.
 6. Click **Apply**.
