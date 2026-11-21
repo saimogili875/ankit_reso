@@ -56,8 +56,6 @@ services:
         sync: false
       - key: VIDEO_STREAMING_DOMAIN
         sync: false
-      - key: VIDEO_STREAMING_SECRET
-        generateValue: true
       - key: ENABLE_1080P
         value: "false"
       - key: ENVIRONMENT
@@ -125,6 +123,11 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SENTRY_DSN
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: VIDEO_STREAMING_SECRET
 
   # 3. Dedicated Celery Video Transcoding Worker (FFmpeg HLS Pipeline)
   - type: worker
@@ -237,6 +240,11 @@ services:
           type: web
           name: ankit-reso
           envVarKey: SENTRY_DSN
+      - key: VIDEO_STREAMING_SECRET
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: VIDEO_STREAMING_SECRET
 
   # 5. Managed Redis (Cache & Celery Broker)
   - type: redis

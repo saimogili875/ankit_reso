@@ -84,11 +84,12 @@ The repository includes a production-ready `render.yaml` Blueprint file defining
 3. Connect your repository (`ankit_reso`).
 4. Render automatically parses `render.yaml`.
 5. Enter the required secret environment values:
+   - `SECRET_KEY`: A secure, random secret key for Django cryptographic signing. **Note**: Docker-based or manual Render services must set `SECRET_KEY` and `VIDEO_STREAMING_SECRET` manually in the dashboard, since `render.yaml` `generateValue` only applies to Blueprint deploys.
    - `DATABASE_URL`: Your pooled Postgres URI.
    - `FRONTEND_URL`: Your Vercel frontend URL (e.g., `https://ankit-reso.vercel.app`).
    - `CORS_ALLOWED_ORIGINS`: `https://ankit-reso.vercel.app`
    - `CSRF_TRUSTED_ORIGINS`: `https://ankit-reso.vercel.app`
-   - `VIDEO_STREAMING_SECRET`: A secure, random 64-character secret used for HMAC signing of video streaming URLs. **Note**: Docker-based Render services must set it manually in the dashboard, since `render.yaml` `generateValue` only applies to Blueprint deploys.
+   - `VIDEO_STREAMING_SECRET`: A secure, random 64-character secret used for HMAC signing of video streaming URLs. Must be set manually in the dashboard for Docker-based services.
    - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`.
    - `SENTRY_DSN`: (Optional) Your backend Sentry DSN.
 6. Click **Apply**.
