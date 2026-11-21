@@ -417,7 +417,7 @@ export function HlsVideoPlayer({
     setIsMuted(newVol === 0);
   };
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (isMuted) {
@@ -428,7 +428,7 @@ export function HlsVideoPlayer({
       video.muted = true;
       setIsMuted(true);
     }
-  };
+  }, [isMuted, volume]);
 
   const toggleFullscreen = () => {
     const container = containerRef.current;
@@ -514,7 +514,7 @@ export function HlsVideoPlayer({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [volume, isMuted, isPlaying]);
+  }, [volume, isMuted, isPlaying, toggleMute]);
 
   // 10. Auto-hide controls
   const handleMouseMove = () => {

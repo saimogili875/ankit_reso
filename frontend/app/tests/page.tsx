@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   FileText,
@@ -54,7 +54,7 @@ export default function TestsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'available' | 'upcoming' | 'attempted'>('available');
 
-  const fetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -66,11 +66,11 @@ export default function TestsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     fetchTests();
-  }, [activeTab]);
+  }, [fetchTests]);
 
   const renderTypeBadge = (type: TestItem['test_type']) => {
     switch (type) {

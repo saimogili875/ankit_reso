@@ -14,7 +14,6 @@ import {
   ArrowRight,
   RefreshCw,
   Sparkles,
-  Info,
 } from 'lucide-react';
 import { processRazorpayPayment, VerifyPaymentResponse } from '@/lib/razorpay';
 import { useAuth } from '@/hooks/use-auth';
@@ -134,7 +133,7 @@ export default function PaymentTestPage() {
         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-3">
           <div className="flex items-center gap-2 font-bold text-amber-200">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <span>Why your PhonePe / GPay app says "Cannot pay with this QR":</span>
+            <span>Why your PhonePe / GPay app says &quot;Cannot pay with this QR&quot;:</span>
           </div>
           <p className="text-amber-200/90 leading-relaxed text-[11px]">
             You are using a <strong>Razorpay Test Mode key</strong> (<code className="bg-amber-950/80 px-1 py-0.5 rounded text-amber-300 font-mono">rzp_test_...</code>). Real banking apps (Google Pay, PhonePe, Paytm, BHIM) automatically reject test sandbox QR codes because banks do not transfer real money in test mode.
@@ -159,13 +158,13 @@ export default function PaymentTestPage() {
               <div className="p-2.5 rounded-lg bg-slate-950/80 border border-amber-500/20 space-y-1">
                 <span className="font-bold text-blue-400 block">Method 3: Netbanking</span>
                 <p className="text-[10px] text-slate-400">Choose SBI / HDFC / ICICI</p>
-                <span className="text-emerald-400 text-[10px] font-bold block">Click "Success" button</span>
+                <span className="text-emerald-400 text-[10px] font-bold block">Click &quot;Success&quot; button</span>
               </div>
             </div>
           </div>
 
           <p className="text-[10px] text-amber-300/80 pt-1 border-t border-amber-500/10">
-            💡 <strong>Want to scan & pay with real ₹1 using PhonePe/GPay?</strong> Switch your Razorpay Dashboard toggle from "Test Mode" to "Live Mode" and replace with your <code className="font-mono text-amber-200">rzp_live_...</code> key in <code className="font-mono">.env</code>.
+            💡 <strong>Want to scan & pay with real ₹1 using PhonePe/GPay?</strong> Switch your Razorpay Dashboard toggle from &quot;Test Mode&quot; to &quot;Live Mode&quot; and replace with your <code className="font-mono text-amber-200">rzp_live_...</code> key in <code className="font-mono">.env</code>.
           </p>
         </div>
 
