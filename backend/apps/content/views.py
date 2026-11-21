@@ -480,21 +480,35 @@ class ChatbotView(APIView):
     """
     Public AllowAny endpoint for the Swecha assistant.
     Takes { message: str, history: list }.
-    Throttled and CSRF-safe.
+    Hardened with chatbot rate throttling, message size bounds, and history sanitization.
     """
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_scope = 'anon'
+    throttle_scope = 'chatbot'
 
     def post(self, request):
         message = str(request.data.get('message', '')).strip()
         if not message:
             return Response({'error': 'Message content is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        history = request.data.get('history', [])
-        if not isinstance(history, list):
-            history = []
+        if len(message) > 500:
+            return Response({'error': 'Message too long. Maximum 500 characters allowed.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        reply = generate_chatbot_response(message, history)
+        raw_history = request.data.get('history', [])
+        sanitized_history = []
+        if isinstance(raw_history, list):
+            # Limit history to the last 6 turns
+            total_chars = 0
+            for item in raw_history[-6:]:
+                if isinstance(item, dict):
+                    role = str(item.get('role', '')).strip().lower()
+                    content = str(item.get('content', '')).strip()
+                    if role in ('user', 'assistant') and content:
+                        total_chars += len(content)
+                        if total_chars > 3000:
+                            break
+                        sanitized_history.append({'role': role, 'content': content[:1000]})
+
+        reply = generate_chatbot_response(message, sanitized_history)
         return Response({'reply': reply}, status=status.HTTP_200_OK)
 

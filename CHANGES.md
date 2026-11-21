@@ -24,8 +24,8 @@ This update completes end-to-end security hardening, role-based backend authoriz
   - Exposes dedicated `apiClient.logout()` which flushes the backend session and deletes client cookies (`auth_session`, `user_role`, `sessionid`).
 - **User Seeding (`python manage.py seed_users`)**:
   - Idempotent Django management command reading credentials securely from `.env`:
-    - **Student**: `mogilisaikumar875@gmail.com` / `sai@123` (`role=STUDENT`, `is_verified=True`, with attached `StudentProfile`).
-    - **Admin**: `ankit@adepteduverse.com` / `Ank@247shbm` (`role=ADMIN`, `is_staff=True`, `is_superuser=True`, `is_verified=True`).
+    - **Student**: `SEED_STUDENT_EMAIL` / `SEED_STUDENT_PASSWORD` (`role=STUDENT`, `is_verified=True`, with attached `StudentProfile`).
+    - **Admin**: `ADMIN_EMAIL` / `ADMIN_PASSWORD` (`role=ADMIN`, `is_staff=True`, `is_superuser=True`, `is_verified=True`).
   - Strict portal validation: Admin cannot sign in on Student tab (`"Use Admin login"`), and Student cannot sign in on Admin tab (`"Invalid credentials. Please check your username and password."`).
 
 ---

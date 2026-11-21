@@ -1,5 +1,7 @@
 from django.db import models
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -8,6 +10,7 @@ from .models import Question, QuestionOption, PYQ, DPP, DPPQuestion
 from .serializers import QuestionSerializer, DPPSerializer, DPPQuestionSerializer
 
 class DPPListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = DPPSerializer
 
     def get_queryset(self):
@@ -36,15 +39,14 @@ class DPPListView(generics.ListAPIView):
         return queryset.order_by('dpp_number', 'title')
 
 class DPPQuestionsView(APIView):
-    def get(self, request, pk):
-        dpp = None
-        try:
-            dpp = DPP.objects.filter(models.Q(id=pk) | models.Q(title__icontains=pk)).first()
-        except Exception:
-            dpp = DPP.objects.filter(title__icontains=pk).first()
+    """
+    Returns DPP question metadata for practice quiz execution.
+    Answers and explanations are intentionally stripped to prevent client-side inspection leakage.
+    """
+    permission_classes = [IsAuthenticated]
 
-        if not dpp:
-            return Response({'error': 'DPP not found'}, status=status.HTTP_404_NOT_FOUND)
+    def get(self, request, pk):
+        dpp = get_object_or_404(DPP, id=pk)
 
         dpp_questions = dpp.dpp_questions.all().order_by('order')
         dpp_data = DPPSerializer(dpp).data
@@ -53,23 +55,16 @@ class DPPQuestionsView(APIView):
         for dq in dpp_questions:
             q = dq.question
             options_list = []
-            correct_ans_id = 'A'
-            for idx, opt in enumerate(q.options.all()):
-                opt_letter = chr(65 + idx)
-                if opt.is_correct:
-                    correct_ans_id = str(opt.id) if str(opt.id) else opt_letter
+            for opt in q.options.all():
                 options_list.append({
                     'id': str(opt.id),
                     'text': opt.option_text,
-                    'is_correct': opt.is_correct
                 })
             
             questions_list.append({
                 'id': str(q.id),
                 'questionText': q.question_text,
                 'options': options_list,
-                'correctAnswerId': correct_ans_id,
-                'explanation': q.solution_text or 'Detailed step-by-step solution provided.',
                 'positive_marks': dq.positive_marks,
                 'negative_marks': dq.negative_marks,
             })
@@ -78,15 +73,14 @@ class DPPQuestionsView(APIView):
         return Response(dpp_data)
 
 class DPPSubmitView(APIView):
-    def post(self, request, pk):
-        dpp = None
-        try:
-            dpp = DPP.objects.filter(models.Q(id=pk) | models.Q(title__icontains=pk)).first()
-        except Exception:
-            dpp = DPP.objects.filter(title__icontains=pk).first()
+    """
+    Submits student responses for grading. Returns attempt metrics alongside
+    the full solutions and explanations map.
+    """
+    permission_classes = [IsAuthenticated]
 
-        if not dpp:
-            return Response({'error': 'DPP not found'}, status=status.HTTP_404_NOT_FOUND)
+    def post(self, request, pk):
+        dpp = get_object_or_404(DPP, id=pk)
 
         answers = request.data.get('answers', {})
         dpp_questions = dpp.dpp_questions.all()
@@ -95,11 +89,20 @@ class DPPSubmitView(APIView):
         incorrect = 0
         score = 0
         total = dpp_questions.count()
+        solutions = {}
 
         for dq in dpp_questions:
             q = dq.question
             user_ans = str(answers.get(str(q.id), '') or answers.get(q.id, ''))
             
+            correct_opts = [str(opt.id) for opt in q.options.all() if opt.is_correct]
+            correct_ans_id = correct_opts[0] if correct_opts else ''
+            solutions[str(q.id)] = {
+                'correctAnswerId': correct_ans_id,
+                'correctOptions': correct_opts,
+                'explanation': q.solution_text or 'Detailed step-by-step solution provided.',
+            }
+
             if not user_ans:
                 continue
 
@@ -142,5 +145,6 @@ class DPPSubmitView(APIView):
             'incorrect': incorrect,
             'unattempted': unattempted,
             'accuracy': accuracy,
-            'completed_at': attempt.completed_at
+            'completed_at': attempt.completed_at,
+            'solutions': solutions,
         }, status=status.HTTP_201_CREATED)

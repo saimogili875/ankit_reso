@@ -1,5 +1,11 @@
+import os
 import socket
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
+
+env = config('ENVIRONMENT', default='development').lower()
+if env == 'production' or config('RENDER', default=False, cast=bool) or os.environ.get('RENDER'):
+    raise ImproperlyConfigured("CRITICAL: Development settings (config.settings.dev) cannot be used in a production environment or on Render.")
 
 DEBUG = True
 

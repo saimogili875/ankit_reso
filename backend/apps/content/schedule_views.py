@@ -146,7 +146,9 @@ class NotificationMarkReadView(APIView):
             ).update(is_read=True)
             return Response({'message': 'All notifications marked as read.'}, status=status.HTTP_200_OK)
 
-        notification = Notification.objects.filter(id=pk).first()
+        notification = Notification.objects.filter(
+            Q(id=pk) & (Q(user=request.user) | Q(user__isnull=True))
+        ).first()
         if not notification:
             return Response({'error': 'Notification not found.'}, status=status.HTTP_404_NOT_FOUND)
 

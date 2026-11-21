@@ -13,70 +13,80 @@ class Command(BaseCommand):
     help = "Seeds default student and admin users idempotently from environment variables, plus base platform records."
 
     def handle(self, *args, **options):
-        # 1. Read credentials from environment variables
-        student_email = config('SEED_STUDENT_EMAIL', default='mogilisaikumar875@gmail.com').strip().lower()
-        student_password = config('SEED_STUDENT_PASSWORD', default='sai@123')
-        admin_email = config('SEED_ADMIN_EMAIL', default='ankit@adepteduverse.com').strip().lower()
-        admin_password = config('SEED_ADMIN_PASSWORD', default='Ank@247shbm')
+        # 1. Read credentials from environment variables (no hardcoded credentials)
+        student_email = config('SEED_STUDENT_EMAIL', default='').strip().lower()
+        student_password = config('SEED_STUDENT_PASSWORD', default='')
+        admin_email = config('ADMIN_EMAIL', default=config('SEED_ADMIN_EMAIL', default='')).strip().lower()
+        admin_password = config('ADMIN_PASSWORD', default=config('SEED_ADMIN_PASSWORD', default=''))
 
         # 2. Seed Student User
-        student_user, student_created = User.objects.get_or_create(
-            email=student_email,
-            defaults={
-                'username': student_email.split('@')[0],
-                'role': User.Role.STUDENT,
-                'first_name': 'Sai Kumar',
-                'last_name': 'Mogili',
-                'is_verified': True,
-                'is_active': True,
-            }
-        )
-        student_user.role = User.Role.STUDENT
-        student_user.is_verified = True
-        student_user.is_active = True
-        student_user.set_password(student_password)
-        student_user.save()
+        if student_email and student_password:
+            student_user, student_created = User.objects.get_or_create(
+                email=student_email,
+                defaults={
+                    'username': student_email.split('@')[0],
+                    'role': User.Role.STUDENT,
+                    'first_name': 'Sai Kumar',
+                    'last_name': 'Mogili',
+                    'is_verified': True,
+                    'is_active': True,
+                }
+            )
+            student_user.role = User.Role.STUDENT
+            student_user.is_verified = True
+            student_user.is_active = True
+            student_user.set_password(student_password)
+            student_user.save()
 
-        StudentProfile.objects.update_or_create(
-            user=student_user,
-            defaults={
-                'target_exam': StudentProfile.TargetExam.BOTH,
-                'target_year': 2025,
-                'bio': 'JEE Main & Advanced aspirant',
-            }
-        )
+            StudentProfile.objects.update_or_create(
+                user=student_user,
+                defaults={
+                    'target_exam': StudentProfile.TargetExam.BOTH,
+                    'target_year': 2025,
+                    'bio': 'JEE Main & Advanced aspirant',
+                }
+            )
 
-        student_action = "Created" if student_created else "Updated"
-        self.stdout.write(self.style.SUCCESS(
-            f"Successfully {student_action} student user: {student_email} (role={student_user.role})"
-        ))
+            student_action = "Created" if student_created else "Updated"
+            self.stdout.write(self.style.SUCCESS(
+                f"Successfully {student_action} student user: {student_email} (role={student_user.role})"
+            ))
+        else:
+            self.stdout.write(self.style.WARNING(
+                "Skipping student user seeding: SEED_STUDENT_EMAIL or SEED_STUDENT_PASSWORD not configured."
+            ))
 
         # 3. Seed Admin User
-        admin_user, admin_created = User.objects.get_or_create(
-            email=admin_email,
-            defaults={
-                'username': admin_email.split('@')[0],
-                'role': User.Role.ADMIN,
-                'first_name': 'Admin',
-                'last_name': 'Sreenidhi',
-                'is_staff': True,
-                'is_superuser': True,
-                'is_verified': True,
-                'is_active': True,
-            }
-        )
-        admin_user.role = User.Role.ADMIN
-        admin_user.is_staff = True
-        admin_user.is_superuser = True
-        admin_user.is_verified = True
-        admin_user.is_active = True
-        admin_user.set_password(admin_password)
-        admin_user.save()
+        if admin_email and admin_password:
+            admin_user, admin_created = User.objects.get_or_create(
+                email=admin_email,
+                defaults={
+                    'username': admin_email.split('@')[0],
+                    'role': User.Role.ADMIN,
+                    'first_name': 'Admin',
+                    'last_name': 'User',
+                    'is_staff': True,
+                    'is_superuser': True,
+                    'is_verified': True,
+                    'is_active': True,
+                }
+            )
+            admin_user.role = User.Role.ADMIN
+            admin_user.is_staff = True
+            admin_user.is_superuser = True
+            admin_user.is_verified = True
+            admin_user.is_active = True
+            admin_user.set_password(admin_password)
+            admin_user.save()
 
-        admin_action = "Created" if admin_created else "Updated"
-        self.stdout.write(self.style.SUCCESS(
-            f"Successfully {admin_action} admin user: {admin_email} (role={admin_user.role}, superuser={admin_user.is_superuser})"
-        ))
+            admin_action = "Created" if admin_created else "Updated"
+            self.stdout.write(self.style.SUCCESS(
+                f"Successfully {admin_action} admin user: {admin_email} (role={admin_user.role}, superuser={admin_user.is_superuser})"
+            ))
+        else:
+            self.stdout.write(self.style.WARNING(
+                "Skipping admin user seeding: ADMIN_EMAIL or ADMIN_PASSWORD not configured."
+            ))
 
         # 4. Seed Base Platform Content (Only if empty, so admin maintains full control)
         # Academic Classes

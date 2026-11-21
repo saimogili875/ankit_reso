@@ -3,11 +3,18 @@ from decouple import config
 from apps.accounts.models import User
 
 class Command(BaseCommand):
-    help = "Ensures an admin user exists with active credentials."
+    help = "Ensures an admin user exists with active credentials read strictly from environment variables."
 
     def handle(self, *args, **options):
-        email = config('SEED_ADMIN_EMAIL', default='ankit@adepteduverse.com').strip().lower()
-        password = config('SEED_ADMIN_PASSWORD', default='Ank@247shbm')
+        email = config('ADMIN_EMAIL', default=config('SEED_ADMIN_EMAIL', default='')).strip().lower()
+        password = config('ADMIN_PASSWORD', default=config('SEED_ADMIN_PASSWORD', default=''))
+
+        if not email or not password:
+            self.stdout.write(self.style.WARNING(
+                "Skipping ensure_admin: ADMIN_EMAIL or ADMIN_PASSWORD environment variable not set."
+            ))
+            return
+
         username = email.split('@')[0]
 
         user = User.objects.filter(email__iexact=email).first()

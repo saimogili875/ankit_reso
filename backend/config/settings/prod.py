@@ -1,9 +1,19 @@
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Production SECRET_KEY: Read from environment
 SECRET_KEY = config('SECRET_KEY', default=SECRET_KEY)
+if not SECRET_KEY or 'dev-secret-key' in SECRET_KEY or 'django-insecure' in SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY must be set to a secure, random string in production.")
+
+# Video Streaming Secret: Enforce separation from SECRET_KEY
+VIDEO_STREAMING_SECRET = config('VIDEO_STREAMING_SECRET', default='')
+if not VIDEO_STREAMING_SECRET:
+    raise ImproperlyConfigured("VIDEO_STREAMING_SECRET must be explicitly set in production.")
+if VIDEO_STREAMING_SECRET == SECRET_KEY:
+    raise ImproperlyConfigured("VIDEO_STREAMING_SECRET must not be identical to SECRET_KEY to prevent key reuse.")
 
 # Host Configuration: Read from ALLOWED_HOSTS env var
 DEFAULT_PROD_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,localhost,127.0.0.1,testserver'
@@ -92,7 +102,14 @@ CSRF_COOKIE_HTTPONLY = False
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
-SECURE_REDIRECT_EXEMPT = [r'^healthz', r'^health', r'^$', r'^api/health']
+SECURE_REDIRECT_EXEMPT = [
+    r'^healthz/?$',
+    r'^health/?$',
+    r'^health/deep/?$',
+    r'^api/health/?$',
+    r'^api/health/deep/?$',
+    r'^$',
+]
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'

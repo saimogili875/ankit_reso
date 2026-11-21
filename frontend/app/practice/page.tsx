@@ -51,15 +51,15 @@ interface ApiDPP {
 interface ApiQuestionOption {
   id: string;
   text: string;
-  is_correct: boolean;
+  is_correct?: boolean;
 }
 
 interface ApiQuestion {
   id: string;
   questionText: string;
   options: ApiQuestionOption[];
-  correctAnswerId: string;
-  explanation: string;
+  correctAnswerId?: string;
+  explanation?: string;
   positive_marks: number;
   negative_marks: number;
 }
@@ -78,6 +78,7 @@ interface SubmitResult {
   incorrect: number;
   unattempted: number;
   accuracy: number;
+  solutions?: Record<string, { correctAnswerId: string; correctOptions: string[]; explanation: string }>;
 }
 
 export default function PracticePage() {
@@ -224,6 +225,27 @@ export default function PracticePage() {
         answers: userAnswers,
       });
       setSubmitResult(res);
+      if (res.solutions) {
+        setActiveDPP((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            questions: prev.questions.map((q) => {
+              const sol = res.solutions?.[q.id];
+              if (!sol) return q;
+              return {
+                ...q,
+                correctAnswerId: sol.correctAnswerId,
+                explanation: sol.explanation,
+                options: q.options.map((opt) => ({
+                  ...opt,
+                  is_correct: sol.correctOptions?.includes(opt.id) || opt.id === sol.correctAnswerId,
+                })),
+              };
+            }),
+          };
+        });
+      }
       setIsSubmitted(true);
     } catch {
       // Local calculation fallback
