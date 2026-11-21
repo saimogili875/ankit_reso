@@ -16,6 +16,7 @@ import {
   Target,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { API_BASE } from '@/lib/config';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 
@@ -216,7 +217,7 @@ export default function AdminTestAnalyticsPage() {
   };
 
   const handleExportCSV = (testId: string) => {
-    window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin-panel/test-analytics/${testId}/export/`, '_blank');
+    window.open(`${API_BASE}/admin-panel/test-analytics/${testId}/export/`, '_blank');
   };
 
   return (

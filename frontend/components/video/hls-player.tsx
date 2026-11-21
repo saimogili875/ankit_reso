@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { API_BASE } from '@/lib/config';
 
 export interface HlsPlayerProps {
   videoId?: string;
@@ -147,8 +148,7 @@ export function HlsVideoPlayer({
 
       if (forceKeepalive && typeof navigator !== 'undefined' && navigator.sendBeacon) {
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-        const beaconUrl = apiBase.endsWith('/api') ? `${apiBase}/progress/video/` : `${apiBase}/api/progress/video/`;
+        const beaconUrl = `${API_BASE}/progress/video/`;
         navigator.sendBeacon(beaconUrl, blob);
       } else {
         apiClient.post('/progress/video/', payload).catch(() => {});

@@ -1,10 +1,10 @@
 import axios from 'axios';
+import { API_BASE } from './config';
 
 // Ensure global Axios default uses withCredentials for cross-origin requests
 axios.defaults.withCredentials = true;
 
-const rawBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').trim().replace(/\/+$/, '');
-export const API_BASE_URL = rawBaseUrl.endsWith('/api') ? rawBaseUrl : `${rawBaseUrl}/api`;
+export const API_BASE_URL = API_BASE;
 
 /**
  * Builds a standardized API URL ensuring /api prefix is present without duplicates.

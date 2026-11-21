@@ -110,8 +110,9 @@ Add the following under **Settings** → **Environment Variables**:
 
 | Variable Name | Example Value | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://ankit-reso.onrender.com/api` | Backend API base URL (**MUST end with /api**) |
-| `NEXT_PUBLIC_SENTRY_DSN` | `https://xxxx@sentry.io/xxxx` | Frontend Sentry error reporting |
+| `NEXT_PUBLIC_API_URL` | `/api` (or `https://ankit-reso.onrender.com/api`) | Backend API base URL. **Required in production**; build throws if unset. |
+| `BACKEND_ORIGIN` | `https://ankit-reso.onrender.com` | Backend origin used by `next.config.ts` rewrites to proxy `/api/:path*`. |
+| `NEXT_PUBLIC_SENTRY_DSN` | `https://xxxx@sentry.io/xxxx` | Frontend Sentry error reporting (optional). |
 
 5. Click **Deploy**.
 
