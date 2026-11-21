@@ -89,13 +89,11 @@ for _origin in [
 CSRF_TRUSTED_ORIGINS = csrf_origins
 
 # Domain Separation & Cross-Site Cookie Configuration:
-# When Next.js frontend (e.g. https://app.adepteduverse.com or Vercel) and Django API (Render)
-# run on different subdomains or origins, cookies must be configured with:
-# 1. SameSite='None' to permit cross-origin authenticated fetch requests with credentials.
-# 2. Secure=True to ensure cookies are only transmitted over HTTPS.
-# 3. CSRF_COOKIE_HTTPONLY=False so frontend JavaScript can read the CSRF cookie or token via header.
-SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='None')
-CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='None')
+# When Next.js frontend proxies /api to Django API via rewrites (or when both share
+# a root domain), SameSite='Lax' is supported and avoids third-party cookie blocking
+# in Safari ITP, Brave Shields, and Chrome.
+SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
+CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
