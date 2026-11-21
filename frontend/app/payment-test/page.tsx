@@ -151,9 +151,9 @@ export default function PaymentTestPage() {
                 <code className="text-emerald-400 font-mono font-bold block bg-slate-900 px-1.5 py-0.5 rounded">success@razorpay</code>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950/80 border border-amber-500/20 space-y-1">
-                <span className="font-bold text-blue-400 block">Method 2: Test Card</span>
+                <span className="font-bold text-blue-400 block">Method 2: Indian Domestic Card</span>
                 <p className="text-[10px] text-slate-400">Card number:</p>
-                <code className="text-emerald-400 font-mono font-bold block bg-slate-900 px-1.5 py-0.5 rounded">4111 1111 1111 1111</code>
+                <code className="text-emerald-400 font-mono font-bold block bg-slate-900 px-1.5 py-0.5 rounded select-all">4100 2800 0000 1007</code>
                 <span className="text-[10px] text-slate-400 block">Expiry: 12/28 | CVV: 123</span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950/80 border border-amber-500/20 space-y-1">
