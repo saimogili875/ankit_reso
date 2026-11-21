@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,11 +85,12 @@ export default function AdminHomePage() {
         apiClient.get<QuickAccess[]>('/admin-panel/quick-access/'),
         apiClient.get<SubjectItem[]>('/admin-panel/subjects/'),
       ]);
-      setSlides(Array.isArray(sRes) ? sRes : []);
-      setQuickItems(Array.isArray(qRes) ? qRes : []);
-      setSubjects(Array.isArray(subjRes) ? subjRes : []);
+      setSlides(asList<HeroSlide>(sRes));
+      setQuickItems(asList<QuickAccess>(qRes));
+      setSubjects(asList<SubjectItem>(subjRes));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch home configurations';
+      console.error('[Admin Home fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to fetch home configurations';
       setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);

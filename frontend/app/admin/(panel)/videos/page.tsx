@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -153,14 +154,14 @@ export default function AdminVideosPage() {
     try {
       const [optRes, vidRes] = await Promise.all([
         apiClient.get<{ lectures: LectureOption[] }>('/admin-panel/options/'),
-        apiClient.get<{ results?: VideoItem[] } | VideoItem[]>('/admin-panel/videos/'),
+        apiClient.get<VideoItem[]>('/admin-panel/videos/'),
       ]);
       setLectures(optRes.lectures || []);
-      const loadedVideos = Array.isArray(vidRes) ? vidRes : vidRes.results || [];
-      setVideos(loadedVideos);
+      setVideos(asList<VideoItem>(vidRes));
     } catch (err: unknown) {
+      console.error('[Admin Videos fetch error]', err);
       if (showLoadingSpinner) {
-        setFormError(err instanceof Error ? err.message : 'Error loading video catalog');
+        setFormError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Error loading video catalog');
       }
     } finally {
       if (showLoadingSpinner) setIsLoading(false);

@@ -12,7 +12,8 @@ import {
   ExternalLink,
   Loader2,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -121,15 +122,17 @@ export default function AdminSchedulePage() {
         }>('/admin-panel/options/'),
       ]);
 
-      setEvents(evRes || []);
+      setEvents(asList<ScheduleEventItem>(evRes));
       setCourses(optRes?.courses || []);
       setSubjects(optRes?.subjects || []);
       setChapters(optRes?.chapters || []);
       setTests(optRes?.tests || []);
       setDpps(optRes?.dpps || []);
       setLectures(optRes?.lectures || []);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load schedule items.' });
+    } catch (err: unknown) {
+      console.error('[Admin Schedule fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load schedule items.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }

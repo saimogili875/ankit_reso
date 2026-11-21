@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList, PaginatedResponse } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,22 +109,47 @@ export default function AdminQuestionsPage() {
   const [pyqYear, setPyqYear] = useState<number>(new Date().getFullYear());
   const [pyqShiftOrPaper, setPyqShiftOrPaper] = useState('');
 
+  // Pagination & Load More State
+  const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // Load options lookup and questions
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [optRes, qRes] = await Promise.all([
         apiClient.get<OptionsLookup>('/admin-panel/options/'),
-        apiClient.get<{ results?: QuestionItem[] } | QuestionItem[]>('/admin-panel/questions/'),
+        apiClient.get<QuestionItem[]>('/admin-panel/questions/'),
       ]);
       setOptionsLookup(optRes);
-      const qList = Array.isArray(qRes) ? qRes : qRes.results || [];
-      setQuestions(qList);
+      const list = asList<QuestionItem>(qRes);
+      setQuestions(list);
+      const paginated = qRes as unknown as PaginatedResponse<QuestionItem>;
+      setNextPageUrl(paginated?.next || null);
+      setTotalCount(paginated?.count ?? list.length);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load question bank data.';
+      console.error('[Admin Questions fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load question bank data.';
       setFormError(msg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!nextPageUrl || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await apiClient.get<QuestionItem[] | PaginatedResponse<QuestionItem>>(nextPageUrl);
+      const list = asList<QuestionItem>(res);
+      setQuestions((prev) => [...prev, ...list]);
+      const paginated = res as unknown as PaginatedResponse<QuestionItem>;
+      setNextPageUrl(paginated?.next || null);
+    } catch (err: unknown) {
+      console.error('[Admin Questions handleLoadMore error]', err);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -929,6 +955,27 @@ export default function AdminQuestionsPage() {
               </div>
             </Card>
           ))
+        )}
+
+        {nextPageUrl && (
+          <div className="py-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoadingMore}
+              onClick={handleLoadMore}
+              className="border-slate-800 text-xs text-slate-300 hover:text-white"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  Loading more questions...
+                </>
+              ) : (
+                `Load More Questions (Showing ${questions.length} of ${totalCount})`
+              )}
+            </Button>
+          </div>
         )}
       </div>
 

@@ -22,7 +22,8 @@ import {
   Upload,
   RefreshCw,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Button } from '@/components/ui/button';
 
 interface BannerSlideAdmin {
@@ -82,13 +83,11 @@ export default function AdminBannersPage() {
     setErrorMessage('');
     try {
       const data = await apiClient.get<BannerSlideAdmin[]>('/banners/manage/');
-      if (Array.isArray(data)) {
-        setSlides(data.sort((a, b) => a.order - b.order));
-      } else {
-        setSlides([]);
-      }
+      const list = asList<BannerSlideAdmin>(data);
+      setSlides(list.sort((a, b) => a.order - b.order));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load banner slides.';
+      console.error('[Admin Banners fetch error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load banner slides.';
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);

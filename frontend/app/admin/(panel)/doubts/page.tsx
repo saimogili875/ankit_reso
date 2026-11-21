@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,9 +52,11 @@ export default function AdminDoubtsPage() {
     setIsLoading(true);
     try {
       const data = await apiClient.get<DoubtItem[]>('/admin-panel/doubts/');
-      setDoubts(data || []);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load doubts.' });
+      setDoubts(asList<DoubtItem>(data));
+    } catch (err: unknown) {
+      console.error('[Admin Doubts fetch error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load doubts.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }

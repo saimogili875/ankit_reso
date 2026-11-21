@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,9 +51,11 @@ export default function AdminAnnouncementsPage() {
     setIsLoading(true);
     try {
       const data = await apiClient.get<AnnouncementItem[]>('/admin-panel/announcements/');
-      setAnnouncements(data || []);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load announcements.' });
+      setAnnouncements(asList<AnnouncementItem>(data));
+    } catch (err: unknown) {
+      console.error('[Admin Announcements fetch error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load announcements.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }

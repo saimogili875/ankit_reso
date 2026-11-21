@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,11 +61,11 @@ export default function AdminTestsPage() {
         apiClient.get<TestItem[]>('/admin-panel/tests/'),
         apiClient.get<{ results?: QuestionItem[] } | QuestionItem[]>('/admin-panel/questions/'),
       ]);
-      setTests(Array.isArray(tRes) ? tRes : []);
-      const qList = Array.isArray(qRes) ? qRes : qRes.results || [];
-      setAllQuestions(qList);
+      setTests(asList<TestItem>(tRes));
+      setAllQuestions(asList<QuestionItem>(qRes));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch tests';
+      console.error('[Admin Tests fetchTests error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to fetch tests';
       setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);

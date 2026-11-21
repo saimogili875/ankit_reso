@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { EnrollmentModal } from '@/components/home/enrollment-modal';
 
 interface CourseData {
@@ -52,7 +53,7 @@ export default function CoursesCatalogPage() {
     setIsLoading(true);
     try {
       const data = await apiClient.get<CourseData[]>('/courses/');
-      setCourses(Array.isArray(data) ? data : []);
+      setCourses(asList<CourseData>(data));
     } catch {
       setFeedback({ type: 'error', message: 'Failed to load courses from database.' });
     } finally {

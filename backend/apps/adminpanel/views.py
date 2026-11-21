@@ -1,6 +1,7 @@
 import csv
 from django.http import HttpResponse
 from rest_framework import viewsets, status, filters
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -143,9 +144,16 @@ class OptionsView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class AdminPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 500
+
+
 class HeroSlideViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminHeroSlideSerializer
+    pagination_class = None
     queryset = HeroSlide.objects.all().order_by('order', '-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'subtitle']
@@ -154,6 +162,7 @@ class HeroSlideViewSet(viewsets.ModelViewSet):
 class QuickAccessViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminQuickAccessSerializer
+    pagination_class = None
     queryset = QuickAccessItem.objects.all().order_by('order', 'title')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description']
@@ -162,6 +171,7 @@ class QuickAccessViewSet(viewsets.ModelViewSet):
 class SubjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminSubjectSerializer
+    pagination_class = None
     queryset = Subject.objects.all().order_by('order', 'name')
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
@@ -170,6 +180,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
 class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminCourseSerializer
+    pagination_class = None
     queryset = Course.objects.prefetch_related('classes', 'subjects', 'enrollments').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'slug', 'subtitle', 'description']
@@ -211,6 +222,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 class AcademicClassViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminAcademicClassSerializer
+    pagination_class = None
     queryset = AcademicClass.objects.all().order_by('order', 'name')
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'code']
@@ -219,6 +231,7 @@ class AcademicClassViewSet(viewsets.ModelViewSet):
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminQuestionSerializer
+    pagination_class = AdminPagination
     queryset = Question.objects.select_related('subject', 'chapter__category__subject', 'topic').prefetch_related('options', 'pyq_meta__exam').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['question_text', 'chapter__name', 'subject__name']
@@ -298,6 +311,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
 class ChapterViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminChapterSerializer
+    pagination_class = AdminPagination
     queryset = Chapter.objects.select_related('category__subject', 'academic_class').all().order_by('category__subject__name', 'order', 'name')
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'category__subject__name', 'description']
@@ -328,6 +342,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
 class LectureViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminLectureSerializer
+    pagination_class = AdminPagination
     queryset = Lecture.objects.select_related('chapter__category__subject').prefetch_related('videos').all().order_by('chapter', 'lecture_number')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'chapter__name']
@@ -352,6 +367,7 @@ class LectureViewSet(viewsets.ModelViewSet):
 class VideoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminVideoSerializer
+    pagination_class = AdminPagination
     queryset = Video.objects.select_related('lecture__chapter', 'topic').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'lecture__title', 'youtube_video_id', 'r2_object_key']
@@ -371,6 +387,7 @@ class VideoViewSet(viewsets.ModelViewSet):
 class DPPViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminDPPSerializer
+    pagination_class = AdminPagination
     queryset = DPP.objects.select_related('chapter__category__subject').prefetch_related('dpp_questions__question').all().order_by('chapter', 'dpp_number')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'chapter__name']
@@ -386,6 +403,7 @@ class DPPViewSet(viewsets.ModelViewSet):
 class TestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminTestSerializer
+    pagination_class = AdminPagination
     queryset = Test.objects.select_related('exam').prefetch_related('test_questions__question').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description']
@@ -444,6 +462,7 @@ class TestViewSet(viewsets.ModelViewSet):
 class StudyMaterialViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminStudyMaterialSerializer
+    pagination_class = AdminPagination
     queryset = StudyMaterial.objects.select_related('subject', 'chapter').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description', 'subject__name', 'chapter__name']
@@ -462,6 +481,7 @@ class StudyMaterialViewSet(viewsets.ModelViewSet):
 class AnnouncementViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminAnnouncementSerializer
+    pagination_class = None
     queryset = Announcement.objects.all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'message']
@@ -470,6 +490,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 class DoubtViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminDoubtSerializer
+    pagination_class = AdminPagination
     queryset = Doubt.objects.select_related('student', 'subject', 'replied_by').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'question_text', 'student__email']
@@ -500,6 +521,7 @@ class DoubtViewSet(viewsets.ModelViewSet):
 class StudentViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminStudentSerializer
+    pagination_class = AdminPagination
     queryset = User.objects.filter(role=User.Role.STUDENT).select_related('student_profile').all().order_by('-date_joined')
     filter_backends = [filters.SearchFilter]
     search_fields = ['email', 'username', 'first_name', 'last_name', 'phone_number']
@@ -592,6 +614,7 @@ class StudentViewSet(viewsets.ReadOnlyModelViewSet):
 class ScheduleEventViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminScheduleEventSerializer
+    pagination_class = AdminPagination
     queryset = ScheduleEvent.objects.select_related('course', 'subject', 'chapter', 'test', 'dpp', 'lecture').all().order_by('-start_time')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description', 'course__title', 'subject__name']
@@ -622,6 +645,7 @@ class ScheduleEventViewSet(viewsets.ModelViewSet):
 class NotificationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminNotificationSerializer
+    pagination_class = AdminPagination
     queryset = Notification.objects.all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'message', 'user__email']
@@ -861,6 +885,7 @@ class TestAnalyticsViewSet(viewsets.ViewSet):
 class RankPredictorViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminRankPredictorSerializer
+    pagination_class = None
     queryset = RankPredictor.objects.all().order_by('-min_marks')
 
 
@@ -924,6 +949,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     CRUD for admin and instructor accounts.
     """
     permission_classes = [IsAdminRole]
+    pagination_class = AdminPagination
     queryset = User.objects.filter(role__in=[User.Role.ADMIN, User.Role.INSTRUCTOR]).order_by('-date_joined')
     serializer_class = UserSerializer
 
@@ -963,6 +989,7 @@ class LandingBannerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     serializer_class = AdminLandingBannerSerializer
+    pagination_class = None
     queryset = LandingBanner.objects.all().order_by('order', '-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'caption']

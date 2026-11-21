@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import React, { useEffect, useState, useCallback } from 'react';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList, PaginatedResponse } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -106,20 +107,70 @@ export default function AdminStudentsPage() {
   const [studentProgress, setStudentProgress] = useState<StudentProgressData | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
 
+  // Pagination & Load More state
+  const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const fetchStudents = useCallback(async (query = '', url?: string, isAppending = false) => {
+    if (isAppending) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
+    try {
+      let endpoint = url;
+      if (!endpoint) {
+        endpoint = query.trim()
+          ? `/admin-panel/students/?search=${encodeURIComponent(query.trim())}`
+          : '/admin-panel/students/';
+      }
+      const res = await apiClient.get<StudentItem[] | PaginatedResponse<StudentItem>>(endpoint);
+      const list = asList<StudentItem>(res);
+      const paginated = res as unknown as PaginatedResponse<StudentItem>;
+
+      if (isAppending) {
+        setStudents((prev) => [...prev, ...list]);
+      } else {
+        setStudents(list);
+      }
+      setNextPageUrl(paginated?.next || null);
+      setTotalCount(paginated?.count ?? (isAppending ? students.length + list.length : list.length));
+    } catch (err: unknown) {
+      console.error('[Admin Students fetchStudents error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load students.';
+      setFeedback({ type: 'error', message: msg });
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [students.length]);
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [stuRes, courseRes] = await Promise.all([
-        apiClient.get<StudentItem[]>('/admin-panel/students/'),
-        apiClient.get<{ results: CourseOption[] } | CourseOption[]>('/admin-panel/courses/'),
+        apiClient.get<StudentItem[] | PaginatedResponse<StudentItem>>('/admin-panel/students/'),
+        apiClient.get<CourseOption[]>('/admin-panel/courses/'),
       ]);
-      setStudents(stuRes || []);
-      const cList = Array.isArray(courseRes) ? courseRes : courseRes?.results || [];
-      setCourses(cList);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load student directory.' });
+      const list = asList<StudentItem>(stuRes);
+      setStudents(list);
+      const paginated = stuRes as unknown as PaginatedResponse<StudentItem>;
+      setNextPageUrl(paginated?.next || null);
+      setTotalCount(paginated?.count ?? list.length);
+      setCourses(asList<CourseOption>(courseRes));
+    } catch (err: unknown) {
+      console.error('[Admin Students fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load student directory.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (nextPageUrl && !isLoadingMore) {
+      fetchStudents(searchQuery, nextPageUrl, true);
     }
   };
 
@@ -245,7 +296,7 @@ export default function AdminStudentsPage() {
           </p>
         </div>
         <div className="text-xs text-slate-400 bg-slate-900 border border-slate-800 rounded-lg px-4 py-2">
-          Total Enrolled Students: <span className="text-slate-100 font-bold">{students.length}</span>
+          Total Enrolled Students: <span className="text-slate-100 font-bold">{totalCount || students.length}</span>
         </div>
       </div>
 
@@ -282,7 +333,11 @@ export default function AdminStudentsPage() {
             type="text"
             placeholder="Search student by name, email, phone number, or username..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchQuery(val);
+              fetchStudents(val);
+            }}
             className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500"
           />
         </div>
@@ -433,6 +488,27 @@ export default function AdminStudentsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {nextPageUrl && (
+          <div className="p-4 border-t border-slate-800 flex justify-center bg-slate-900/30">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoadingMore}
+              onClick={handleLoadMore}
+              className="border-slate-800 text-xs text-slate-300 hover:text-white"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  Loading more students...
+                </>
+              ) : (
+                `Load More Students (Showing ${students.length} of ${totalCount})`
+              )}
+            </Button>
           </div>
         )}
       </Card>

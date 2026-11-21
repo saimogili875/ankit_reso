@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,12 +78,13 @@ export default function AdminMaterialsPage() {
         apiClient.get<{ subjects: SubjectOption[] }>('/admin-panel/options/'),
         apiClient.get<{ results: ChapterOption[] } | ChapterOption[]>('/admin-panel/chapters/'),
       ]);
-      setMaterials(matRes || []);
+      setMaterials(asList<MaterialItem>(matRes));
       setSubjects(optRes?.subjects || []);
-      const chaps = Array.isArray(chapRes) ? chapRes : chapRes?.results || [];
-      setChapters(chaps);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load study materials data.' });
+      setChapters(asList<ChapterOption>(chapRes));
+    } catch (err: unknown) {
+      console.error('[Admin Materials fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load study materials data.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }

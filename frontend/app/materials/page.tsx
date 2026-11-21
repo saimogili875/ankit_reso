@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Download, ShieldCheck, FileText, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 
 interface StudyMaterialItem {
   id: string;
@@ -27,7 +28,7 @@ export default function MaterialsPage() {
     apiClient.get<StudyMaterialItem[]>('/materials/')
       .then((data) => {
         if (!isMounted) return;
-        setMaterials(Array.isArray(data) ? data : []);
+        setMaterials(asList<StudyMaterialItem>(data));
         setIsLoading(false);
       })
       .catch(() => {

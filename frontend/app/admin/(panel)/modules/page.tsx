@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -184,12 +185,13 @@ export default function AdminModulesPage() {
 
       setCategories(optRes.categories || []);
       setClasses(optRes.classes || []);
-      setChapters(Array.isArray(chRes) ? chRes : chRes.results || []);
-      setLectures(Array.isArray(lecRes) ? lecRes : lecRes.results || []);
-      setDpps(Array.isArray(dppRes) ? dppRes : dppRes.results || []);
-      setAvailableQuestions(Array.isArray(qRes) ? qRes : qRes.results || []);
+      setChapters(asList<ChapterItem>(chRes));
+      setLectures(asList<LectureItem>(lecRes));
+      setDpps(asList<DPPItem>(dppRes));
+      setAvailableQuestions(asList<QuestionLookupItem>(qRes));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error fetching module data';
+      console.error('[Admin Modules fetchAllData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Error fetching module data';
       setFormError(msg);
     } finally {
       setIsLoading(false);

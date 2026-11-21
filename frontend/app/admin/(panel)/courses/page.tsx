@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -98,29 +99,23 @@ export default function AdminCoursesPage() {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [selectedStudentToEnroll, setSelectedStudentToEnroll] = useState('');
   const [isEnrollingStudent, setIsEnrollingStudent] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [isSearchingStudents, setIsSearchingStudents] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [courseRes, optRes, stuRes] = await Promise.all([
+      const [courseRes, optRes] = await Promise.all([
         apiClient.get<CourseItem[]>('/admin-panel/courses/'),
         apiClient.get<{ classes: OptionItem[]; subjects: OptionItem[] }>('/admin-panel/options/'),
-        apiClient.get<Array<{ id: string; email: string; first_name: string; last_name: string; username: string }>>('/admin-panel/students/'),
       ]);
-      setCourses(courseRes || []);
+      setCourses(asList<CourseItem>(courseRes));
       setClassesList(optRes?.classes || []);
       setSubjectsList(optRes?.subjects || []);
-      if (Array.isArray(stuRes)) {
-        setAllStudentsList(
-          stuRes.map((s) => ({
-            id: s.id,
-            email: s.email,
-            name: `${s.first_name} ${s.last_name}`.trim() || s.username,
-          }))
-        );
-      }
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load courses.' });
+    } catch (err: unknown) {
+      console.error('[Admin Courses fetchData error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load courses.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }
@@ -263,14 +258,41 @@ export default function AdminCoursesPage() {
     }
   };
 
+  const loadStudentsForEnroll = async (query = '') => {
+    setIsSearchingStudents(true);
+    try {
+      const endpoint = query.trim()
+        ? `/admin-panel/students/?search=${encodeURIComponent(query.trim())}`
+        : '/admin-panel/students/';
+      const res = await apiClient.get<Array<{ id: string; email: string; first_name: string; last_name: string; username: string }>>(endpoint);
+      const list = asList<{ id: string; email: string; first_name: string; last_name: string; username: string }>(res);
+      setAllStudentsList(
+        list.map((s) => ({
+          id: s.id,
+          email: s.email,
+          name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.username || s.email,
+        }))
+      );
+    } catch (err) {
+      console.error('[loadStudentsForEnroll error]', err);
+    } finally {
+      setIsSearchingStudents(false);
+    }
+  };
+
   const openStudentsModal = async (course: CourseItem) => {
     setSelectedCourseForStudents(course);
     setIsLoadingStudents(true);
+    setSelectedStudentToEnroll('');
+    setStudentSearchQuery('');
+    loadStudentsForEnroll('');
     try {
       const data = await apiClient.get<EnrolledStudent[]>(`/admin-panel/courses/${course.id}/students/`);
-      setEnrolledStudents(data || []);
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to load enrolled students.' });
+      setEnrolledStudents(asList<EnrolledStudent>(data));
+    } catch (err: unknown) {
+      console.error('[openStudentsModal error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load enrolled students.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsLoadingStudents(false);
     }
@@ -288,8 +310,10 @@ export default function AdminCoursesPage() {
       setSelectedStudentToEnroll('');
       openStudentsModal(selectedCourseForStudents);
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to enroll student.' });
+    } catch (err: unknown) {
+      console.error('[handleEnrollStudent error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to enroll student.';
+      setFeedback({ type: 'error', message: msg });
     } finally {
       setIsEnrollingStudent(false);
     }
@@ -305,8 +329,10 @@ export default function AdminCoursesPage() {
       setFeedback({ type: 'success', message: 'Student un-enrolled from course.' });
       openStudentsModal(selectedCourseForStudents);
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to un-enroll student.' });
+    } catch (err: unknown) {
+      console.error('[handleUnenrollStudent error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to un-enroll student.';
+      setFeedback({ type: 'error', message: msg });
     }
   };
 
@@ -649,29 +675,54 @@ export default function AdminCoursesPage() {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              {/* Enroll new student form */}
-              <form onSubmit={handleEnrollStudent} className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex gap-2">
-                <select
-                  value={selectedStudentToEnroll}
-                  onChange={(e) => setSelectedStudentToEnroll(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
-                >
-                  <option value="">Select student to enroll...</option>
-                  {allStudentsList.map((stu) => (
-                    <option key={stu.id} value={stu.id}>
-                      {stu.name} ({stu.email})
+              {/* Enroll new student form with dynamic search */}
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-xs font-semibold text-slate-300">Enroll a Student</div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search student by name, email, or phone..."
+                    value={studentSearchQuery}
+                    onChange={(e) => {
+                      setStudentSearchQuery(e.target.value);
+                      loadStudentsForEnroll(e.target.value);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                  />
+                  {isSearchingStudents && (
+                    <div className="absolute right-2.5 top-2 text-slate-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleEnrollStudent} className="flex gap-2">
+                  <select
+                    value={selectedStudentToEnroll}
+                    onChange={(e) => setSelectedStudentToEnroll(e.target.value)}
+                    className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
+                  >
+                    <option value="">
+                      {allStudentsList.length === 0
+                        ? isSearchingStudents ? 'Searching...' : 'No students found (type to search)'
+                        : 'Select student to enroll...'}
                     </option>
-                  ))}
-                </select>
-                <Button
-                  type="submit"
-                  disabled={!selectedStudentToEnroll || isEnrollingStudent}
-                  className="bg-brand-500 hover:bg-brand-600 text-white text-xs shrink-0"
-                >
-                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-                  Enroll
-                </Button>
-              </form>
+                    {allStudentsList.map((stu) => (
+                      <option key={stu.id} value={stu.id}>
+                        {stu.name} ({stu.email})
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="submit"
+                    disabled={!selectedStudentToEnroll || isEnrollingStudent}
+                    className="bg-brand-500 hover:bg-brand-600 text-white text-xs shrink-0"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                    {isEnrollingStudent ? 'Enrolling...' : 'Enroll'}
+                  </Button>
+                </form>
+              </div>
 
               {/* Enrolled list */}
               <div>

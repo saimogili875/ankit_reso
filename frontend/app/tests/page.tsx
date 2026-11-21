@@ -11,6 +11,7 @@ import {
   Play,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -58,7 +59,7 @@ export default function TestsPage() {
     setError(null);
     try {
       const data = await apiClient.get<TestItem[]>(`/tests/?status=${activeTab}`);
-      setTests(Array.isArray(data) ? data : []);
+      setTests(asList<TestItem>(data));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load tests.';
       setError(msg);

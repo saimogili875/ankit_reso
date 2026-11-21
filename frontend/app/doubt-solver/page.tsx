@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 
 interface SubjectOption {
   id: string | number;
@@ -35,16 +36,6 @@ interface DoubtRecord {
   replied_by_name?: string | null;
   replied_at?: string | null;
   created_at: string;
-}
-
-function extractArray<T>(data: unknown): T[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data;
-  if (typeof data === 'object' && data !== null && 'results' in data) {
-    const res = (data as { results: unknown }).results;
-    if (Array.isArray(res)) return res as T[];
-  }
-  return [];
 }
 
 export default function DoubtSolverPage() {
@@ -67,8 +58,8 @@ export default function DoubtSolverPage() {
         apiClient.get<DoubtRecord[] | { results: DoubtRecord[] }>('/doubts/my/').catch(() => []),
         apiClient.get<SubjectOption[] | { results: SubjectOption[] }>('/academics/subjects/').catch(() => []),
       ]);
-      const loadedDoubts = extractArray<DoubtRecord>(dRes);
-      const loadedSubjects = extractArray<SubjectOption>(sRes);
+      const loadedDoubts = asList<DoubtRecord>(dRes);
+      const loadedSubjects = asList<SubjectOption>(sRes);
 
       setDoubts(loadedDoubts);
       setSubjects(loadedSubjects);

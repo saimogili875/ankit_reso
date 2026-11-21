@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useEnrollment } from '@/hooks/use-enrollment';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import {
   Edit3,
   ChevronRight,
@@ -117,13 +118,7 @@ export default function PracticePage() {
     apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>('/academics/subjects/')
       .then((data) => {
         if (!isMounted) return;
-        if (Array.isArray(data)) {
-          setSubjects(data);
-        } else if (data && Array.isArray(data.results)) {
-          setSubjects(data.results);
-        } else {
-          setSubjects([]);
-        }
+        setSubjects(asList<ApiSubject>(data));
       })
       .catch((err) => {
         console.warn('Failed to load subjects:', err);
@@ -150,7 +145,7 @@ export default function PracticePage() {
     apiClient.get<ApiChapter[]>(`/academics/subjects/${selectedSubject.id}/chapters/${query}`)
       .then((data) => {
         if (!isMounted) return;
-        setChapters(Array.isArray(data) ? data : []);
+        setChapters(asList<ApiChapter>(data));
       })
       .catch((err) => {
         console.warn('Failed to load chapters:', err);
@@ -177,7 +172,7 @@ export default function PracticePage() {
     apiClient.get<ApiDPP[]>(`/questions/dpps/?chapter=${selectedChapter.id}`)
       .then((data) => {
         if (!isMounted) return;
-        setDpps(Array.isArray(data) ? data : []);
+        setDpps(asList<ApiDPP>(data));
       })
       .catch((err) => {
         console.warn('Failed to load DPPs:', err);

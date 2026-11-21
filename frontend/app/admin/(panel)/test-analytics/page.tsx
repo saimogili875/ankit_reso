@@ -15,7 +15,8 @@ import {
   X,
   Target,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { API_BASE } from '@/lib/config';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -148,9 +149,10 @@ export default function AdminTestAnalyticsPage() {
     setError(null);
     try {
       const data = await apiClient.get<TestSummaryItem[]>('/admin-panel/test-analytics/');
-      setTests(Array.isArray(data) ? data : []);
+      setTests(asList<TestSummaryItem>(data));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load test analytics.';
+      console.error('[Admin Test Analytics loadTests error]', err);
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to load test analytics.';
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -167,8 +169,9 @@ export default function AdminTestAnalyticsPage() {
     try {
       const res = await apiClient.get<TestDetailAnalytics>(`/admin-panel/test-analytics/${testId}/`);
       setDetailData(res);
-    } catch {
-      alert('Failed to load test details.');
+    } catch (err: unknown) {
+      console.error('[openDetailModal error]', err);
+      alert(err instanceof Error ? err.message : 'Failed to load test details.');
     } finally {
       setIsLoadingDetail(false);
     }
@@ -177,9 +180,10 @@ export default function AdminTestAnalyticsPage() {
   const loadPredictorBands = async () => {
     try {
       const res = await apiClient.get<RankPredictorBand[]>('/admin-panel/rank-predictor/');
-      setPredictorBands(Array.isArray(res) ? res : []);
-    } catch {
-      alert('Failed to load rank predictor table.');
+      setPredictorBands(asList<RankPredictorBand>(res));
+    } catch (err: unknown) {
+      console.error('[loadPredictorBands error]', err);
+      alert(err instanceof Error ? err.message : 'Failed to load rank predictor table.');
     }
   };
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useEnrollment } from '@/hooks/use-enrollment';
 import { apiClient } from '@/lib/api-client';
+import { asList } from '@/lib/api-utils';
 import { HlsVideoPlayer } from '@/components/video/hls-player';
 import {
   BookOpen,
@@ -90,13 +91,7 @@ export default function LearnPage() {
     apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>('/academics/subjects/')
       .then((data) => {
         if (!isMounted) return;
-        if (Array.isArray(data)) {
-          setSubjects(data);
-        } else if (data && Array.isArray(data.results)) {
-          setSubjects(data.results);
-        } else {
-          setSubjects([]);
-        }
+        setSubjects(asList<ApiSubject>(data));
       })
       .catch((err) => {
         console.warn('Failed to load subjects:', err);
@@ -123,7 +118,7 @@ export default function LearnPage() {
     apiClient.get<ApiChapter[]>(`/academics/subjects/${selectedSubject.id}/chapters/${query}`)
       .then((data) => {
         if (!isMounted) return;
-        setChapters(Array.isArray(data) ? data : []);
+        setChapters(asList<ApiChapter>(data));
       })
       .catch((err) => {
         console.warn('Failed to load chapters:', err);
@@ -150,7 +145,7 @@ export default function LearnPage() {
     apiClient.get<ApiLecture[]>(`/academics/chapters/${selectedChapter.id}/lectures/`)
       .then((data) => {
         if (!isMounted) return;
-        setLectures(Array.isArray(data) ? data : []);
+        setLectures(asList<ApiLecture>(data));
       })
       .catch((err) => {
         console.warn('Failed to load lectures:', err);
