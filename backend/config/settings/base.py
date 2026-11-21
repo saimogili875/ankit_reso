@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 from decouple import config
@@ -108,7 +109,14 @@ if DATABASE_URL:
 
 DISABLE_SERVER_SIDE_CURSORS = config('DISABLE_SERVER_SIDE_CURSORS', default=is_pooler, cast=bool)
 
-if DATABASE_URL:
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+elif DATABASE_URL:
     try:
         import dj_database_url
         DATABASES = {
@@ -365,4 +373,5 @@ TEXTBEE_DEVICE_ID = config('TEXTBEE_DEVICE_ID', default='')
 # Razorpay Payment Gateway Configuration
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
+RAZORPAY_WEBHOOK_SECRET = config('RAZORPAY_WEBHOOK_SECRET', default='')
 

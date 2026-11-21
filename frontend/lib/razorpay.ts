@@ -17,7 +17,6 @@ export interface VerifyPaymentPayload {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
-  course_id?: string;
 }
 
 export interface VerifyPaymentResponse {
@@ -106,13 +105,14 @@ export function loadRazorpayScript(): Promise<boolean> {
 
 /**
  * Initiates Razorpay Standard Checkout:
- * 1. Calls backend /api/create-order/ to create an order
+ * 1. Calls backend /api/payments/create-order/ to create an order (sends course_id only)
  * 2. Opens the Razorpay modal
- * 3. On success, calls backend /api/verify-payment/ to verify signature
+ * 3. On success, calls backend /api/payments/verify/ to verify signature
  */
 export async function processRazorpayPayment(params: {
-  amountPaise?: number; // minimum 100 paise = ₹1.00
   courseId?: string;
+  courseTitle?: string;
+  amountPaise?: number;
   description?: string;
   prefill?: RazorpayPrefill;
 }): Promise<{
@@ -129,20 +129,28 @@ export async function processRazorpayPayment(params: {
     throw new Error('Failed to load Razorpay SDK. Please check your internet connection and try again.');
   }
 
-  const amount = params.amountPaise && params.amountPaise >= 100 ? params.amountPaise : 100;
+  let targetCourseId = params.courseId;
+  if (!targetCourseId && !params.amountPaise) {
+    try {
+      const coursesRes = await apiClient.get<Array<{ id: string; is_free?: boolean }>>('/courses/');
+      if (Array.isArray(coursesRes) && coursesRes.length > 0) {
+        const paidCourse = coursesRes.find((c) => !c.is_free) || coursesRes[0];
+        targetCourseId = paidCourse.id;
+      }
+    } catch {}
+  }
 
   // STEP 1: Backend - Create Order
-  const order = await apiClient.post<CreateOrderResponse>('/create-order/', {
-    amount,
-    currency: 'INR',
-    course_id: params.courseId,
-    notes: {
-      course_id: params.courseId || '',
-      description: params.description || 'Test ₹1 Razorpay Payment',
-    },
-  });
+  const orderPayload = targetCourseId
+    ? { course_id: targetCourseId }
+    : { amount: params.amountPaise || 100 };
 
-  const keyId = order.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_U2rAFA7UCHJKz3';
+  const order = await apiClient.post<CreateOrderResponse>('/payments/create-order/', orderPayload);
+
+  const keyId = order.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
+  if (!keyId) {
+    throw new Error('Razorpay public key ID is not configured on the client or server.');
+  }
 
   // STEP 2: Frontend - Open Razorpay Modal
   const paymentResult = await new Promise<{
@@ -155,13 +163,12 @@ export async function processRazorpayPayment(params: {
       amount: order.amount,
       currency: order.currency || 'INR',
       name: 'AdeptEduverse',
-      description: params.description || 'JEE Prep — ₹1.00 Test Checkout',
-      image: '/images/logo-icon.png',
+      description: params.description || params.courseTitle || 'JEE Course Enrollment',
+      image: '/images/hero/slide-1.jpg',
       order_id: order.order_id,
       prefill: params.prefill || {
         name: 'Student',
         email: 'student@example.com',
-        contact: '9999999999',
       },
       theme: {
         color: '#2563eb', // Brand Blue
@@ -176,23 +183,27 @@ export async function processRazorpayPayment(params: {
       },
     };
 
-    const rzp = new window.Razorpay!(options);
+    try {
+      const rzp = new window.Razorpay!(options);
 
-    rzp.on('payment.failed', (response: unknown) => {
-      const err = response as { error?: { description?: string; code?: string } };
-      const msg = err?.error?.description || 'Payment failed. Please try again.';
+      rzp.on('payment.failed', (response: unknown) => {
+        const err = response as { error?: { description?: string; code?: string } };
+        const msg = err?.error?.description || 'Payment failed. Please try again.';
+        reject(new Error(msg));
+      });
+
+      rzp.open();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to launch Razorpay modal.';
       reject(new Error(msg));
-    });
-
-    rzp.open();
+    }
   });
 
   // STEP 3: Backend - Verify Signature
-  const verification = await apiClient.post<VerifyPaymentResponse>('/verify-payment/', {
+  const verification = await apiClient.post<VerifyPaymentResponse>('/payments/verify/', {
     razorpay_order_id: paymentResult.razorpay_order_id,
     razorpay_payment_id: paymentResult.razorpay_payment_id,
     razorpay_signature: paymentResult.razorpay_signature,
-    course_id: params.courseId,
   });
 
   if (!verification.success) {

@@ -25,6 +25,7 @@ import {
   GraduationCap,
   BarChart2,
   Image as ImageIcon,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +33,7 @@ import { Button } from '@/components/ui/button';
 const adminNav = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Courses & Batches', href: '/admin/courses', icon: GraduationCap },
+  { label: 'Payments', href: '/admin/payments', icon: CreditCard },
   { label: 'Schedule', href: '/admin/schedule', icon: Calendar },
   { label: 'Home & Slides', href: '/admin/home', icon: Sliders },
   { label: 'Banner Sliders', href: '/admin/banners', icon: ImageIcon },

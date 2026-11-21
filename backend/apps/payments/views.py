@@ -1,12 +1,23 @@
 import hmac
 import hashlib
+import json
 import uuid
 import logging
 from django.conf import settings
+from django.db import transaction, models
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
-from rest_framework import status, permissions
 import razorpay
+
+from apps.accounts.permissions import IsStudent, IsAdminRole
+from apps.academics.models import Course, Enrollment
+from .models import Payment
+from .serializers import PaymentSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -17,90 +28,147 @@ def get_razorpay_client():
         raise ValueError("Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are not configured.")
     return razorpay.Client(auth=(key_id, key_secret))
 
+
 class CreateOrderView(APIView):
     """
-    POST /api/create-order or /api/payments/create-order/
-    Creates a new Razorpay order.
-    Amount must be at least 100 paise (₹1.00). Defaults to 100 paise (₹1).
+    POST /api/payments/create-order/ or POST /api/create-order
+    Creates a new Razorpay order for purchasing a paid course or direct checkout.
+    Accepts:
+      - {course_id}: loads course, verifies student, uses server price.
+      - {amount, currency, receipt}: direct order creation (amount >= 100 paise).
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        try:
-            # Amount in paise (minimum 100 paise = ₹1.00)
-            raw_amount = request.data.get('amount', 100)
+        data = request.data
+        course_id = data.get('course_id')
+        amount_param = data.get('amount')
+
+        if not course_id and amount_param is None:
+            return Response(
+                {'error': 'course_id or amount is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        course = None
+        if course_id:
+            # 1. Load course (is_published=True)
             try:
-                amount = int(raw_amount)
+                course = Course.objects.filter(
+                    models.Q(id=course_id) | models.Q(slug=course_id),
+                    is_published=True
+                ).first()
+            except (ValidationError, ValueError):
+                course = Course.objects.filter(slug=course_id, is_published=True).first()
+
+            if not course:
+                return Response(
+                    {'error': 'Course not found or is not published.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # 2. Check if already enrolled -> 409 Conflict
+            if Enrollment.objects.filter(user=request.user, course=course).exists():
+                return Response(
+                    {'error': 'You are already enrolled in this course.'},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            # 3. Read price strictly from server; convert rupees to paise (x100)
+            try:
+                course_price_rupees = float(course.price or 0)
+            except (ValueError, TypeError):
+                course_price_rupees = 0.0
+
+            amount_paise = int(round(course_price_rupees * 100))
+
+            # 4. Reject free courses and amounts < 100 paise
+            if course.is_free or amount_paise < 100:
+                return Response(
+                    {'error': 'This course is free. Please use standard course enrollment.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            currency = 'INR'
+            receipt = data.get('receipt') or f"rcpt_{uuid.uuid4().hex[:14]}"
+            notes = {
+                'user_id': str(request.user.id),
+                'course_id': str(course.id),
+            }
+        else:
+            # Direct amount provided
+            try:
+                amount_paise = int(amount_param)
             except (ValueError, TypeError):
                 return Response(
-                    {'error': 'Invalid amount. Must be an integer representing paise (minimum 100).'},
+                    {'error': 'Valid amount in paise is required.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            if amount < 100:
+            if amount_paise < 100:
                 return Response(
-                    {'error': 'Amount must be at least 100 paise (₹1.00).'},
+                    {'error': 'amount must be at least 100 paise.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            currency = request.data.get('currency', 'INR').upper()
-            receipt = request.data.get('receipt') or f"rcpt_{uuid.uuid4().hex[:12]}"
+            currency = data.get('currency', 'INR')
+            receipt = data.get('receipt') or f"rcpt_{uuid.uuid4().hex[:14]}"
+            notes = {
+                'user_id': str(request.user.id),
+            }
 
-            notes = request.data.get('notes', {})
-            if not isinstance(notes, dict):
-                notes = {}
-
-            if request.user and request.user.is_authenticated:
-                notes['user_id'] = str(request.user.id)
-                notes['email'] = request.user.email
-                if getattr(request.user, 'full_name', None):
-                    notes['name'] = request.user.full_name
-
-            course_id = request.data.get('course_id')
-            if course_id:
-                notes['course_id'] = str(course_id)
-
+        # 5. Create Razorpay order
+        try:
             client = get_razorpay_client()
-            order_data = {
-                'amount': amount,
+            order = client.order.create({
+                'amount': amount_paise,
                 'currency': currency,
                 'receipt': receipt,
                 'notes': notes,
-            }
-
-            order = client.order.create(data=order_data)
-            logger.info("Razorpay order created: %s for amount %s %s", order['id'], amount, currency)
-
-            return Response({
-                'order_id': order['id'],
-                'amount': order['amount'],
-                'currency': order['currency'],
-                'key_id': getattr(settings, 'RAZORPAY_KEY_ID', ''),
-                'receipt': order.get('receipt', receipt),
-            }, status=status.HTTP_201_CREATED)
-
+            })
         except ValueError as e:
             logger.error("Configuration error in CreateOrderView: %s", e)
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except razorpay.errors.BadRequestError as e:
-            logger.error("Razorpay BadRequestError: %s", e)
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except razorpay.errors.SignatureVerificationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Payment gateway credentials are not configured.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         except razorpay.errors.RazorpayError as e:
-            logger.error("Razorpay API error: %s", e)
-            return Response({'error': f"Razorpay API error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Razorpay order creation API error: %s", e)
+            return Response(
+                {'error': 'Payment gateway error. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         except Exception as e:
             logger.exception("Unexpected error creating Razorpay order: %s", e)
-            return Response({'error': f"Failed to create order: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {'error': 'Failed to initiate payment. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # 6. Save Payment row (status=created)
+        Payment.objects.create(
+            user=request.user,
+            course=course,
+            amount_paise=amount_paise,
+            currency=currency,
+            razorpay_order_id=order['id'],
+            status=Payment.Status.CREATED,
+        )
+
+        return Response({
+            'order_id': order['id'],
+            'amount': amount_paise,
+            'currency': currency,
+            'key_id': getattr(settings, 'RAZORPAY_KEY_ID', ''),
+        }, status=status.HTTP_201_CREATED)
 
 
 class VerifyPaymentView(APIView):
     """
-    POST /api/verify-payment or /api/payments/verify-payment/
-    Verifies payment signature using HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET).
+    POST /api/payments/verify/
+    Verifies the Razorpay payment signature and activates enrollment.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         data = request.data
@@ -108,77 +176,197 @@ class VerifyPaymentView(APIView):
         razorpay_payment_id = data.get('razorpay_payment_id') or data.get('payment_id')
         razorpay_signature = data.get('razorpay_signature') or data.get('signature')
 
-        # Validate presence of required fields
-        if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
-            return Response({
-                'success': False,
-                'error': 'Missing required fields: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # 1. Missing fields check
+        if not (razorpay_order_id and razorpay_payment_id and razorpay_signature):
+            return Response(
+                {'error': 'razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2. Load Payment by order_id AND user=request.user (else 404)
+        payment = Payment.objects.filter(
+            razorpay_order_id=razorpay_order_id,
+            user=request.user
+        ).first()
+
+        if not payment:
+            return Response(
+                {'error': 'Payment record not found for this order and user.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '').strip()
         if not key_secret:
-            return Response({
-                'success': False,
-                'error': 'Server payment credentials are not configured.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # Generate HMAC-SHA256 signature
-        # Algorithm: HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
-        msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode('utf-8')
-        secret = key_secret.encode('utf-8')
-        generated_signature = hmac.new(
-            secret,
-            msg,
-            hashlib.sha256
-        ).hexdigest()
-
-        # Constant-time comparison to prevent timing attacks
-        if not hmac.compare_digest(generated_signature, razorpay_signature):
-            logger.warning(
-                "Razorpay signature mismatch for order %s and payment %s",
-                razorpay_order_id,
-                razorpay_payment_id
+            return Response(
+                {'error': 'Payment gateway credentials are not configured.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            return Response({
-                'success': False,
-                'error': 'Payment verification failed: Signature mismatch.'
-            }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Signature is valid!
-        logger.info(
-            "Razorpay payment verified successfully! Order: %s, Payment: %s",
-            razorpay_order_id,
-            razorpay_payment_id
-        )
+        # 3. Verify signature using Razorpay client utility and constant-time compare
+        is_valid = False
+        try:
+            client = get_razorpay_client()
+            client.utility.verify_payment_signature({
+                'razorpay_order_id': razorpay_order_id,
+                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_signature': razorpay_signature,
+            })
+            is_valid = True
+        except (razorpay.errors.SignatureVerificationError, ValueError):
+            is_valid = False
 
-        # If a course_id was passed and user is authenticated, enroll the user
-        course_id = data.get('course_id')
-        enrolled = False
-        course_title = None
+        # Fallback constant-time HMAC check
+        if not is_valid:
+            msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode('utf-8')
+            generated = hmac.new(key_secret.encode('utf-8'), msg, hashlib.sha256).hexdigest()
+            if hmac.compare_digest(generated, razorpay_signature):
+                is_valid = True
 
-        if course_id and request.user and request.user.is_authenticated:
-            try:
-                from apps.academics.models import Course, Enrollment
-                course = Course.objects.filter(id=course_id).first() or Course.objects.filter(slug=course_id).first()
-                if course:
-                    enrollment, created = Enrollment.objects.get_or_create(
-                        user=request.user,
-                        course=course,
-                        defaults={'status': 'ACTIVE'}
-                    )
-                    if not created and enrollment.status != 'ACTIVE':
-                        enrollment.status = 'ACTIVE'
-                        enrollment.save(update_fields=['status'])
-                    enrolled = True
-                    course_title = course.title
-            except Exception as e:
-                logger.error("Failed to enroll user after payment verification: %s", e)
+        if not is_valid:
+            logger.warning("Signature mismatch for order=%s, payment=%s", razorpay_order_id, razorpay_payment_id)
+            payment.status = Payment.Status.FAILED
+            payment.save(update_fields=['status'])
+            return Response(
+                {'error': 'Payment signature verification failed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 4. Atomic idempotent enrollment
+        with transaction.atomic():
+            locked_payment = Payment.objects.select_for_update().get(id=payment.id)
+            if locked_payment.status == Payment.Status.PAID:
+                return Response({
+                    'success': True,
+                    'message': 'Payment already verified.',
+                    'order_id': locked_payment.razorpay_order_id,
+                    'payment_id': locked_payment.razorpay_payment_id,
+                    'enrolled': True,
+                }, status=status.HTTP_200_OK)
+
+            locked_payment.status = Payment.Status.PAID
+            locked_payment.razorpay_payment_id = razorpay_payment_id
+            locked_payment.paid_at = timezone.now()
+            locked_payment.save(update_fields=['status', 'razorpay_payment_id', 'paid_at'])
+
+            if locked_payment.course:
+                enrollment, _ = Enrollment.objects.get_or_create(
+                    user=request.user,
+                    course=locked_payment.course,
+                    defaults={'status': 'ACTIVE'}
+                )
+                if enrollment.status != 'ACTIVE':
+                    enrollment.status = 'ACTIVE'
+                    enrollment.save(update_fields=['status'])
 
         return Response({
             'success': True,
             'message': 'Payment verified successfully.',
-            'order_id': razorpay_order_id,
-            'payment_id': razorpay_payment_id,
-            'enrolled': enrolled,
-            'course_title': course_title,
+            'order_id': locked_payment.razorpay_order_id,
+            'payment_id': locked_payment.razorpay_payment_id,
+            'enrolled': bool(locked_payment.course),
         }, status=status.HTTP_200_OK)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class WebhookView(APIView):
+    """
+    POST /api/payments/webhook/
+    Asynchronously processes Razorpay webhooks (payment.captured, order.paid, payment.failed).
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = []
+
+    def post(self, request):
+        signature = request.META.get('HTTP_X_RAZORPAY_SIGNATURE', '')
+        if not signature:
+            return Response({'error': 'Missing X-Razorpay-Signature header.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        webhook_secret = getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', '').strip()
+        if not webhook_secret:
+            logger.error("RAZORPAY_WEBHOOK_SECRET is not configured.")
+            return Response({'error': 'Webhook secret unconfigured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        raw_body = request.body.decode('utf-8') if isinstance(request.body, bytes) else str(request.body)
+
+        try:
+            client = get_razorpay_client()
+            client.utility.verify_webhook_signature(raw_body, signature, webhook_secret)
+        except (razorpay.errors.SignatureVerificationError, ValueError):
+            # Constant-time comparison fallback
+            dig = hmac.new(webhook_secret.encode('utf-8'), raw_body.encode('utf-8'), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(dig, signature):
+                logger.warning("Invalid Razorpay webhook signature received.")
+                return Response({'error': 'Invalid webhook signature.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            event_data = json.loads(raw_body)
+        except Exception:
+            return Response({'error': 'Invalid JSON body.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        event = event_data.get('event')
+        payload = event_data.get('payload', {})
+        payment_entity = payload.get('payment', {}).get('entity', {})
+        order_entity = payload.get('order', {}).get('entity', {})
+
+        order_id = payment_entity.get('order_id') or order_entity.get('id')
+        payment_id = payment_entity.get('id')
+
+        if event in ['payment.captured', 'order.paid']:
+            if order_id:
+                payment = Payment.objects.filter(razorpay_order_id=order_id).first()
+                if payment:
+                    with transaction.atomic():
+                        locked = Payment.objects.select_for_update().get(id=payment.id)
+                        if locked.status != Payment.Status.PAID:
+                            locked.status = Payment.Status.PAID
+                            if payment_id:
+                                locked.razorpay_payment_id = payment_id
+                            locked.paid_at = timezone.now()
+                            locked.save(update_fields=['status', 'razorpay_payment_id', 'paid_at'])
+
+                            if locked.course:
+                                enrollment, _ = Enrollment.objects.get_or_create(
+                                    user=locked.user,
+                                    course=locked.course,
+                                    defaults={'status': 'ACTIVE'}
+                                )
+                                if enrollment.status != 'ACTIVE':
+                                    enrollment.status = 'ACTIVE'
+                                    enrollment.save(update_fields=['status'])
+
+            return Response({'status': 'ok', 'message': 'Event processed successfully.'}, status=status.HTTP_200_OK)
+
+        elif event == 'payment.failed':
+            if order_id:
+                payment = Payment.objects.filter(razorpay_order_id=order_id).first()
+                if payment and payment.status != Payment.Status.PAID:
+                    payment.status = Payment.Status.FAILED
+                    payment.save(update_fields=['status'])
+
+            return Response({'status': 'ok', 'message': 'Payment marked failed.'}, status=status.HTTP_200_OK)
+
+        return Response({'status': 'ok', 'message': 'Event acknowledged.'}, status=status.HTTP_200_OK)
+
+
+class AdminPaymentListView(generics.ListAPIView):
+    """
+    GET /api/admin/payments/
+    Admin-only paginated listing of all payment transactions.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = PaymentSerializer
+
+    def get_queryset(self):
+        qs = Payment.objects.select_related('user', 'course').all().order_by('-created_at')
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param.lower())
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(user__email__icontains=search) |
+                models.Q(course__title__icontains=search) |
+                models.Q(razorpay_order_id__icontains=search) |
+                models.Q(razorpay_payment_id__icontains=search)
+            )
+        return qs

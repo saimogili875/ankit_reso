@@ -85,10 +85,28 @@ class EnrollView(APIView):
         if not course:
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not course.allow_self_enrollment and not (request.user.is_staff or getattr(request.user, 'role', '') == 'ADMIN'):
+        is_admin_or_staff = request.user.is_staff or getattr(request.user, 'role', '') == 'ADMIN'
+        if not course.allow_self_enrollment and not is_admin_or_staff:
             return Response({
                 'error': 'Direct self-enrollment is disabled for this course. Please contact administration to enroll.'
             }, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if course requires payment
+        is_paid = (not course.is_free) and (course.price and course.price > 0)
+        if is_paid and not is_admin_or_staff:
+            from apps.payments.models import Payment
+            has_paid = Payment.objects.filter(
+                user=request.user,
+                course=course,
+                status=Payment.Status.PAID
+            ).exists()
+            if not has_paid:
+                return Response({
+                    'error': 'Payment required to enroll in this course.',
+                    'payment_required': True,
+                    'course_id': str(course.id),
+                    'price': str(course.price),
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
         user = request.user
         enrollment, created = Enrollment.objects.get_or_create(
