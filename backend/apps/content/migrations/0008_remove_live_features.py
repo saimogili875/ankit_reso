@@ -18,11 +18,14 @@ def convert_live_class_data(apps, schema_editor):
 def drop_live_class_column(apps, schema_editor):
     connection = schema_editor.connection
     with connection.cursor() as cursor:
-        cursor.execute("DROP INDEX IF EXISTS content_scheduleevent_live_class_id_a1e87265;")
-        cursor.execute("PRAGMA table_info(content_scheduleevent);")
-        columns = [row[1] for row in cursor.fetchall()]
-        if 'live_class_id' in columns:
-            cursor.execute("ALTER TABLE content_scheduleevent DROP COLUMN live_class_id;")
+        if connection.vendor == 'sqlite':
+            cursor.execute("DROP INDEX IF EXISTS content_scheduleevent_live_class_id_a1e87265;")
+            cursor.execute("PRAGMA table_info(content_scheduleevent);")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'live_class_id' in columns:
+                cursor.execute("ALTER TABLE content_scheduleevent DROP COLUMN live_class_id;")
+        else:
+            cursor.execute("ALTER TABLE content_scheduleevent DROP COLUMN IF EXISTS live_class_id CASCADE;")
 
 
 class Migration(migrations.Migration):
