@@ -242,9 +242,6 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
             'negative_marks': 1
         }, format='json')
 
-        if res.status_code != 201:
-            print("DPP ERROR DATA:", res.data)
-
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         dpp_id = res.data['id']
         entries = DPPQuestion.objects.filter(dpp_id=dpp_id).order_by('order')

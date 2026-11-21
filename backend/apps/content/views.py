@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 import os
 import re
 import math
@@ -36,7 +37,7 @@ class LectureVideoView(APIView):
         video = None
         try:
             video = Video.objects.filter(lecture_id=pk).first() or Video.objects.filter(id=pk).first()
-        except Exception:
+        except (ValidationError, ValueError):
             video = None
 
         if not video:

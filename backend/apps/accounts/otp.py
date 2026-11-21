@@ -88,7 +88,8 @@ class OTPService:
         else:
             try:
                 cache.incr(hourly_key)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Cache incr failed on {hourly_key}, resetting count: {e}")
                 cache.set(hourly_key, current_rate + 1, timeout=3600)
 
         return otp
@@ -109,7 +110,7 @@ class OTPService:
 
         try:
             data = json.loads(raw_data)
-        except Exception:
+        except (json.JSONDecodeError, TypeError):
             cache.delete(key)
             return False, "Invalid OTP session. Please request a new code.", None
 

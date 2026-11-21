@@ -105,6 +105,22 @@ export async function fetchCsrfToken(): Promise<string | null> {
   return csrfFetchPromise;
 }
 
+export class ApiError extends Error {
+  status: number;
+  data: unknown;
+
+  constructor(message: string, status = 500, data: unknown = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
+// In-flight GET request deduplication cache to prevent duplicate concurrent round-trips
+const inflightGetRequests = new Map<string, Promise<unknown>>();
+
 export function formatApiError(errorData: Record<string, unknown> | null | undefined, status: number): string {
   if (!errorData || typeof errorData !== 'object') {
     return `API Error (${status})`;
@@ -161,94 +177,123 @@ export function formatApiError(errorData: Record<string, unknown> | null | undef
 
 export async function apiFetch<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = buildApiUrl(endpoint);
-
   const method = (options.method || 'GET').toUpperCase();
 
-  const defaultHeaders: Record<string, string> = {
-    'Accept': 'application/json',
-  };
-
-  if (options.body && typeof options.body === 'string') {
-    defaultHeaders['Content-Type'] = 'application/json';
+  // Deduplicate concurrent GET requests
+  if (method === 'GET' && inflightGetRequests.has(url)) {
+    return inflightGetRequests.get(url) as Promise<T>;
   }
 
-  // Add CSRF token for mutating methods
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const token = await fetchCsrfToken();
-    if (token) {
-      defaultHeaders['X-CSRFToken'] = token;
+  const executeFetch = async (): Promise<T> => {
+    const defaultHeaders: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+
+    if (options.body && typeof options.body === 'string') {
+      defaultHeaders['Content-Type'] = 'application/json';
     }
-  }
 
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...((options.headers as Record<string, string>) || {}),
-    },
-    credentials: 'include',
-  };
+    // Add CSRF token for mutating methods
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const token = await fetchCsrfToken();
+      if (token) {
+        defaultHeaders['X-CSRFToken'] = token;
+      }
+    }
 
-  try {
-    const response = await fetch(url, config);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const formatted = formatApiError(errorData, response.status);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
 
-      // Handle 401/403 redirects according to authentication policy
-      const isAuthCheckEndpoint = endpoint.includes('/auth/me');
-      const isAuthEndpoint =
-        endpoint.includes('/auth/login') ||
-        endpoint.includes('/auth/register') ||
-        endpoint.includes('/auth/signup') ||
-        endpoint.includes('/auth/csrf') ||
-        isAuthCheckEndpoint;
+    const config: RequestInit = {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...((options.headers as Record<string, string>) || {}),
+      },
+      credentials: 'include',
+      signal: options.signal || controller.signal,
+    };
 
-      if (typeof window !== 'undefined' && !isAuthEndpoint) {
-        const currentPath = window.location.pathname;
-        const isPublicRoute = PUBLIC_PATHS.some((path) =>
-          path === '/' ? currentPath === '/' : currentPath === path || currentPath.startsWith(`${path}/`)
-        );
+    try {
+      const response = await fetch(url, config);
+      clearTimeout(timeoutId);
 
-        if (response.status === 401) {
-          clearAuthCookies();
-          if (!isPublicRoute && !isRedirecting) {
-            isRedirecting = true;
-            window.location.href = '/login';
-          }
-        } else if (response.status === 403) {
-          const detail = (typeof errorData?.detail === 'string' ? errorData.detail : '').toLowerCase();
-          const isCredentialIssue =
-            detail.includes('credentials') ||
-            detail.includes('not provided') ||
-            detail.includes('not authenticated') ||
-            detail.includes('authentication credentials');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const formatted = formatApiError(errorData, response.status);
 
-          if (isCredentialIssue) {
+        // Handle 401/403 redirects according to authentication policy
+        const isAuthCheckEndpoint = endpoint.includes('/auth/me');
+        const isAuthEndpoint =
+          endpoint.includes('/auth/login') ||
+          endpoint.includes('/auth/register') ||
+          endpoint.includes('/auth/signup') ||
+          endpoint.includes('/auth/csrf') ||
+          isAuthCheckEndpoint;
+
+        if (typeof window !== 'undefined' && !isAuthEndpoint) {
+          const currentPath = window.location.pathname;
+          const isPublicRoute = PUBLIC_PATHS.some((path) =>
+            path === '/' ? currentPath === '/' : currentPath === path || currentPath.startsWith(`${path}/`)
+          );
+
+          if (response.status === 401) {
             clearAuthCookies();
             if (!isPublicRoute && !isRedirecting) {
               isRedirecting = true;
               window.location.href = '/login';
             }
-          } else if (currentPath.startsWith('/admin') && !isRedirecting) {
-            isRedirecting = true;
-            window.location.href = '/';
+          } else if (response.status === 403) {
+            const detail = (typeof errorData?.detail === 'string' ? errorData.detail : '').toLowerCase();
+            const isCredentialIssue =
+              detail.includes('credentials') ||
+              detail.includes('not provided') ||
+              detail.includes('not authenticated') ||
+              detail.includes('authentication credentials');
+
+            if (isCredentialIssue) {
+              clearAuthCookies();
+              if (!isPublicRoute && !isRedirecting) {
+                isRedirecting = true;
+                window.location.href = '/login';
+              }
+            } else if (currentPath.startsWith('/admin') && !isRedirecting) {
+              isRedirecting = true;
+              window.location.href = '/';
+            }
           }
         }
+
+        throw new ApiError(formatted, response.status, errorData);
       }
 
-      throw new Error(formatted);
+      // Return empty object for 204 No Content
+      if (response.status === 204) {
+        return {} as T;
+      }
+      return await response.json();
+    } catch (error: unknown) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = new ApiError('Request timed out after 15 seconds. Please try again.', 408);
+        console.warn(`[API Client Timeout] ${method} ${url}`);
+        throw timeoutError;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[API Client Warning] ${method} ${url}:`, message);
+      throw error;
     }
-    // Return empty object for 204 No Content
-    if (response.status === 204) {
-      return {} as T;
-    }
-    return await response.json();
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[API Client Warning] ${method} ${url}:`, message);
-    throw error;
+  };
+
+  if (method === 'GET') {
+    const fetchPromise = executeFetch().finally(() => {
+      inflightGetRequests.delete(url);
+    });
+    inflightGetRequests.set(url, fetchPromise);
+    return fetchPromise;
   }
+
+  return executeFetch();
 }
 
 export const apiClient = {

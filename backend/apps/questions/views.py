@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -24,7 +25,7 @@ class DPPListView(generics.ListAPIView):
                     models.Q(chapter_id=chapter_param) |
                     models.Q(chapter__slug=chapter_param)
                 )
-            except Exception:
+            except (ValidationError, ValueError):
                 queryset = queryset.filter(chapter__slug=chapter_param)
 
         if subject_param:
@@ -33,7 +34,7 @@ class DPPListView(generics.ListAPIView):
                     models.Q(chapter__category__subject_id=subject_param) |
                     models.Q(chapter__category__subject__slug=subject_param)
                 )
-            except Exception:
+            except (ValidationError, ValueError):
                 queryset = queryset.filter(chapter__category__subject__slug=subject_param)
 
         return queryset.order_by('dpp_number', 'title')

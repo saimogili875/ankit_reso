@@ -33,7 +33,7 @@ def process_and_upload_banner_image(uploaded_file, filename_hint: str = "banner"
             uploaded_file.seek(0, io.SEEK_END)
             file_size = uploaded_file.tell()
             uploaded_file.seek(0)
-        except Exception:
+        except (OSError, IOError, AttributeError):
             file_size = 0
 
     if file_size > MAX_FILE_SIZE_BYTES:

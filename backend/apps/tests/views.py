@@ -1,7 +1,7 @@
 import logging
 from decimal import Decimal
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Avg, Count, Q
 from django.core.cache import cache
 from rest_framework import generics, status
@@ -295,122 +295,154 @@ class TestSubmitView(APIView):
     """
     Submits a test attempt (manually or auto-submit), scores all answers against the answer key,
     updates QuestionAttemptLogs, computes full TestAttemptAnalysis, and refreshes test ranks.
+    Concurrency-safe via select_for_update() and transaction.atomic().
     """
     permission_classes = [IsAuthenticated]
     throttle_scope = 'test_submit'
 
     def post(self, request, pk):
-        attempt = TestAttempt.objects.filter(id=pk, user=request.user).first()
-        if not attempt:
-            return Response({'error': 'Attempt not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if attempt.status in [TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]:
-            return Response({
-                'message': 'Attempt already submitted.',
-                'attempt_id': str(attempt.id),
-                'score': float(attempt.score),
-            }, status=status.HTTP_200_OK)
-
         is_auto = bool(request.data.get('is_auto', False))
-        final_answers = request.data.get('answers') or attempt.answers or {}
-        time_taken = int(request.data.get('time_taken_seconds', attempt.time_taken_seconds or 0))
+        final_answers = request.data.get('answers') or {}
+        time_taken_param = request.data.get('time_taken_seconds')
 
-        test = attempt.test
-        test_questions = test.test_questions.select_related('question').prefetch_related('question__options')
+        with transaction.atomic():
+            attempt = TestAttempt.objects.select_for_update().filter(id=pk, user=request.user).first()
+            if not attempt:
+                return Response({'error': 'Attempt not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        score = 0.0
-        correct_count = 0
-        incorrect_count = 0
-        total_q = test_questions.count()
+            # Idempotency guard: Return already submitted attempt without re-grading
+            if attempt.status in [TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]:
+                return Response({
+                    'message': 'Attempt already submitted.',
+                    'attempt_id': str(attempt.id),
+                    'score': float(attempt.score),
+                }, status=status.HTTP_200_OK)
 
-        for tq in test_questions:
-            q = tq.question
-            ans_val = final_answers.get(str(q.id), '') or final_answers.get(q.id, '')
-            if isinstance(ans_val, dict):
-                sel_opts = ans_val.get('selected_options', [])
-                user_ans = str(sel_opts[0]) if sel_opts else str(ans_val.get('text_answer', '')).strip()
-            else:
-                user_ans = str(ans_val).strip()
+            if not final_answers and attempt.answers:
+                final_answers = attempt.answers
+            time_taken = int(time_taken_param if time_taken_param is not None else (attempt.time_taken_seconds or 0))
 
-            log, _ = QuestionAttemptLog.objects.get_or_create(
-                attempt=attempt,
-                question=q,
-                defaults={'test_question': tq}
-            )
-            log.test_question = tq
-            log.selected_answer = user_ans
+            test = attempt.test
+            test_questions = test.test_questions.select_related('question').prefetch_related('question__options')
 
-            if isinstance(ans_val, dict):
-                time_val = ans_val.get('time_spent') or ans_val.get('time_spent_seconds')
-                if time_val is not None:
-                    log.time_spent_seconds = int(time_val)
-                if 'visit_count' in ans_val:
-                    log.visit_count = int(ans_val['visit_count'])
-                if 'status' in ans_val and ans_val['status']:
-                    log.status = ans_val['status']
+            score = 0.0
+            correct_count = 0
+            incorrect_count = 0
+            total_q = test_questions.count()
 
-            if not user_ans:
-                log.is_correct = False
-                log.marks_awarded = Decimal('0.0')
-                log.status = QuestionAttemptLog.Status.SKIPPED
+            for tq in test_questions:
+                q = tq.question
+                ans_val = final_answers.get(str(q.id), '') or final_answers.get(q.id, '')
+                sel_opts = []
+                if isinstance(ans_val, dict):
+                    sel_opts = ans_val.get('selected_options', [])
+                    user_ans = str(sel_opts[0]) if sel_opts else str(ans_val.get('text_answer', '')).strip()
+                elif isinstance(ans_val, list):
+                    sel_opts = ans_val
+                    user_ans = str(sel_opts[0]) if sel_opts else ''
+                else:
+                    user_ans = str(ans_val).strip()
+
+                log, _ = QuestionAttemptLog.objects.get_or_create(
+                    attempt=attempt,
+                    question=q,
+                    defaults={'test_question': tq}
+                )
+                log.test_question = tq
+                log.selected_answer = user_ans
+
+                if isinstance(ans_val, dict):
+                    time_val = ans_val.get('time_spent') or ans_val.get('time_spent_seconds')
+                    if time_val is not None:
+                        log.time_spent_seconds = int(time_val)
+                    if 'visit_count' in ans_val:
+                        log.visit_count = int(ans_val['visit_count'])
+                    if 'status' in ans_val and ans_val['status']:
+                        log.status = ans_val['status']
+
+                if not user_ans and not sel_opts:
+                    log.is_correct = False
+                    log.marks_awarded = Decimal('0.0')
+                    log.status = QuestionAttemptLog.Status.SKIPPED
+                    log.save()
+                    continue
+
+                # Evaluate correct answer based on question type
+                is_correct = False
+                if q.question_type == Question.QuestionType.NUMERICAL:
+                    try:
+                        user_float = float(user_ans)
+                        if q.numerical_lower_bound is not None and q.numerical_upper_bound is not None:
+                            is_correct = float(q.numerical_lower_bound) <= user_float <= float(q.numerical_upper_bound)
+                        else:
+                            correct_opt = q.options.filter(is_correct=True).first()
+                            if correct_opt:
+                                is_correct = abs(user_float - float(correct_opt.option_text.strip())) < 1e-4
+                    except (ValueError, TypeError):
+                        is_correct = False
+
+                elif q.question_type == Question.QuestionType.MULTIPLE_CHOICE:
+                    correct_ids = set(str(opt.id) for opt in q.options.all() if opt.is_correct)
+                    candidate_ids = set(str(x) for x in sel_opts) if sel_opts else ({user_ans} if user_ans else set())
+                    is_correct = bool(correct_ids and candidate_ids == correct_ids)
+
+                else:
+                    # Single choice MCQ
+                    for opt in q.options.all():
+                        if opt.is_correct and (str(opt.id) == user_ans or opt.option_text.strip() == user_ans):
+                            is_correct = True
+                            break
+
+                log.is_correct = is_correct
+                if is_correct:
+                    correct_count += 1
+                    pos_m = float(tq.positive_marks)
+                    score += pos_m
+                    log.marks_awarded = Decimal(str(pos_m))
+                    log.status = QuestionAttemptLog.Status.CORRECT
+                else:
+                    incorrect_count += 1
+                    neg_m = float(tq.negative_marks)
+                    score -= neg_m
+                    log.marks_awarded = Decimal(str(-neg_m))
+                    log.status = QuestionAttemptLog.Status.WRONG
+
                 log.save()
-                continue
 
-            # Evaluate correct answer
-            is_correct = False
-            if q.question_type == Question.QuestionType.NUMERICAL:
-                # Compare numerical answer from solution or option
-                correct_opt = q.options.filter(is_correct=True).first()
-                if correct_opt and correct_opt.option_text.strip().lower() == user_ans.lower():
-                    is_correct = True
-            else:
-                for opt in q.options.all():
-                    if opt.is_correct and (str(opt.id) == user_ans or opt.option_text.strip() == user_ans):
-                        is_correct = True
-                        break
+            unattempted = max(0, total_q - (correct_count + incorrect_count))
+            total_attempted = correct_count + incorrect_count
+            accuracy = round((correct_count / total_attempted * 100), 2) if total_attempted > 0 else 0.0
 
-            log.is_correct = is_correct
-            if is_correct:
-                correct_count += 1
-                pos_m = float(tq.positive_marks)
-                score += pos_m
-                log.marks_awarded = Decimal(str(pos_m))
-                log.status = QuestionAttemptLog.Status.CORRECT
-            else:
-                incorrect_count += 1
-                neg_m = float(tq.negative_marks)
-                score -= neg_m
-                log.marks_awarded = Decimal(str(-neg_m))
-                log.status = QuestionAttemptLog.Status.WRONG
+            attempt.status = TestAttempt.Status.AUTO_SUBMITTED if is_auto else TestAttempt.Status.SUBMITTED
+            attempt.is_completed = True
+            attempt.score = Decimal(str(max(0, score)))
+            attempt.time_taken_seconds = time_taken
+            attempt.correct_count = correct_count
+            attempt.incorrect_count = incorrect_count
+            attempt.unattempted_count = unattempted
+            attempt.accuracy_percentage = Decimal(str(accuracy))
+            attempt.submitted_at = timezone.now()
+            attempt.completed_at = timezone.now()
+            attempt.answers = final_answers
+            attempt.save()
 
-            log.save()
-
-        unattempted = max(0, total_q - (correct_count + incorrect_count))
-        total_attempted = correct_count + incorrect_count
-        accuracy = round((correct_count / total_attempted * 100), 2) if total_attempted > 0 else 0.0
-
-        attempt.status = TestAttempt.Status.AUTO_SUBMITTED if is_auto else TestAttempt.Status.SUBMITTED
-        attempt.is_completed = True
-        attempt.score = Decimal(str(max(0, score)))
-        attempt.time_taken_seconds = time_taken
-        attempt.correct_count = correct_count
-        attempt.incorrect_count = incorrect_count
-        attempt.unattempted_count = unattempted
-        attempt.accuracy_percentage = Decimal(str(accuracy))
-        attempt.submitted_at = timezone.now()
-        attempt.completed_at = timezone.now()
-        attempt.answers = final_answers
-        attempt.save()
-
-        # Trigger full performance analysis asynchronously via Celery
+        # Trigger full performance analysis asynchronously via Celery (outside atomic transaction)
+        from django.conf import settings
         from .tasks import compute_test_attempt_analysis_task
         analysis_data = {}
-        try:
-            compute_test_attempt_analysis_task.delay(str(attempt.id))
-        except Exception as e:
-            logger.warning(f"Celery task dispatch failed or unavailable ({e}); running synchronously.")
+        redis_available = bool(getattr(settings, 'REDIS_URL', ''))
+        always_eager = bool(getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False))
+
+        if always_eager or not redis_available:
             analysis = compute_test_attempt_analysis(attempt)
             analysis_data = analysis.overview_data
+        else:
+            try:
+                compute_test_attempt_analysis_task.delay(str(attempt.id))
+            except Exception as e:
+                logger.warning(f"Celery task dispatch failed or unavailable ({e}); running synchronously.")
+                analysis = compute_test_attempt_analysis(attempt)
+                analysis_data = analysis.overview_data
 
         return Response({
             'message': 'Test submitted successfully.',

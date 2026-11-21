@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -44,7 +45,7 @@ class SubjectChaptersView(APIView):
         subject = None
         try:
             subject = Subject.objects.filter(models.Q(id=pk) | models.Q(slug=pk)).first()
-        except Exception:
+        except (ValidationError, ValueError):
             subject = Subject.objects.filter(slug=pk).first()
 
         if not subject:
@@ -78,7 +79,7 @@ class EnrollView(APIView):
         course = None
         try:
             course = Course.objects.filter(models.Q(id=course_id) | models.Q(slug=course_id)).first()
-        except Exception:
+        except (ValidationError, ValueError):
             course = Course.objects.filter(slug=course_id).first()
 
         if not course:

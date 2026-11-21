@@ -16,10 +16,9 @@ class StudyMaterialSerializer(serializers.ModelSerializer):
 
     def get_download_url(self, obj):
         if obj.r2_object_key:
-            # If storage service has presigned URL generation, resolve it
             try:
-                from apps.content.services.storage_service import storage_service
-                return storage_service.generate_presigned_download_url(obj.r2_object_key)
+                from storage.service import storage_service
+                return storage_service.get_material_download_url(obj.r2_object_key)
             except Exception:
                 return f"/api/content/download/?key={obj.r2_object_key}"
         return ""

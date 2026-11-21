@@ -14,7 +14,7 @@ PURPOSE_TITLES = {
     "change_phone": "Confirm Phone Change",
 }
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+@shared_task(bind=True, max_retries=3, default_retry_delay=5, time_limit=60, soft_time_limit=45)
 def send_email_otp_task(self, email: str, otp_code: str, purpose: str = "signup_email"):
     """
     Sends a styled HTML and plaintext OTP verification email via Django's configured email backend.

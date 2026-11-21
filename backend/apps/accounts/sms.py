@@ -22,10 +22,6 @@ def send_sms(phone: str, message: str) -> bool:
     if settings.DEBUG or not api_key:
         masked_phone = phone[:3] + "****" + phone[-3:] if len(phone) >= 7 else phone
         logger.info(f"[SMS MOCK] To: {masked_phone} | Message: {message}")
-        print(f"\n==================== [SMS MOCK] ====================")
-        print(f"Recipient: {phone}")
-        print(f"Message  : {message}")
-        print(f"====================================================\n")
         return True
 
     payload = {
