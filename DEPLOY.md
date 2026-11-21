@@ -122,6 +122,7 @@ The table below outlines all production environment variables, which services re
 | `ADMIN_EMAIL` | `ankit-reso` (web) | System admin email (e.g. `admin@adepteduverse.com`). | Seed admin email provisioned by `ensure_admin`. |
 | `ADMIN_PASSWORD` | `ankit-reso` (web) | Secure password for initial admin user. | Initial password provisioned by `ensure_admin`. |
 | `ADMIN_RESET_PASSWORD` | `ankit-reso` (web) | (Optional) Set to `"true"` only when an intentional admin password reset is needed. | Prevents overwriting changed admin passwords on deploys. |
+| `NUM_PROXIES` | `ankit-reso` (web) | Default `2` (for Vercel rewrite proxy + Render). Set to `1` for Render alone. | Number of reverse proxies DRF trusts for `X-Forwarded-For`. Render alone = 1; Vercel rewrite proxy + Render = 2. Ensures DRF resolves the real client IP rather than the Vercel egress IP, preventing IP throttle bypass. |
 | `SENTRY_DSN` | All services (optional) | From Sentry Project Settings → Client Keys (DSN). | Error reporting and performance monitoring. |
 
 ---

@@ -188,6 +188,7 @@ REST_FRAMEWORK = {
         'user': '120/minute',
         'chatbot': '10/minute',
         'login': '10/minute',
+        'login_failed_identifier': '5/15min',
         'register': '10/minute',
         'signup': '10/minute',
         'otp_send': '5/minute',
@@ -195,6 +196,7 @@ REST_FRAMEWORK = {
         'password_reset': '5/minute',
         'test_submit': '15/minute',
     },
+    'NUM_PROXIES': config('NUM_PROXIES', default=2, cast=int),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
@@ -212,6 +214,7 @@ REDIS_URL = config('REDIS_URL', default='').strip()
 REDIS_HOST = config('REDIS_HOST', default='redis')
 REDIS_PORT = config('REDIS_PORT', default='6379')
 DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+DJANGO_REDIS_LOGGER = 'django_redis'
 
 if REDIS_URL:
     CACHES = {

@@ -46,6 +46,7 @@ export function clearAuthCookies(): void {
   document.cookie = `auth_session=; path=/; expires=${pastDate}; SameSite=Lax`;
   document.cookie = `user_role=; path=/; expires=${pastDate}; SameSite=Lax`;
   document.cookie = `sessionid=; path=/; expires=${pastDate}; SameSite=Lax`;
+  resetCsrfToken();
 }
 
 /**
@@ -61,18 +62,29 @@ export function setAuthCookies(role: string, rememberMe = false): void {
 let cachedCsrfToken: string | null = null;
 let csrfFetchPromise: Promise<string | null> | null = null;
 
+export function resetCsrfToken(): void {
+  cachedCsrfToken = null;
+  csrfFetchPromise = null;
+}
+
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
   return match ? decodeURIComponent(match[3]) : null;
 }
 
-export async function fetchCsrfToken(): Promise<string | null> {
-  // Check cookie first
+export async function fetchCsrfToken(forceRefresh = false): Promise<string | null> {
   const cookieToken = getCookie('csrftoken');
-  if (cookieToken) {
+
+  // If cookie exists and we're not forcing refresh, sync cached token with cookie
+  if (!forceRefresh && cookieToken) {
     cachedCsrfToken = cookieToken;
     return cookieToken;
+  }
+
+  // If cookie is missing or forceRefresh requested, invalidate cached token
+  if (forceRefresh || !cookieToken) {
+    cachedCsrfToken = null;
   }
 
   if (cachedCsrfToken) return cachedCsrfToken;
@@ -245,6 +257,9 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
             }
           } else if (response.status === 403) {
             const detail = (typeof errorData?.detail === 'string' ? errorData.detail : '').toLowerCase();
+            if (detail.includes('csrf')) {
+              resetCsrfToken();
+            }
             const isCredentialIssue =
               detail.includes('credentials') ||
               detail.includes('not provided') ||
@@ -265,6 +280,13 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
         }
 
         throw new ApiError(formatted, response.status, errorData);
+      }
+
+      // Reset CSRF tokens after successful login or logout (since Django rotates CSRF tokens)
+      const isLoginEndpoint = endpoint.includes('/auth/login');
+      const isLogoutEndpoint = endpoint.includes('/auth/logout');
+      if (isLoginEndpoint || isLogoutEndpoint) {
+        resetCsrfToken();
       }
 
       // Return empty object for 204 No Content

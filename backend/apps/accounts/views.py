@@ -1,7 +1,9 @@
 import logging
+import hashlib
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle, BaseThrottle
 from django.contrib.auth import login, logout
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -26,6 +28,7 @@ from .serializers import (
     ResetPasswordSerializer,
     UpdateProfileSerializer,
 )
+from .throttles import LoginFailedIdentifierRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +186,10 @@ class LoginView(APIView):
     Returns generic 'Invalid credentials' on failure. Throttled by IP and identifier.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [
+        ScopedRateThrottle,
+        LoginFailedIdentifierRateThrottle,
+    ]
     throttle_scope = 'login'
 
     def post(self, request):
@@ -197,11 +204,32 @@ class LoginView(APIView):
             else:
                 request.session.set_expiry(0)       # browser session
 
+            # Reset failure count for this identifier upon successful login
+            LoginFailedIdentifierRateThrottle.clear_login_failures(request)
+
             user_data = UserSerializer(user).data
             return Response({
                 'message': 'Login successful',
                 'user': user_data
             }, status=status.HTTP_200_OK)
+
+        # Login failed: record failure against identifier and log warning
+        LoginFailedIdentifierRateThrottle.record_login_failure(request)
+
+        raw_identifier = (request.data.get('identifier') or request.data.get('email') or '').strip().lower()
+        ident_hash = hashlib.sha256(raw_identifier.encode('utf-8')).hexdigest()[:16] if raw_identifier else 'anonymous'
+        client_ip = BaseThrottle().get_ident(request)
+        portal = request.data.get('portal', 'student')
+        xff = request.META.get('HTTP_X_FORWARDED_FOR', 'none')
+
+        logger.warning(
+            "Failed login attempt: identifier_hash=%s, ip=%s, portal=%s, xff=%s",
+            ident_hash,
+            client_ip,
+            portal,
+            xff,
+        )
+
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
