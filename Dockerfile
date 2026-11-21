@@ -23,8 +23,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source code to container
 COPY backend/ /app/
 
-# Collect static files for WhiteNoise at build time (using build-only dummy SECRET_KEY)
-RUN SECRET_KEY=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
+# Collect static files for WhiteNoise at build time (using build-only dummy SECRET_KEY and VIDEO_STREAMING_SECRET)
+RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only-video DJANGO_SETTINGS_MODULE=config.settings.prod \
     python manage.py collectstatic --noinput
 
 # Expose Render web service port (Render default is 10000, fallback 8000)
