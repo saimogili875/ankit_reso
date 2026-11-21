@@ -24,8 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY backend/ /app/
 
 # Collect static files for WhiteNoise at build time (using build-only dummy SECRET_KEY, VIDEO_STREAMING_SECRET, and REDIS_URL)
-RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only REDIS_URL=redis://build-only:6379/0 DJANGO_SETTINGS_MODULE=config.settings.prod \
-    python manage.py collectstatic --noinput
+RUN SECRET_KEY=build-only-django-key VIDEO_STREAMING_SECRET=build-only-video-key REDIS_URL=redis://build-only:6379/0 DJANGO_SETTINGS_MODULE=config.settings.prod python manage.py collectstatic --noinput
 
 # Create and switch to non-root user
 RUN adduser --disabled-password --gecos '' --no-create-home appuser && \
