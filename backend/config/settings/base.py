@@ -211,6 +211,7 @@ SPECTACULAR_SETTINGS = {
 REDIS_URL = config('REDIS_URL', default='').strip()
 REDIS_HOST = config('REDIS_HOST', default='redis')
 REDIS_PORT = config('REDIS_PORT', default='6379')
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 if REDIS_URL:
     CACHES = {
@@ -330,6 +331,11 @@ LOGGING = {
         'apps': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'django_redis': {
+            'handlers': ['console'],
+            'level': 'WARNING',
             'propagate': False,
         },
     },

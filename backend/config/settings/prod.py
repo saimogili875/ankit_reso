@@ -15,6 +15,14 @@ if not VIDEO_STREAMING_SECRET:
 if VIDEO_STREAMING_SECRET == SECRET_KEY:
     raise ImproperlyConfigured("VIDEO_STREAMING_SECRET must not be identical to SECRET_KEY to prevent key reuse.")
 
+# Redis Configuration for Production:
+# Enforce REDIS_URL to avoid silent LocMemCache fallback which leads to split-brain
+# cache state across multi-process Gunicorn workers and Celery services.
+# Supports both redis:// and rediss:// (TLS) URLs from Render Managed Redis.
+REDIS_URL = config('REDIS_URL', default=REDIS_URL).strip()
+if not REDIS_URL:
+    raise ImproperlyConfigured("REDIS_URL must be configured in production to prevent in-memory cache split-brain across workers.")
+
 # Host Configuration: Read from ALLOWED_HOSTS env var
 DEFAULT_PROD_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,localhost,127.0.0.1,testserver'
 ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default=DEFAULT_PROD_ALLOWED_HOSTS).split(',') if h.strip()]

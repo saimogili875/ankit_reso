@@ -23,8 +23,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source code to container
 COPY backend/ /app/
 
-# Collect static files for WhiteNoise at build time (using build-only dummy SECRET_KEY and VIDEO_STREAMING_SECRET)
-RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
+# Collect static files for WhiteNoise at build time (using build-only dummy SECRET_KEY, VIDEO_STREAMING_SECRET, and REDIS_URL)
+RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only REDIS_URL=redis://build-only:6379/0 DJANGO_SETTINGS_MODULE=config.settings.prod \
     python manage.py collectstatic --noinput
 
 # Create and switch to non-root user

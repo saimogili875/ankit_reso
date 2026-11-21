@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source code
 COPY . /app/
 
-RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only DJANGO_SETTINGS_MODULE=config.settings.prod \
+RUN SECRET_KEY=build-only VIDEO_STREAMING_SECRET=build-only REDIS_URL=redis://build-only:6379/0 DJANGO_SETTINGS_MODULE=config.settings.prod \
     python manage.py collectstatic --noinput
 
 # Create and switch to non-root user
