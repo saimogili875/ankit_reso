@@ -8,6 +8,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         email = config('ADMIN_EMAIL', default=config('SEED_ADMIN_EMAIL', default='')).strip().lower()
         password = config('ADMIN_PASSWORD', default=config('SEED_ADMIN_PASSWORD', default=''))
+        reset_password = config('ADMIN_RESET_PASSWORD', default=False, cast=bool)
 
         if not email or not password:
             self.stdout.write(self.style.WARNING(
@@ -30,9 +31,12 @@ class Command(BaseCommand):
             user.is_active = True
             user.is_verified = True
             user.is_email_verified = True
-            user.set_password(password)
+            if reset_password:
+                user.set_password(password)
+                self.stdout.write(self.style.SUCCESS(f"Successfully updated admin user and reset password: {email}"))
+            else:
+                self.stdout.write(self.style.SUCCESS(f"Admin user exists: {email} (password unchanged; set ADMIN_RESET_PASSWORD=true to reset)"))
             user.save()
-            self.stdout.write(self.style.SUCCESS(f"Successfully updated admin user: {email}"))
         else:
             User.objects.create_superuser(
                 email=email,
