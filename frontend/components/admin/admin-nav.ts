@@ -14,6 +14,7 @@ import {
   Sliders,
   Image as ImageIcon,
   Bell,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -71,6 +72,12 @@ export const adminNavGroups: AdminNavGroup[] = [
       { label: 'Home & Slides', href: '/admin/home', icon: Sliders, hint: 'Home carousel and quick access tiles' },
       { label: 'Banner Sliders', href: '/admin/banners', icon: ImageIcon, hint: 'Promotional banners by placement' },
       { label: 'Announcements', href: '/admin/announcements', icon: Bell, hint: 'Notices shown to students' },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { label: 'Roles & RBAC', href: '/admin/roles', icon: ShieldCheck, hint: 'Assign Admin, Teacher, or Student roles' },
     ],
   },
 ];

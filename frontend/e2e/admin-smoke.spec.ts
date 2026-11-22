@@ -71,9 +71,9 @@ test.describe('Admin Console Smoke Tests', () => {
 
     await page.goto('/admin');
 
-    // Should redirect away from /admin (to /admin/login or home)
+    // Should redirect away from /admin (to /403, /admin/login or home)
     await expect(page).not.toHaveURL(/^\/admin$/);
-    await expect(page).toHaveURL(/(\/admin\/login|\/)/);
+    await expect(page).toHaveURL(/(\/403|\/admin\/login|\/)/);
   });
 
   test('(c) an admin can open every sidebar link with no console errors', async ({ page, context }) => {

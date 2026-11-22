@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { extractRoleFromClaims } from './lib/rbac';
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -7,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/login(.*)',
+  '/403',
+  '/courses(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
@@ -21,7 +24,7 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.next();
   }
 
-  // Admin routes: Kept on existing Django admin session authentication (NOT handled by Clerk)
+  // Admin routes:
   if (pathname.startsWith('/admin')) {
     const isAdminAuthPage =
       pathname === '/admin/login' ||
@@ -32,15 +35,40 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.next();
     }
 
+    // Check Django session or Clerk session
     const sessionCookie = request.cookies.get('sessionid') || request.cookies.get('auth_session');
-    const userRole = request.cookies.get('user_role')?.value;
-    const isAuthenticated = Boolean(sessionCookie?.value);
+    const userRoleCookie = request.cookies.get('user_role')?.value;
+    const isDjangoAuth = Boolean(sessionCookie?.value);
 
-    if (!isAuthenticated) {
+    const clerkAuth = await auth();
+    const clerkRole = extractRoleFromClaims(clerkAuth.sessionClaims);
+    const isClerkAdmin = Boolean(clerkAuth.userId && clerkRole === 'admin');
+
+    // If signed in as student (in Clerk or cookie) and trying to access admin -> 403
+    if (userRoleCookie === 'STUDENT' || (clerkAuth.userId && clerkRole === 'student')) {
+      return NextResponse.redirect(new URL('/403', request.url));
+    }
+
+    if (!isDjangoAuth && !isClerkAdmin) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
-    if (userRole !== 'ADMIN') {
-      return NextResponse.redirect(new URL('/', request.url));
+
+    if (userRoleCookie && userRoleCookie !== 'ADMIN' && !isClerkAdmin) {
+      return NextResponse.redirect(new URL('/403', request.url));
+    }
+
+    return NextResponse.next();
+  }
+
+  // Teacher routes: Accessible by teacher and admin roles
+  if (pathname.startsWith('/teacher')) {
+    const session = await auth();
+    if (!session.userId) {
+      return NextResponse.redirect(new URL('/sign-in', request.url));
+    }
+    const role = extractRoleFromClaims(session.sessionClaims);
+    if (role !== 'teacher' && role !== 'admin') {
+      return NextResponse.redirect(new URL('/403', request.url));
     }
     return NextResponse.next();
   }
