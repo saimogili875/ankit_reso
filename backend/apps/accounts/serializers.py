@@ -8,7 +8,12 @@ from .otp import OTPService, TOKEN_MAX_AGE_SECONDS
 class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
-        fields = ['target_exam', 'target_year', 'avatar_url', 'bio']
+        fields = [
+            'academic_class', 'target_exam', 'target_year',
+            'city', 'state', 'school_or_coaching',
+            'preferred_language', 'contact_phone', 'is_onboarded',
+            'avatar_url', 'bio'
+        ]
 
 class UserSerializer(serializers.ModelSerializer):
     student_profile = StudentProfileSerializer(read_only=True)
@@ -17,14 +22,35 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'username', 'full_name', 'first_name', 'last_name',
+            'id', 'clerk_id', 'email', 'username', 'full_name', 'first_name', 'last_name',
             'role', 'phone', 'phone_number', 'is_verified', 'is_email_verified',
             'is_phone_verified', 'is_admin', 'student_profile'
         ]
-        read_only_fields = ['id', 'is_verified', 'is_email_verified', 'is_phone_verified', 'is_admin']
+        read_only_fields = ['id', 'clerk_id', 'is_verified', 'is_email_verified', 'is_phone_verified', 'is_admin']
 
     def get_is_admin(self, obj):
         return bool(str(obj.role).upper() == User.Role.ADMIN or obj.is_superuser or obj.is_staff)
+
+
+class StudentOnboardingSerializer(serializers.Serializer):
+    academic_class = serializers.CharField(max_length=20, required=False, default='12')
+    target_exam = serializers.CharField(max_length=20, required=False, default='BOTH')
+    target_year = serializers.IntegerField(required=False, default=2025)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    school_or_coaching = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    preferred_language = serializers.CharField(max_length=50, required=False, allow_blank=True, default='English')
+    contact_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+
+    def validate_contact_phone(self, value):
+        if not value:
+            return ""
+        val = value.strip()
+        digits = re.sub(r'\D', '', val)
+        if digits and len(digits) != 10:
+            raise serializers.ValidationError("Please provide a valid 10-digit mobile number.")
+        return digits
+
 
 
 # --- OTP Serializers ---

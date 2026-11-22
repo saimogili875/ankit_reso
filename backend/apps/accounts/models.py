@@ -30,6 +30,7 @@ class User(AbstractUser):
         INSTRUCTOR = 'INSTRUCTOR', 'Instructor'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    clerk_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     full_name = models.CharField(max_length=255, blank=True, default='')
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
@@ -90,8 +91,15 @@ class StudentProfile(TimeStampedModel):
         BOTH = 'BOTH', 'JEE Main & Advanced'
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
+    academic_class = models.CharField(max_length=20, default='12', blank=True)
     target_exam = models.CharField(max_length=20, choices=TargetExam.choices, default=TargetExam.BOTH)
     target_year = models.IntegerField(default=2025)
+    city = models.CharField(max_length=100, blank=True, default='')
+    state = models.CharField(max_length=100, blank=True, default='')
+    school_or_coaching = models.CharField(max_length=255, blank=True, default='')
+    preferred_language = models.CharField(max_length=50, default='English', blank=True)
+    contact_phone = models.CharField(max_length=20, blank=True, default='', help_text="Unverified 10-digit mobile contact number")
+    is_onboarded = models.BooleanField(default=False)
     avatar_url = models.URLField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
 

@@ -37,6 +37,8 @@ let isRedirecting = false;
 const PUBLIC_PATHS = [
   '/',
   '/landing',
+  '/sign-in',
+  '/sign-up',
   '/login',
   '/register',
   '/signup',
@@ -45,8 +47,23 @@ const PUBLIC_PATHS = [
   '/admin/login',
   '/admin/forgot-password',
   '/admin/reset-password',
-  '/payment-test',
 ];
+
+/**
+ * Retrieves the current Clerk JWT session token from the browser window instance.
+ */
+export async function getClerkToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const clerk = (window as unknown as { Clerk?: { session?: { getToken: () => Promise<string | null> } } }).Clerk;
+    if (clerk?.session?.getToken) {
+      return await clerk.session.getToken();
+    }
+  } catch {
+    // Ignore and fallback to session
+  }
+  return null;
+}
 
 /**
  * Single source of truth for clearing authentication cookies on the frontend domain.
@@ -216,6 +233,12 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
       defaultHeaders['Content-Type'] = 'application/json';
     }
 
+    // Attach Clerk Bearer session token if present
+    const clerkToken = await getClerkToken();
+    if (clerkToken) {
+      defaultHeaders['Authorization'] = `Bearer ${clerkToken}`;
+    }
+
     // Add CSRF token for mutating methods
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
       const token = await fetchCsrfToken();
@@ -264,7 +287,7 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
             clearAuthCookies();
             if (!isPublicRoute && !isRedirecting) {
               isRedirecting = true;
-              window.location.href = '/login';
+              window.location.href = currentPath.startsWith('/admin') ? '/admin/login' : '/sign-in';
             }
           } else if (response.status === 403) {
             const detail = (typeof errorData?.detail === 'string' ? errorData.detail : '').toLowerCase();
@@ -281,7 +304,7 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
               clearAuthCookies();
               if (!isPublicRoute && !isRedirecting) {
                 isRedirecting = true;
-                window.location.href = '/login';
+                window.location.href = currentPath.startsWith('/admin') ? '/admin/login' : '/sign-in';
               }
             } else if (currentPath.startsWith('/admin') && !isRedirecting) {
               isRedirecting = true;

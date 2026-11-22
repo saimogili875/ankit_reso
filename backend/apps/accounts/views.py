@@ -1,12 +1,13 @@
 import logging
 import hashlib
+from django.conf import settings
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import ScopedRateThrottle, BaseThrottle
 from django.contrib.auth import login, logout
 from django.middleware.csrf import get_token
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.utils.decorators import method_decorator
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
@@ -27,6 +28,7 @@ from .serializers import (
     VerifyResetOtpSerializer,
     ResetPasswordSerializer,
     UpdateProfileSerializer,
+    StudentOnboardingSerializer,
 )
 from .throttles import LoginFailedIdentifierRateThrottle
 
@@ -507,3 +509,179 @@ class RegisterView(APIView):
             user_data = UserSerializer(user).data
             return Response({'message': 'Registration successful', 'user': user_data}, status=status.HTTP_201_CREATED)
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ==========================================
+# Clerk Authentication & Student Onboarding
+# ==========================================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ClerkWebhookView(APIView):
+    """
+    POST /api/auth/clerk-webhook/
+    Receives events from Clerk (user.created, user.updated, user.deleted).
+    Verifies Svix signature using CLERK_WEBHOOK_SECRET on RAW request body.
+    Idempotent. Does not sync phone numbers (per student privacy override).
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        webhook_secret = getattr(settings, 'CLERK_WEBHOOK_SECRET', '')
+        if not webhook_secret:
+            logger.error("CLERK_WEBHOOK_SECRET not configured.")
+            return Response({'error': 'Webhook secret unconfigured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        svix_id = request.headers.get('svix-id') or request.META.get('HTTP_SVIX_ID', '')
+        svix_timestamp = request.headers.get('svix-timestamp') or request.META.get('HTTP_SVIX_TIMESTAMP', '')
+        svix_signature = request.headers.get('svix-signature') or request.META.get('HTTP_SVIX_SIGNATURE', '')
+
+        if not svix_id or not svix_timestamp or not svix_signature:
+            logger.warning("Clerk webhook missing required svix headers.")
+            return Response({'error': 'Missing svix headers'}, status=status.HTTP_400_BAD_REQUEST)
+
+        headers = {
+            'svix-id': svix_id,
+            'svix-timestamp': svix_timestamp,
+            'svix-signature': svix_signature,
+        }
+
+        try:
+            from svix.webhooks import Webhook, WebhookVerificationError
+            wh = Webhook(webhook_secret)
+            payload = wh.verify(request.body.decode('utf-8'), headers)
+        except WebhookVerificationError as exc:
+            logger.warning("Clerk webhook Svix verification failed: %s", exc)
+            return Response({'error': 'Invalid webhook signature'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("Clerk webhook processing error: %s", exc)
+            return Response({'error': 'Invalid webhook payload'}, status=status.HTTP_400_BAD_REQUEST)
+
+        event_type = payload.get('type')
+        data = payload.get('data', {})
+        clerk_id = data.get('id')
+
+        if not clerk_id:
+            return Response({'error': 'Missing clerk_id in data'}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("Processing Clerk webhook event: %s for clerk_id=%s", event_type, clerk_id)
+
+        if event_type == 'user.created' or event_type == 'user.updated':
+            email_addresses = data.get('email_addresses', [])
+            primary_id = data.get('primary_email_address_id')
+            email = ''
+            for ea in email_addresses:
+                if ea.get('id') == primary_id or not email:
+                    email = ea.get('email_address', '').strip().lower()
+
+            first_name = data.get('first_name') or ''
+            last_name = data.get('last_name') or ''
+            username = data.get('username') or ''
+
+            user = User.objects.filter(clerk_id=clerk_id).first()
+            if not user and email:
+                user = User.objects.filter(email__iexact=email).first()
+
+            if user:
+                # Update existing user
+                user.clerk_id = clerk_id
+                if first_name or last_name:
+                    user.first_name = first_name
+                    user.last_name = last_name
+                    user.full_name = f"{first_name} {last_name}".strip()
+                if username and not User.objects.filter(username__iexact=username).exclude(id=user.id).exists():
+                    user.username = username
+                user.save()
+            elif email:
+                # Create student user
+                base_username = username or email.split('@')[0]
+                final_username = base_username
+                counter = 1
+                while User.objects.filter(username__iexact=final_username).exists():
+                    final_username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User.objects.create_user(
+                    username=final_username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    full_name=f"{first_name} {last_name}".strip() or final_username,
+                    role=User.Role.STUDENT,
+                    clerk_id=clerk_id,
+                    is_email_verified=True,
+                    is_verified=True,
+                )
+                StudentProfile.objects.get_or_create(user=user)
+
+        elif event_type == 'user.deleted':
+            # Deactivate student without deleting historical test / payment data
+            user = User.objects.filter(clerk_id=clerk_id).first()
+            if user:
+                user.is_active = False
+                user.save(update_fields=['is_active'])
+                logger.info("Deactivated user %s upon Clerk deletion.", user.email)
+
+        return Response({'received': True, 'event': event_type}, status=status.HTTP_200_OK)
+
+
+class StudentOnboardingView(APIView):
+    """
+    GET /api/students/onboarding/ - Returns current onboarding state for logged-in student.
+    POST /api/students/onboarding/ - Validates choices and stores them on StudentProfile.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if getattr(request.user, 'role', None) != User.Role.STUDENT:
+            return Response({'error': 'Students only'}, status=status.HTTP_403_FORBIDDEN)
+
+        profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+        return Response({
+            'is_onboarded': profile.is_onboarded,
+            'academic_class': profile.academic_class,
+            'target_exam': profile.target_exam,
+            'target_year': profile.target_year,
+            'city': profile.city,
+            'state': profile.state,
+            'school_or_coaching': profile.school_or_coaching,
+            'preferred_language': profile.preferred_language,
+            'contact_phone': profile.contact_phone,
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if getattr(request.user, 'role', None) != User.Role.STUDENT:
+            return Response({'error': 'Students only'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = StudentOnboardingSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+
+        profile.academic_class = data.get('academic_class', profile.academic_class)
+        profile.target_exam = data.get('target_exam', profile.target_exam)
+        profile.target_year = data.get('target_year', profile.target_year)
+        profile.city = data.get('city', profile.city)
+        profile.state = data.get('state', profile.state)
+        profile.school_or_coaching = data.get('school_or_coaching', profile.school_or_coaching)
+        profile.preferred_language = data.get('preferred_language', profile.preferred_language)
+        profile.contact_phone = data.get('contact_phone', profile.contact_phone)
+        profile.is_onboarded = True
+        profile.save()
+
+        return Response({
+            'message': 'Onboarding completed successfully',
+            'is_onboarded': True,
+            'profile': {
+                'academic_class': profile.academic_class,
+                'target_exam': profile.target_exam,
+                'target_year': profile.target_year,
+                'city': profile.city,
+                'state': profile.state,
+                'school_or_coaching': profile.school_or_coaching,
+                'preferred_language': profile.preferred_language,
+                'contact_phone': profile.contact_phone,
+            }
+        }, status=status.HTTP_200_OK)
+
