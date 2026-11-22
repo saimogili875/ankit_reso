@@ -120,7 +120,7 @@ export const LandingPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => logout()}
+                      onClick={() => logout('/sign-in')}
                       className="login-link text-xs flex items-center gap-1 text-slate-400 hover:text-white"
                       title="Sign out"
                     >
@@ -203,7 +203,7 @@ export const LandingPage: React.FC = () => {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => logout()}
+                  onClick={() => logout('/sign-in')}
                   className="text-xs text-rose-400 font-semibold ml-auto"
                 >
                   Sign out

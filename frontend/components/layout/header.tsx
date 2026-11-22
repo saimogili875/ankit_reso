@@ -91,7 +91,7 @@ export const Header: React.FC = () => {
 
   const handleLogout = async () => {
     setIsProfileMenuOpen(false);
-    await logout();
+    await logout('/sign-in');
   };
 
   const handleMarkAllRead = async () => {

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { UserButton, useClerk } from '@clerk/nextjs';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,9 +38,8 @@ interface UserData {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const { openUserProfile, signOut } = useClerk();
-  const { user: authUser, isLoading: authLoading, refresh } = useAuth();
+  const { openUserProfile } = useClerk();
+  const { user: authUser, isLoading: authLoading, refresh, logout } = useAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -99,12 +97,7 @@ export default function ProfilePage() {
   };
 
   const handleSignOut = async () => {
-    try {
-      await apiClient.logout();
-      await signOut().catch(() => null);
-    } finally {
-      router.push('/sign-in');
-    }
+    await logout('/sign-in');
   };
 
   if (isLoading) {

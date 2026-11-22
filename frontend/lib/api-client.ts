@@ -368,9 +368,6 @@ export const apiClient = {
       // ignore
     } finally {
       clearAuthCookies();
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
     }
   },
 };

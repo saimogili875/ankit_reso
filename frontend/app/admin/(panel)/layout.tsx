@@ -94,8 +94,7 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    await logout();
-    router.replace('/admin/login');
+    await logout('/admin/login');
   };
 
   if (isLoading || !adminUser || !adminUser.is_admin) {

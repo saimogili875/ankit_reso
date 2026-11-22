@@ -173,8 +173,7 @@ export default function AdminLoginPage() {
               <button
                 type="button"
                 onClick={async () => {
-                  await logout();
-                  clearAuthCookies();
+                  await logout('/admin/login');
                 }}
                 className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 hover:bg-amber-500/10 text-amber-200"
               >
