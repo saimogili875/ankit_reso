@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { GraduationCap } from 'lucide-react';
+import { useUser, useClerk } from '@clerk/nextjs';
+import { GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 
 interface FAQItemData {
@@ -42,6 +43,13 @@ const FAQ_ITEMS: FAQItemData[] = [
 export const LandingPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+
+  const userRole = ((user?.publicMetadata?.role as string) || 'student').toLowerCase();
+  const dashboardHref = userRole === 'admin' || userRole === 'teacher' ? '/admin' : '/';
+  const displayName = user?.firstName || user?.fullName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Account';
 
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
@@ -95,29 +103,58 @@ export const LandingPage: React.FC = () => {
             </ul>
 
             <div className="nav-actions">
-              <Link href="/sign-in" className="login-link" title="Login" aria-label="Login">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                  <polyline points="10 17 15 12 10 7" />
-                  <line x1="15" y1="12" x2="3" y2="12" />
-                </svg>
-                Login
-              </Link>
-              <Link
-                href="/sign-up"
-                className="landing-btn btn-primary btn-sm"
-              >
-                Create account
-              </Link>
+              {isLoaded && isSignedIn && user ? (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={dashboardHref}
+                    className="landing-btn btn-primary btn-sm flex items-center gap-1.5"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    <span>Dashboard</span>
+                  </Link>
+
+                  <div className="flex items-center gap-2 pl-2 border-l border-slate-700/80">
+                    <span className="text-xs font-semibold text-slate-200 hidden xl:inline max-w-[120px] truncate">
+                      {displayName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => signOut({ redirectUrl: '/sign-in' })}
+                      className="login-link text-xs flex items-center gap-1 text-slate-400 hover:text-white"
+                      title="Sign out"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Sign out</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Link href="/sign-in" className="login-link" title="Login" aria-label="Login">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                    Login
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className="landing-btn btn-primary btn-sm"
+                  >
+                    Create account
+                  </Link>
+                </>
+              )}
             </div>
 
             <button
@@ -152,12 +189,36 @@ export const LandingPage: React.FC = () => {
           <a href="#faq" className="mobile-link" onClick={closeMobileMenu}>
             Frequently Asked Questions
           </a>
-          <Link href="/sign-in" className="mobile-link" onClick={closeMobileMenu}>
-            Login
-          </Link>
-          <Link href="/sign-up" className="mobile-link" onClick={closeMobileMenu}>
-            Create account
-          </Link>
+
+          {isLoaded && isSignedIn && user ? (
+            <div className="p-3 my-2 rounded-xl bg-slate-900 border border-slate-800 text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">{displayName}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold uppercase">{userRole}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-800">
+                <Link href={dashboardHref} className="text-xs text-indigo-400 font-semibold" onClick={closeMobileMenu}>
+                  Go to Dashboard →
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => signOut({ redirectUrl: '/sign-in' })}
+                  className="text-xs text-rose-400 font-semibold ml-auto"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Link href="/sign-in" className="mobile-link" onClick={closeMobileMenu}>
+                Login
+              </Link>
+              <Link href="/sign-up" className="mobile-link" onClick={closeMobileMenu}>
+                Create account
+              </Link>
+            </>
+          )}
           <a
             href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Adept%20Eduverse%20classes"
             target="_blank"
@@ -972,8 +1033,11 @@ export const LandingPage: React.FC = () => {
         >
           WhatsApp Desk
         </a>
-        <Link href="/sign-in" className="landing-btn btn-primary">
-          Login
+        <Link
+          href={isLoaded && isSignedIn && user ? dashboardHref : "/sign-in"}
+          className="landing-btn btn-primary"
+        >
+          {isLoaded && isSignedIn && user ? "Dashboard" : "Login"}
         </Link>
       </div>
     </div>
