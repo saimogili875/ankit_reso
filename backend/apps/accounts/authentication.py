@@ -72,6 +72,17 @@ class ClerkJWTAuthentication(BaseAuthentication):
             logger.warning("Failed to fetch user %s from Clerk API: %s", clerk_id, e)
         return {}
 
+    @staticmethod
+    def _verified_primary_email(clerk_data):
+        """Returns the user's primary email only if Clerk reports it as verified."""
+        if not clerk_data:
+            return ''
+        primary_id = clerk_data.get('primary_email_address_id')
+        for ea in clerk_data.get('email_addresses') or []:
+            if ea.get('id') == primary_id and (ea.get('verification') or {}).get('status') == 'verified':
+                return (ea.get('email_address') or '').strip().lower()
+        return ''
+
     def authenticate(self, request):
         auth = get_authorization_header(request).split()
 
@@ -99,56 +110,45 @@ class ClerkJWTAuthentication(BaseAuthentication):
         user = User.objects.filter(clerk_id=clerk_id).first()
 
         if not user:
-            # Extract email, names, username from claims if present
-            email = (payload.get('email') or payload.get('primary_email_address') or '').strip().lower()
-            username = payload.get('username') or ''
-            first_name = payload.get('first_name') or ''
-            last_name = payload.get('last_name') or ''
+            # Never trust an email that Clerk has not verified: linking by an unverified address
+            # would let anyone take over an existing student account (enrollments, payments).
+            clerk_data = self.fetch_user_from_clerk_api(clerk_id)
+            email = self._verified_primary_email(clerk_data)
+            username = (clerk_data.get('username') if clerk_data else None) or payload.get('username') or ''
+            first_name = (clerk_data.get('first_name') if clerk_data else None) or payload.get('first_name') or ''
+            last_name = (clerk_data.get('last_name') if clerk_data else None) or payload.get('last_name') or ''
 
-            # If not in payload claims, query Clerk API once
-            if not email or not username:
-                clerk_data = self.fetch_user_from_clerk_api(clerk_id)
-                if clerk_data:
-                    email_addrs = clerk_data.get('email_addresses', [])
-                    primary_id = clerk_data.get('primary_email_address_id')
-                    for ea in email_addrs:
-                        if ea.get('id') == primary_id or not email:
-                            email = ea.get('email_address', '').strip().lower()
-                    username = clerk_data.get('username') or username
-                    first_name = clerk_data.get('first_name') or first_name
-                    last_name = clerk_data.get('last_name') or last_name
+            if not email:
+                raise exceptions.AuthenticationFailed('Could not retrieve a verified email for this Clerk user.')
 
-            if email:
-                # Match existing student by verified email
-                user = User.objects.filter(email__iexact=email).first()
-                if user:
-                    user.clerk_id = clerk_id
-                    user.save(update_fields=['clerk_id'])
-                else:
-                    # Create new student
-                    base_username = username or email.split('@')[0]
-                    # Ensure unique username
-                    final_username = base_username
-                    counter = 1
-                    while User.objects.filter(username__iexact=final_username).exists():
-                        final_username = f"{base_username}{counter}"
-                        counter += 1
-
-                    full_name = f"{first_name} {last_name}".strip() or final_username
-                    user = User.objects.create_user(
-                        username=final_username,
-                        email=email,
-                        first_name=first_name,
-                        last_name=last_name,
-                        full_name=full_name,
-                        role=User.Role.STUDENT,
-                        clerk_id=clerk_id,
-                        is_email_verified=True,
-                        is_verified=True,
-                    )
-                    StudentProfile.objects.get_or_create(user=user)
+            existing = User.objects.filter(email__iexact=email).first()
+            if existing:
+                if existing.clerk_id and existing.clerk_id != clerk_id:
+                    raise exceptions.AuthenticationFailed('This email is already linked to a different sign-in.')
+                existing.clerk_id = clerk_id
+                existing.save(update_fields=['clerk_id'])
+                user = existing
             else:
-                raise exceptions.AuthenticationFailed('Could not retrieve verified email for Clerk user.')
+                base_username = username or email.split('@')[0]
+                final_username = base_username
+                counter = 1
+                while User.objects.filter(username__iexact=final_username).exists():
+                    final_username = f"{base_username}{counter}"
+                    counter += 1
+
+                full_name = f"{first_name} {last_name}".strip() or final_username
+                user = User.objects.create_user(
+                    username=final_username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    full_name=full_name,
+                    role=User.Role.STUDENT,
+                    clerk_id=clerk_id,
+                    is_email_verified=True,
+                    is_verified=True,
+                )
+                StudentProfile.objects.get_or_create(user=user)
 
         if not user.is_active:
             raise exceptions.AuthenticationFailed('User account is disabled. Please contact support.')

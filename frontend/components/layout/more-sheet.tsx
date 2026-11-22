@@ -28,7 +28,7 @@ export const MoreSheet: React.FC<MoreSheetProps> = ({ isOpen, onClose }) => {
 
   const handleLogout = async () => {
     onClose();
-    await logout('/sign-in');
+    await logout();
   };
 
   const menuItems = [

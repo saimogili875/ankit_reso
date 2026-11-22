@@ -361,13 +361,18 @@ export const apiClient = {
   patch: <T = unknown>(endpoint: string, data?: unknown) =>
     apiFetch<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data || {}) }),
   delete: <T = unknown>(endpoint: string) => apiFetch<T>(endpoint, { method: 'DELETE' }),
-  logout: async () => {
+  // Clears the Django session. It does NOT navigate by default: callers that also need to end a
+  // Clerk session must do that first, because a page navigation here would cancel the sign-out.
+  logout: async (redirectTo?: string) => {
     try {
       await apiFetch('/auth/logout/', { method: 'POST' });
     } catch {
       // ignore
     } finally {
       clearAuthCookies();
+      if (redirectTo && typeof window !== 'undefined') {
+        window.location.href = redirectTo;
+      }
     }
   },
 };

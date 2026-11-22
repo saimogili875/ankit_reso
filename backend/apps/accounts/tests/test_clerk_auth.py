@@ -8,8 +8,32 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import User, StudentProfile
 from apps.academics.models import Course, Enrollment
 
+def clerk_api_user(clerk_id, email, verified=True, **extra):
+    """Shape of GET https://api.clerk.com/v1/users/<id> for a user with one primary email."""
+    data = {
+        'id': clerk_id,
+        'primary_email_address_id': 'idn_primary',
+        'email_addresses': [{
+            'id': 'idn_primary',
+            'email_address': email,
+            'verification': {'status': 'verified' if verified else 'unverified'},
+        }],
+    }
+    data.update(extra)
+    return data
+
+
 class ClerkAuthTests(APITestCase):
     def setUp(self):
+        # Clerk's backend API is never called in tests; each test registers the user it expects.
+        self.clerk_users = {}
+        api_patcher = patch(
+            'apps.accounts.authentication.ClerkJWTAuthentication.fetch_user_from_clerk_api',
+            side_effect=lambda cid: self.clerk_users.get(cid, {}),
+        )
+        api_patcher.start()
+        self.addCleanup(api_patcher.stop)
+
         # Existing student
         self.existing_student = User.objects.create_user(
             username='existing_student',
@@ -47,6 +71,7 @@ class ClerkAuthTests(APITestCase):
             'last_name': 'Student',
             'exp': int(time.time()) + 3600,
         }
+        self.clerk_users['user_clerk_new_123'] = clerk_api_user('user_clerk_new_123', 'newstudent@example.com', username='newbie', first_name='New', last_name='Student')
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer test_token_new')
         response = self.client.get('/api/auth/me/')
@@ -69,6 +94,7 @@ class ClerkAuthTests(APITestCase):
             'last_name': 'Student',
             'exp': int(time.time()) + 3600,
         }
+        self.clerk_users['user_clerk_link_456'] = clerk_api_user('user_clerk_link_456', 'existing@example.com', first_name='Existing', last_name='Student')
 
         original_id = self.existing_student.id
 
@@ -87,6 +113,7 @@ class ClerkAuthTests(APITestCase):
             'email': 'admin@example.com',
             'exp': int(time.time()) + 3600,
         }
+        self.clerk_users['user_clerk_admin_789'] = clerk_api_user('user_clerk_admin_789', 'admin@example.com')
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer test_token_admin')
         response = self.client.get('/api/students/onboarding/')
@@ -101,6 +128,7 @@ class ClerkAuthTests(APITestCase):
             'email': 'onboarding@example.com',
             'exp': int(time.time()) + 3600,
         }
+        self.clerk_users['user_clerk_onboard_101'] = clerk_api_user('user_clerk_onboard_101', 'onboarding@example.com')
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer test_token_onboard')
 
@@ -137,6 +165,7 @@ class ClerkAuthTests(APITestCase):
             'email': 'buyer@example.com',
             'exp': int(time.time()) + 3600,
         }
+        self.clerk_users['user_clerk_pay_202'] = clerk_api_user('user_clerk_pay_202', 'buyer@example.com')
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer test_token_pay')
         res = self.client.post('/api/enrollment/enroll/', {'course_id': str(self.paid_course.id)}, format='json')
@@ -153,3 +182,30 @@ class ClerkAuthTests(APITestCase):
             HTTP_SVIX_SIGNATURE='v1,bad_sig'
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('apps.accounts.authentication.ClerkJWTAuthentication.verify_token')
+    def test_unverified_email_cannot_take_over_existing_account(self, mock_verify):
+        mock_verify.return_value = {'sub': 'user_clerk_attacker', 'exp': int(time.time()) + 3600}
+        # Attacker signed up with the victim's address but never proved they own it.
+        self.clerk_users['user_clerk_attacker'] = clerk_api_user('user_clerk_attacker', 'existing@example.com', verified=False)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer attacker_token')
+        response = self.client.get('/api/auth/me/')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.existing_student.refresh_from_db()
+        self.assertFalse(self.existing_student.clerk_id)
+
+    @patch('apps.accounts.authentication.ClerkJWTAuthentication.verify_token')
+    def test_email_already_linked_to_another_clerk_account_is_rejected(self, mock_verify):
+        self.existing_student.clerk_id = 'user_clerk_original'
+        self.existing_student.save(update_fields=['clerk_id'])
+        mock_verify.return_value = {'sub': 'user_clerk_second', 'exp': int(time.time()) + 3600}
+        self.clerk_users['user_clerk_second'] = clerk_api_user('user_clerk_second', 'existing@example.com')
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer second_token')
+        response = self.client.get('/api/auth/me/')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.existing_student.refresh_from_db()
+        self.assertEqual(self.existing_student.clerk_id, 'user_clerk_original')

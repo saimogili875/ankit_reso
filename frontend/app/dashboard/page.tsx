@@ -107,10 +107,10 @@ export default function DashboardPage() {
   // Handle Logout
   const handleLogout = async () => {
     try {
-      await logout('/sign-in');
+      await logout();
     } catch {
       clearAuthCookies();
-      router.push('/sign-in');
+      router.push('/');
     }
   };
 

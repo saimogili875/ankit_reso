@@ -39,7 +39,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   refresh: () => Promise<AuthUser | null>;
-  logout: (redirectUrl?: string) => Promise<void>;
+  logout: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
 }
 
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchUser, clerkLoaded, clerkUser]);
 
-  const logout = useCallback(async (redirectUrl = '/sign-in') => {
+  const logout = useCallback(async () => {
     try {
       clearAuthCookies();
       await apiClient.logout();
@@ -110,14 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignored
     } finally {
       setUser(null);
-      try {
-        await signOut({ redirectUrl });
-      } catch (err) {
-        console.error('Clerk signOut error:', err);
-      }
-      if (typeof window !== 'undefined' && window.location.pathname !== redirectUrl) {
-        window.location.href = redirectUrl;
-      }
+      // End the Clerk session and land on the public home page
+      await signOut({ redirectUrl: '/' });
     }
   }, [signOut]);
 

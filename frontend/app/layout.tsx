@@ -48,6 +48,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} dark`}>
       <body className="antialiased bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 font-sans min-h-[100dvh]">
         <ClerkProvider
+          afterSignOutUrl="/"
           appearance={{
             variables: {
               colorPrimary: '#2B2FB8',
