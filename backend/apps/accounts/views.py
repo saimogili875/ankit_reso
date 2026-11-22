@@ -30,7 +30,7 @@ from .serializers import (
     UpdateProfileSerializer,
     StudentOnboardingSerializer,
 )
-from .throttles import LoginFailedIdentifierRateThrottle
+from .throttles import LoginFailedIdentifierRateThrottle, AdminLoginThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +191,7 @@ class LoginView(APIView):
     throttle_classes = [
         ScopedRateThrottle,
         LoginFailedIdentifierRateThrottle,
+        AdminLoginThrottle,
     ]
     throttle_scope = 'login'
 

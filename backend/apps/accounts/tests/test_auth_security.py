@@ -1,10 +1,12 @@
 from django.urls import reverse
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.accounts.models import User
 
 class AuthSecurityTests(APITestCase):
     def setUp(self):
+        cache.clear()
         # Create student user
         self.student = User.objects.create_user(
             username='student1',

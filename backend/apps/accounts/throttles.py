@@ -113,3 +113,27 @@ class LoginFailedIdentifierRateThrottle(SimpleRateThrottle):
             inst.key = inst.get_cache_key(request, None)
             if inst.key:
                 inst.clear_failures()
+
+
+class AdminLoginThrottle(LoginFailedIdentifierRateThrottle):
+    """
+    Dedicated rate limit & lockout for administrator login attempts.
+    Limits repeated login attempts to 5 attempts per 15 minutes per IP.
+    """
+    scope = 'admin_login'
+
+    def get_rate(self):
+        rate = super().get_rate()
+        return rate if rate is not None else '5/15min'
+
+    def get_cache_key(self, request, view):
+        portal = (getattr(request, 'data', {}) or {}).get('portal', '')
+        if str(portal).lower() != 'admin':
+            return None
+        ident = self.get_ident(request)
+        ident_hash = hashlib.sha256(ident.encode('utf-8')).hexdigest()
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': ident_hash
+        }
+

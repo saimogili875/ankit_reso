@@ -6,8 +6,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Count, Q, Avg, Max, Min
+from django.db.models import Count, Q, Avg, Max, Min, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
+from datetime import timedelta
 
 from apps.accounts.models import User
 from apps.accounts.permissions import IsAdminRole
@@ -28,6 +30,7 @@ from apps.tests.models import (
 from apps.progress.models import DPPAttempt, VideoProgress
 from apps.analytics.models import RankPredictor
 from apps.accounts.serializers import UserSerializer
+from apps.payments.models import Payment
 
 from .serializers import (
     AdminQuestionSerializer,
@@ -77,6 +80,83 @@ class OverviewView(APIView):
             'schedule_events_count': ScheduleEvent.objects.count(),
         }
         return Response(data, status=status.HTTP_200_OK)
+
+
+class OverviewTrendsView(APIView):
+    """
+    Read-only endpoint returning signups and payments per day for the last 30 days.
+    """
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        today = timezone.localdate() if timezone.is_aware(timezone.now()) else timezone.now().date()
+        start_date = today - timedelta(days=29)
+
+        # Aggregate signups per day
+        signups_qs = (
+            User.objects.filter(
+                role=User.Role.STUDENT,
+                date_joined__date__gte=start_date,
+                date_joined__date__lte=today,
+            )
+            .annotate(day=TruncDate('date_joined'))
+            .values('day')
+            .annotate(count=Count('id'))
+        )
+        signups_map = {item['day'].strftime('%Y-%m-%d'): item['count'] for item in signups_qs if item['day']}
+
+        # Aggregate payments per day (status=paid)
+        payments_qs = (
+            Payment.objects.filter(
+                status=Payment.Status.PAID,
+                created_at__date__gte=start_date,
+                created_at__date__lte=today,
+            )
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'), total_paise=Sum('amount_paise'))
+        )
+        payments_map = {
+            item['day'].strftime('%Y-%m-%d'): {
+                'count': item['count'],
+                'amount': float((item['total_paise'] or 0) / 100.0),
+            }
+            for item in payments_qs if item['day']
+        }
+
+        daily_trends = []
+        total_signups = 0
+        total_payments_count = 0
+        total_revenue = 0.0
+
+        for i in range(30):
+            day = start_date + timedelta(days=i)
+            day_str = day.strftime('%Y-%m-%d')
+            day_signups = signups_map.get(day_str, 0)
+            pay_data = payments_map.get(day_str, {'count': 0, 'amount': 0.0})
+            day_payments = pay_data['count']
+            day_amount = pay_data['amount']
+
+            total_signups += day_signups
+            total_payments_count += day_payments
+            total_revenue += day_amount
+
+            daily_trends.append({
+                'date': day_str,
+                'label': day.strftime('%d %b'),
+                'signups': day_signups,
+                'payments_count': day_payments,
+                'payments_amount': round(day_amount, 2),
+            })
+
+        return Response({
+            'total_signups_30d': total_signups,
+            'total_payments_count_30d': total_payments_count,
+            'total_revenue_30d': round(total_revenue, 2),
+            'start_date': start_date.strftime('%Y-%m-%d'),
+            'end_date': today.strftime('%Y-%m-%d'),
+            'trends': daily_trends,
+        }, status=status.HTTP_200_OK)
 
 
 class OptionsView(APIView):

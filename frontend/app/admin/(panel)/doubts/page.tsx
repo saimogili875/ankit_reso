@@ -330,6 +330,7 @@ export default function AdminDoubtsPage() {
                 <p className="text-xs text-slate-300 whitespace-pre-wrap">{activeDoubt.question_text}</p>
                 {activeDoubt.image_url && (
                   <div className="mt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={activeDoubt.image_url}
                       alt="Student question attachment"

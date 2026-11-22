@@ -17,11 +17,12 @@ import {
   Radio,
   CheckSquare,
   Hash,
-  AlertTriangle,
   Loader2,
   X,
   Sparkles,
+  Download,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 
 interface QuestionOptionData {
   id?: string;
@@ -73,6 +74,11 @@ export default function AdminQuestionsPage() {
   const [formSuccess, setFormSuccess] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<QuestionItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Bulk selection & export state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Filters
   const [filterSubject, setFilterSubject] = useState<string>('');
@@ -379,6 +385,7 @@ export default function AdminQuestionsPage() {
     try {
       await apiClient.delete(`/admin-panel/questions/${deleteTarget.id}/`);
       setQuestions((prev) => prev.filter((q) => q.id !== deleteTarget.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete question.';
@@ -386,6 +393,47 @@ export default function AdminQuestionsPage() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(
+        selectedIds.map((id) => apiClient.delete(`/admin-panel/questions/${id}/`).catch(() => null))
+      );
+      setQuestions((prev) => prev.filter((q) => !selectedIds.includes(q.id)));
+      setSelectedIds([]);
+      setBulkDeleteOpen(false);
+    } catch {
+      alert('Error during bulk deletion.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (filteredQuestions.length === 0) return;
+    const headers = ['ID', 'Subject', 'Chapter', 'Type', 'Difficulty', 'Question Text', 'Options', 'Solution', 'PYQ'];
+    const rows = filteredQuestions.map((q) => [
+      `"${q.id}"`,
+      `"${q.subject_name || ''}"`,
+      `"${q.chapter_name || ''}"`,
+      q.question_type,
+      q.difficulty,
+      `"${q.question_text.replace(/"/g, '""')}"`,
+      `"${(q.options || []).map((o, i) => `${String.fromCharCode(65 + i)}: ${o.option_text} [${o.is_correct ? 'CORRECT' : ''}]`).join('; ').replace(/"/g, '""')}"`,
+      `"${(q.solution_text || '').replace(/"/g, '""')}"`,
+      q.pyq_meta ? `"${q.pyq_meta.exam_name || ''} ${q.pyq_meta.year || ''}"` : 'No',
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `adept_questions_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredQuestions = useMemo(() => {
@@ -418,16 +466,29 @@ export default function AdminQuestionsPage() {
           </p>
         </div>
 
-        {!isFormOpen && (
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
-            variant="primary"
-            onClick={handleOpenCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-xs gap-1.5 shadow-indigo-600/20"
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={filteredQuestions.length === 0}
+            className="border-slate-800 text-xs gap-1.5 text-slate-300 hover:text-white"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Question</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
           </Button>
-        )}
+
+          {!isFormOpen && (
+            <Button
+              variant="primary"
+              onClick={handleOpenCreate}
+              className="bg-indigo-600 hover:bg-indigo-700 text-xs gap-1.5 shadow-indigo-600/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Question</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Dynamic Creation / Edit Modal or Card */}
@@ -852,8 +913,36 @@ export default function AdminQuestionsPage() {
 
       {/* Questions List */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-          <span>Showing {filteredQuestions.length} questions</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 px-1 py-1 gap-2">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300">
+              <input
+                type="checkbox"
+                checked={filteredQuestions.length > 0 && selectedIds.length === filteredQuestions.length}
+                onChange={(e) => {
+                  setSelectedIds(e.target.checked ? filteredQuestions.map((q) => q.id) : []);
+                }}
+                className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <span className="font-semibold text-xs">Select All</span>
+            </label>
+            <span>Showing {filteredQuestions.length} questions</span>
+          </div>
+
+          {selectedIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-indigo-400 font-semibold">{selectedIds.length} selected</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteOpen(true)}
+                className="h-7 px-2.5 text-xs text-rose-400 border-rose-900/60 hover:bg-rose-950/40 gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected</span>
+              </Button>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -869,10 +958,23 @@ export default function AdminQuestionsPage() {
           filteredQuestions.map((q) => (
             <Card
               key={q.id}
-              className="p-4 sm:p-5 bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-all space-y-3"
+              className={`p-4 sm:p-5 bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-all space-y-3 ${
+                selectedIds.includes(q.id) ? 'ring-1 ring-indigo-500/50 bg-indigo-950/15' : ''
+              }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(q.id)}
+                    onChange={(e) => {
+                      setSelectedIds((prev) =>
+                        e.target.checked ? [...prev, q.id] : prev.filter((id) => id !== q.id)
+                      );
+                    }}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+
                   <Badge variant="purple" className="border-indigo-800 text-indigo-300 font-mono text-[10px]">
                     {q.question_type}
                   </Badge>
@@ -979,57 +1081,38 @@ export default function AdminQuestionsPage() {
         )}
       </div>
 
-      {/* Confirmation Dialog before Delete */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="max-w-md w-full p-5 bg-slate-900 border-red-900/60 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-red-400">
-              <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-800 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Delete Question</h3>
-                <p className="text-xs text-slate-400">This action cannot be undone.</p>
-              </div>
+      {/* Single Question Delete Confirmation */}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Question"
+        description={
+          deleteTarget ? (
+            <div className="space-y-2">
+              <p>Are you sure you want to permanently delete this question? This action cannot be undone.</p>
+              <p className="text-xs font-mono p-2.5 rounded-lg bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 line-clamp-2">
+                &ldquo;{deleteTarget.question_text}&rdquo;
+              </p>
             </div>
+          ) : ''
+        }
+        confirmText="Confirm Delete"
+        variant="danger"
+        isLoading={isDeleting}
+      />
 
-            <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-lg font-mono line-clamp-3">
-              &quot;{deleteTarget.question_text}&quot;
-            </p>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteTarget(null)}
-                disabled={isDeleting}
-                className="border-slate-800 text-xs"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white border-none text-xs gap-1.5"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Confirm Delete</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      {/* Bulk Delete Confirmation */}
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${selectedIds.length} Questions?`}
+        description={`Are you sure you want to delete all ${selectedIds.length} selected questions from the question bank? This action cannot be undone.`}
+        confirmText="Delete All"
+        variant="danger"
+        isLoading={isBulkDeleting}
+      />
     </div>
   );
 }

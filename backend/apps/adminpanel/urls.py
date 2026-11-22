@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     OverviewView,
+    OverviewTrendsView,
     OptionsView,
     HeroSlideViewSet,
     QuickAccessViewSet,
@@ -54,6 +55,7 @@ router.register('admins', AdminUserViewSet, basename='admin-users')
 
 urlpatterns = [
     path('landing-banner-settings/', LandingBannerSettingsView.as_view(), name='admin-landing-banner-settings'),
+    path('overview/trends/', OverviewTrendsView.as_view(), name='admin-overview-trends'),
     path('overview/', OverviewView.as_view(), name='admin-overview'),
     path('options/', OptionsView.as_view(), name='admin-options'),
     path('', include(router.urls)),

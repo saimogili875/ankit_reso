@@ -49,6 +49,7 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
     def test_anonymous_and_student_blocked_on_admin_endpoints(self):
         endpoints = [
             reverse('admin-overview'),
+            reverse('admin-overview-trends'),
             reverse('admin-options'),
             reverse('admin-questions-list'),
             reverse('admin-chapters-list'),
@@ -350,6 +351,25 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         self.client.logout()
         res_public2 = self.client.get(reverse('landing-banners'))
         self.assertEqual(res_public2.data['display_count'], 2)
+
+    def test_overview_trends_data(self):
+        from apps.payments.models import Payment
+        self.client.force_authenticate(user=self.admin)
+        # Create a paid payment
+        Payment.objects.create(
+            user=self.student,
+            amount_paise=499900,
+            status=Payment.Status.PAID,
+            razorpay_order_id='order_trends_test_1',
+            razorpay_payment_id='pay_trends_test_1',
+        )
+
+        res = self.client.get(reverse('admin-overview-trends'))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data['trends']), 30)
+        self.assertGreaterEqual(res.data['total_signups_30d'], 1)
+        self.assertEqual(res.data['total_payments_count_30d'], 1)
+        self.assertEqual(res.data['total_revenue_30d'], 4999.0)
 
     def test_chatbot_endpoint_responses(self):
         # 1. Chatbot handles batch timing query via keyword fallback
