@@ -935,18 +935,24 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
 }
 
 .portrait-halo {
   position: relative;
-  width: 320px;
-  height: 320px;
+  width: 260px;
+  height: 260px;
   border-radius: 50%;
-  padding: 10px;
-  background: radial-gradient(circle, rgba(216, 185, 122, 0.25) 0%, transparent 70%);
-  border: 1px solid var(--border-gold);
-  box-shadow: 0 0 50px rgba(216, 185, 122, 0.2);
-  margin-bottom: 24px;
+  padding: 8px;
+  background: radial-gradient(circle, rgba(216, 185, 122, 0.25) 0%, rgba(7, 21, 43, 0.5) 70%);
+  border: 2px solid var(--border-gold);
+  box-shadow: 0 0 45px rgba(216, 185, 122, 0.2), 0 12px 36px rgba(0, 0, 0, 0.5);
+  margin-bottom: 18px;
+  flex-shrink: 0;
 }
 
 .teacher-pic {
@@ -954,26 +960,25 @@
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 30%;
+  object-position: 50% 20%;
   border: 2px solid var(--gold-400);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   display: block;
 }
 
 .iit-seal-badge {
-  position: absolute;
-  bottom: 6px;
-  right: -8px;
+  position: static;
   background: linear-gradient(135deg, #0e274e 0%, #07152b 100%);
-  border: 2px solid var(--gold-400);
+  border: 1.5px solid var(--gold-400);
   border-radius: var(--radius-full);
-  padding: 8px 16px;
-  display: flex;
+  padding: 8px 18px;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(216, 185, 122, 0.3);
-  z-index: 10;
-  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 14px rgba(216, 185, 122, 0.25);
+  margin-bottom: 14px;
+  max-width: 95%;
 }
 
 .seal-icon {
@@ -984,6 +989,7 @@
 .seal-text-group {
   display: flex;
   flex-direction: column;
+  text-align: left;
 }
 
 .seal-title {
@@ -991,33 +997,40 @@
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--gold-300);
+  line-height: 1.2;
 }
 
 .seal-sub {
   font-size: 0.72rem;
   color: #94a9c9;
   letter-spacing: 0.05em;
+  font-weight: 500;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 .teacher-caption {
-  margin-top: 4px;
+  margin-top: 2px;
   text-align: center;
-  position: relative;
-  z-index: 5;
+  width: 100%;
 }
 
 .teacher-name {
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   color: var(--text-white);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
 }
 
 .teacher-deg {
   color: var(--gold-400);
   font-size: 0.95rem;
   font-weight: 600;
-  margin-top: 4px;
+  margin-top: 8px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
 }
 
 .teacher-content h2 {
@@ -1581,16 +1594,24 @@
   }
 
   .portrait-halo {
-    width: min(290px, 80vw);
-    height: min(290px, 80vw);
-    padding: 8px;
-    margin-bottom: 24px;
+    width: min(230px, 65vw);
+    height: min(230px, 65vw);
+    padding: 6px;
+    margin-bottom: 14px;
   }
 
   .iit-seal-badge {
-    bottom: 2px;
-    right: -4px;
     padding: 6px 14px;
+    margin-bottom: 12px;
+  }
+
+  .teacher-name {
+    font-size: 1.5rem;
+  }
+
+  .teacher-deg {
+    font-size: 0.88rem;
+    margin-top: 6px;
   }
 
   .teacher-content h2 {

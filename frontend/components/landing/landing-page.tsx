@@ -514,28 +514,28 @@ export const LandingPage: React.FC = () => {
              ==================================================================== */}
         <section className="landing-section teacher-section" id="teacher">
           <div className="landing-wrap teacher-grid">
-            <div className="teacher-portrait-box">
+            <div className="teacher-portrait-box" id="faculty-profile-card">
               <div className="portrait-halo">
-                {/* TODO: Source image ankit-sir-headshot.jpg is 304x304 (below 600x600). Supply a sharper high-resolution (600x600+) photo for optimal 2x display */}
                 <Image
                   src="/images/ankit-sir-headshot.jpg"
                   alt="Ankit Kumar, B.Tech IIT Kharagpur – Founder Adept Eduverse"
-                  width={600}
-                  height={600}
+                  width={320}
+                  height={320}
                   className="teacher-pic"
                   priority
                 />
-                <div className="iit-seal-badge">
-                  <GraduationCap className="seal-icon" width={22} height={22} />
-                  <div className="seal-text-group">
-                    <span className="seal-title">IIT Kharagpur</span>
-                    <span className="seal-sub">B.Tech Engineering Alumnus</span>
-                  </div>
+              </div>
+
+              <div className="iit-seal-badge">
+                <GraduationCap className="seal-icon" width={22} height={22} />
+                <div className="seal-text-group">
+                  <span className="seal-title">IIT Kharagpur</span>
+                  <span className="seal-sub">B.Tech Engineering Alumnus</span>
                 </div>
               </div>
 
               <div className="teacher-caption">
-                <div className="teacher-name">Ankit Kumar</div>
+                <h3 className="teacher-name">Ankit Kumar</h3>
                 <div className="teacher-deg">B.Tech, IIT Kharagpur | JEE Math Specialist</div>
               </div>
             </div>
