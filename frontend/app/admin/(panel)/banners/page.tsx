@@ -660,8 +660,12 @@ export default function AdminBannersPage() {
                       Drag &amp; drop banner image, or click to browse
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
-                      JPG, PNG, or WebP up to 5 MB. Automatically resized to max 1600px width.
+                      JPG, PNG, or WebP up to 5 MB.
                     </p>
+                    <div className="mt-3 inline-flex flex-col sm:flex-row items-center gap-2 p-2 px-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs text-center">
+                      <span className="font-semibold">Recommended for Hero:</span>
+                      <span>1920 × 1080 px (16:9 Aspect Ratio). Fits desktop &amp; mobile hero area.</span>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3 p-4 rounded-2xl bg-slate-950/60 border border-slate-800">

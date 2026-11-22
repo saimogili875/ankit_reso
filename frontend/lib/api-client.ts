@@ -352,14 +352,27 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
   return executeFetch();
 }
 
+const toBody = (data?: unknown): BodyInit | undefined => {
+  if (data === undefined || data === null) return undefined;
+  if (
+    typeof data === 'string' ||
+    (typeof FormData !== 'undefined' && data instanceof FormData) ||
+    (typeof Blob !== 'undefined' && data instanceof Blob) ||
+    (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer)
+  ) {
+    return data as BodyInit;
+  }
+  return JSON.stringify(data);
+};
+
 export const apiClient = {
   get: <T = unknown>(endpoint: string) => apiFetch<T>(endpoint, { method: 'GET' }),
   post: <T = unknown>(endpoint: string, data?: unknown) =>
-    apiFetch<T>(endpoint, { method: 'POST', body: JSON.stringify(data || {}) }),
+    apiFetch<T>(endpoint, { method: 'POST', body: toBody(data) }),
   put: <T = unknown>(endpoint: string, data?: unknown) =>
-    apiFetch<T>(endpoint, { method: 'PUT', body: JSON.stringify(data || {}) }),
+    apiFetch<T>(endpoint, { method: 'PUT', body: toBody(data) }),
   patch: <T = unknown>(endpoint: string, data?: unknown) =>
-    apiFetch<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data || {}) }),
+    apiFetch<T>(endpoint, { method: 'PATCH', body: toBody(data) }),
   delete: <T = unknown>(endpoint: string) => apiFetch<T>(endpoint, { method: 'DELETE' }),
   // Clears the Django session. It does NOT navigate by default: callers that also need to end a
   // Clerk session must do that first, because a page navigation here would cancel the sign-out.

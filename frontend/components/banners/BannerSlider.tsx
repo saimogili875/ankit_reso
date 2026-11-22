@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, GraduationCap } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
 export interface BannerSlide {
@@ -139,15 +139,77 @@ export function BannerSlider({ placement, className = '', isCompact = false }: B
     }
   };
 
-  // If loading, error, or no slides: render nothing
+  const aspectClass = isCompact ? 'aspect-[2/1] sm:aspect-[16/9]' : 'aspect-[16/9]';
+
+  // Fallback hero visual when there are no active banners uploaded yet
+  const renderDefaultHero = () => (
+    <div
+      className={`group relative w-full overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/95 via-[#071328]/95 to-slate-950/95 shadow-2xl backdrop-blur-md transition-all duration-300 ${className}`}
+    >
+      <div className={`relative w-full ${aspectClass} flex items-center`}>
+        {/* Ambient background glow */}
+        <div className="absolute -top-12 -right-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 w-full h-full flex flex-row items-center justify-between p-5 sm:p-7 gap-4">
+          <div className="flex-1 space-y-2 sm:space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold tracking-wide">
+              <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+              <span>IIT Kharagpur Faculty</span>
+            </div>
+
+            <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-snug">
+              Master JEE with <span className="text-amber-400">Ankit Sir</span>
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 max-w-sm">
+              10+ years coaching top JEE Advanced &amp; Main rankers with rigorous physics &amp; mathematics fundamentals.
+            </p>
+
+            <div className="pt-1 flex items-center gap-2">
+              <a
+                href="#batches"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-md transition-all"
+              >
+                Explore Batches →
+              </a>
+              <a
+                href="#teacher"
+                className="inline-flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-700/80 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Meet Faculty
+              </a>
+            </div>
+          </div>
+
+          <div className="relative w-28 h-28 sm:w-40 sm:h-40 md:w-48 md:h-48 flex-shrink-0 self-center">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-indigo-500/30 blur-md pointer-events-none" />
+            <Image
+              src="/images/ankit-sir.jpg"
+              alt="Ankit Sir - Founder Adept Eduverse"
+              fill
+              sizes="(max-width: 640px) 120px, 192px"
+              className="object-cover rounded-2xl border border-slate-700/80 shadow-xl"
+              priority
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // If loading, error, or no slides: show default hero visual for home placement
   if (isLoading || hasError || totalSlides === 0) {
+    if (placement === 'home') {
+      return renderDefaultHero();
+    }
     return null;
   }
 
   const activeSlide = slides[currentIndex];
-  if (!activeSlide) return null;
-
-  const aspectClass = isCompact ? 'aspect-[2/1] sm:aspect-[16/9]' : 'aspect-[16/9]';
+  if (!activeSlide) {
+    return placement === 'home' ? renderDefaultHero() : null;
+  }
 
   return (
     <div
