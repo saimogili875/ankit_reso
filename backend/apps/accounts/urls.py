@@ -17,6 +17,8 @@ from .views import (
     VerifyProfileChangeEmailOtpView,
     SendProfileChangePhoneOtpView,
     VerifyProfileChangePhoneOtpView,
+    ClerkWebhookView,
+    StudentOnboardingView,
 )
 
 urlpatterns = [
@@ -40,9 +42,12 @@ urlpatterns = [
     # Legacy / Backward compatibility
     re_path(r'^register/?$', RegisterView.as_view(), name='register'),
 
-    # Login & Logout
+    # Login & Logout (Admin session auth)
     re_path(r'^login/?$', LoginView.as_view(), name='login'),
     re_path(r'^logout/?$', LogoutView.as_view(), name='logout'),
+
+    # Clerk Webhook
+    re_path(r'^clerk-webhook/?$', ClerkWebhookView.as_view(), name='clerk-webhook'),
 
     # Password Recovery (OTP-based)
     re_path(r'^password/forgot/?$', ForgotPasswordView.as_view(), name='password-forgot'),

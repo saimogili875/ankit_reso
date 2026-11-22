@@ -93,7 +93,7 @@ export const Header: React.FC = () => {
     try {
       await apiClient.logout();
     } finally {
-      router.push('/login');
+      router.push('/sign-in');
     }
   };
 
@@ -161,17 +161,17 @@ export const Header: React.FC = () => {
           <input
             type="text"
             placeholder="Search topics, PYQs, tests, concepts..."
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 text-base sm:text-sm bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
         </div>
       </div>
 
       {/* Right Controls: Exam Selector, Bell, User Profile */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Exam Selector Pill */}
         <Link
           href="/profile"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-200 cursor-pointer hover:border-slate-700 transition-colors"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-200 cursor-pointer hover:border-slate-700 transition-colors min-h-[44px]"
           title="Edit Target Exam in Profile"
         >
           <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
@@ -184,21 +184,21 @@ export const Header: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsBellOpen(!isBellOpen)}
-            className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
+            className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-5 h-5" />
             {unreadCount > 0 ? (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-[10px] font-extrabold text-white flex items-center justify-center border-2 border-slate-950 shadow-sm animate-pulse">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             ) : announcements.length > 0 ? (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             ) : null}
           </button>
 
           {isBellOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 overflow-hidden">
               {/* Dropdown Header with Tab Switches */}
               <div className="p-2.5 border-b border-slate-800 flex items-center justify-between gap-2 bg-slate-950/40">
                 <div className="flex items-center gap-1">

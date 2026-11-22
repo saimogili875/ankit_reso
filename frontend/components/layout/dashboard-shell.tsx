@@ -12,8 +12,12 @@ export interface DashboardShellProps {
 }
 
 const AUTH_PATHS = [
+  '/sign-in',
+  '/sign-up',
+  '/onboarding',
   '/login',
   '/register',
+  '/signup',
   '/forgot-password',
   '/reset-password',
   '/admin/login',
@@ -37,22 +41,29 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   // Admin pages have their own dedicated admin layout and header
   const isAdminPage = pathname?.startsWith('/admin');
 
+  // Test attempt page has its own dedicated CBT fullscreen chrome
+  const isCBTAttemptPage = pathname?.includes('/attempt');
+
   // The landing page on /landing or / (for unauthenticated visitors) renders full-width without dashboard chrome
   const isLanding = pathname === '/landing' || (pathname === '/' && isAuthenticated !== true);
 
   if (isAuthPage || isAdminPage || isLanding) {
-    return <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">{children}</div>;
+    return <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 font-sans">{children}</div>;
+  }
+
+  if (isCBTAttemptPage) {
+    return <div className="min-h-[100dvh] bg-slate-950 text-slate-100 font-sans">{children}</div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
+    <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 flex flex-col font-sans">
       {/* Desktop Fixed Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="lg:pl-64 flex-1 flex flex-col pb-16 lg:pb-0">
+      <div className="lg:pl-64 flex-1 flex flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <Header />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

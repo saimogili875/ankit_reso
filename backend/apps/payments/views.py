@@ -21,125 +21,116 @@ from .serializers import PaymentSerializer
 
 logger = logging.getLogger(__name__)
 
+def get_razorpay_keys():
+    raw_id = getattr(settings, 'RAZORPAY_KEY_ID', '')
+    raw_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+    key_id = str(raw_id).strip().strip("'\"") if raw_id else ""
+    key_secret = str(raw_secret).strip().strip("'\"") if raw_secret else ""
+    return key_id, key_secret
+
 def get_razorpay_client():
-    key_id = getattr(settings, 'RAZORPAY_KEY_ID', '').strip()
-    key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '').strip()
+    key_id, key_secret = get_razorpay_keys()
     if not key_id or not key_secret:
-        raise ValueError("Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are not configured.")
+        logger.error("Razorpay keys missing")
+        raise ValueError("Razorpay keys missing")
     return razorpay.Client(auth=(key_id, key_secret))
 
 
 class CreateOrderView(APIView):
     """
-    POST /api/payments/create-order/ or POST /api/create-order
-    Creates a new Razorpay order for purchasing a paid course or direct checkout.
-    Accepts:
-      - {course_id}: loads course, verifies student, uses server price.
-      - {amount, currency, receipt}: direct order creation (amount >= 100 paise).
+    POST /api/payments/create-order/
+    Creates a new Razorpay order for purchasing a paid course.
+    Accepts {course_id} ONLY. Never accepts amount from the client.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        data = request.data
-        course_id = data.get('course_id')
-        amount_param = data.get('amount')
-
-        if not course_id and amount_param is None:
+        course_id = request.data.get('course_id')
+        if not course_id:
             return Response(
-                {'error': 'course_id or amount is required.'},
+                {'error': 'course_id is required.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        course = None
-        if course_id:
-            # 1. Load course (is_published=True)
-            try:
-                course = Course.objects.filter(
-                    models.Q(id=course_id) | models.Q(slug=course_id),
-                    is_published=True
-                ).first()
-            except (ValidationError, ValueError):
-                course = Course.objects.filter(slug=course_id, is_published=True).first()
+        # 1. Load course (is_published=True)
+        try:
+            course = Course.objects.filter(
+                models.Q(id=course_id) | models.Q(slug=course_id),
+                is_published=True
+            ).first()
+        except (ValidationError, ValueError):
+            course = Course.objects.filter(slug=course_id, is_published=True).first()
 
-            if not course:
-                return Response(
-                    {'error': 'Course not found or is not published.'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+        if not course:
+            return Response(
+                {'error': 'Course not found or is not published.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-            # 2. Check if already enrolled -> 409 Conflict
-            if Enrollment.objects.filter(user=request.user, course=course).exists():
-                return Response(
-                    {'error': 'You are already enrolled in this course.'},
-                    status=status.HTTP_409_CONFLICT
-                )
+        # 2. Check if already enrolled -> 409 Conflict
+        if Enrollment.objects.filter(user=request.user, course=course).exists():
+            return Response(
+                {'error': 'You are already enrolled in this course.'},
+                status=status.HTTP_409_CONFLICT
+            )
 
-            # 3. Read price strictly from server; convert rupees to paise (x100)
-            try:
-                course_price_rupees = float(course.price or 0)
-            except (ValueError, TypeError):
-                course_price_rupees = 0.0
+        # 3. Read price strictly from server; convert rupees to paise (x100)
+        try:
+            course_price_rupees = float(course.price or 0)
+        except (ValueError, TypeError):
+            course_price_rupees = 0.0
 
-            amount_paise = int(round(course_price_rupees * 100))
+        amount_paise = int(round(course_price_rupees * 100))
 
-            # 4. Reject free courses and amounts < 100 paise
-            if course.is_free or amount_paise < 100:
-                return Response(
-                    {'error': 'This course is free. Please use standard course enrollment.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # 4. Reject free courses and amounts under 100 paise
+        if course.is_free or amount_paise < 100:
+            return Response(
+                {'error': 'This course is free. Please use standard course enrollment.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            currency = 'INR'
-            receipt = data.get('receipt') or f"rcpt_{uuid.uuid4().hex[:14]}"
-            notes = {
-                'user_id': str(request.user.id),
-                'course_id': str(course.id),
-            }
-        else:
-            # Direct amount provided
-            try:
-                amount_paise = int(amount_param)
-            except (ValueError, TypeError):
-                return Response(
-                    {'error': 'Valid amount in paise is required.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            if amount_paise < 100:
-                return Response(
-                    {'error': 'amount must be at least 100 paise.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            currency = data.get('currency', 'INR')
-            receipt = data.get('receipt') or f"rcpt_{uuid.uuid4().hex[:14]}"
-            notes = {
-                'user_id': str(request.user.id),
-            }
+        receipt = f"rcpt_{uuid.uuid4().hex[:14]}"
+        notes = {
+            'user_id': str(request.user.id),
+            'course_id': str(course.id),
+        }
 
         # 5. Create Razorpay order
         try:
             client = get_razorpay_client()
             order = client.order.create({
                 'amount': amount_paise,
-                'currency': currency,
+                'currency': 'INR',
                 'receipt': receipt,
                 'notes': notes,
             })
-        except ValueError as e:
-            logger.error("Configuration error in CreateOrderView: %s", e)
+        except ValueError:
             return Response(
                 {'error': 'Payment gateway credentials are not configured.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        except razorpay.errors.RazorpayError as e:
-            logger.error("Razorpay order creation API error: %s", e)
+        except (razorpay.errors.BadRequestError, razorpay.errors.ServerError) as e:
+            err_msg = str(e).lower()
+            if any(k in err_msg for k in ['auth', 'unauthorized', 'credential', 'key']):
+                logger.error("Razorpay auth error: %s", type(e).__name__)
+                return Response(
+                    {'error': 'Payment gateway authentication failed.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            logger.exception("create-order failed")
             return Response(
                 {'error': 'Payment gateway error. Please try again later.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         except Exception as e:
-            logger.exception("Unexpected error creating Razorpay order: %s", e)
+            err_msg = str(e).lower()
+            if any(k in err_msg for k in ['auth', 'unauthorized', 'credential', 'key']):
+                logger.error("Razorpay auth error: %s", type(e).__name__)
+                return Response(
+                    {'error': 'Payment gateway authentication failed.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            logger.exception("create-order failed")
             return Response(
                 {'error': 'Failed to initiate payment. Please try again later.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -150,16 +141,17 @@ class CreateOrderView(APIView):
             user=request.user,
             course=course,
             amount_paise=amount_paise,
-            currency=currency,
+            currency='INR',
             razorpay_order_id=order['id'],
             status=Payment.Status.CREATED,
         )
 
+        key_id, _ = get_razorpay_keys()
         return Response({
             'order_id': order['id'],
             'amount': amount_paise,
-            'currency': currency,
-            'key_id': getattr(settings, 'RAZORPAY_KEY_ID', ''),
+            'currency': 'INR',
+            'key_id': key_id,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -195,8 +187,9 @@ class VerifyPaymentView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '').strip()
+        _, key_secret = get_razorpay_keys()
         if not key_secret:
+            logger.error("Razorpay keys missing")
             return Response(
                 {'error': 'Payment gateway credentials are not configured.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -281,9 +274,10 @@ class WebhookView(APIView):
         if not signature:
             return Response({'error': 'Missing X-Razorpay-Signature header.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        webhook_secret = getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', '').strip()
+        raw_secret = getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', '')
+        webhook_secret = str(raw_secret).strip().strip("'\"") if raw_secret else ""
         if not webhook_secret:
-            logger.error("RAZORPAY_WEBHOOK_SECRET is not configured.")
+            logger.error("Razorpay keys missing")
             return Response({'error': 'Webhook secret unconfigured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         raw_body = request.body.decode('utf-8') if isinstance(request.body, bytes) else str(request.body)

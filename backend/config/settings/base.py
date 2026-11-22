@@ -183,6 +183,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'apps.accounts.authentication.ClerkJWTAuthentication',
         'apps.accounts.authentication.Session401Authentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -374,4 +375,14 @@ TEXTBEE_DEVICE_ID = config('TEXTBEE_DEVICE_ID', default='')
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 RAZORPAY_WEBHOOK_SECRET = config('RAZORPAY_WEBHOOK_SECRET', default='')
+
+# Clerk Authentication (Student Portal)
+CLERK_SECRET_KEY = config('CLERK_SECRET_KEY', default='').strip()
+CLERK_WEBHOOK_SECRET = config('CLERK_WEBHOOK_SECRET', default='').strip()
+CLERK_JWKS_URL = config('CLERK_JWKS_URL', default='https://clerk.adepteduverse.com/.well-known/jwks.json').strip()
+CLERK_ISSUER = config('CLERK_ISSUER', default='https://clerk.adepteduverse.com').strip()
+CLERK_AUTHORIZED_PARTIES = [
+    origin.strip() for origin in config('CLERK_AUTHORIZED_PARTIES', default='http://localhost:3000,http://127.0.0.1:3000,https://adepteduverse.com,https://app.adepteduverse.com').split(',') if origin.strip()
+]
+
 

@@ -16,7 +16,6 @@ import {
   User,
   Settings,
   ChevronRight,
-  CreditCard,
 } from 'lucide-react';
 
 export const navItems = [
@@ -25,9 +24,8 @@ export const navItems = [
   { label: 'Practice', href: '/practice', icon: Edit3 },
   { label: 'Schedule', href: '/schedule', icon: CalendarDays },
   { label: 'Courses', href: '/courses', icon: GraduationCap },
-  { label: 'Analysis', href: '/progress', icon: BarChart3 },
+  { label: 'Analysis', href: '/analysis', icon: BarChart3 },
   { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare },
-  { label: 'Pay ₹1 Test', href: '/payment-test', icon: CreditCard },
   { label: 'Profile', href: '/profile', icon: User },
 ];
 

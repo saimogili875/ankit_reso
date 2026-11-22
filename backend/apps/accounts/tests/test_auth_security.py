@@ -94,34 +94,6 @@ class AuthSecurityTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Invalid credentials", str(response.data['errors']))
 
-    def test_login_with_phone_number(self):
-        url = reverse('login')
-        response = self.client.post(url, {
-            'identifier': '9876543210',
-            'password': 'Password123!',
-            'portal': 'student'
-        })
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['user']['email'], 'student@example.com')
-
-    def test_ambiguous_phone_number_rejected(self):
-        # Create second user with same phone number
-        User.objects.create_user(
-            username='student2',
-            email='student2@example.com',
-            password='Password123!',
-            role=User.Role.STUDENT,
-            phone_number='9876543210'
-        )
-        url = reverse('login')
-        response = self.client.post(url, {
-            'identifier': '9876543210',
-            'password': 'Password123!',
-            'portal': 'student'
-        })
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Multiple accounts", str(response.data['errors']))
-
     def test_csrf_endpoint(self):
         url = reverse('csrf')
         response = self.client.get(url)

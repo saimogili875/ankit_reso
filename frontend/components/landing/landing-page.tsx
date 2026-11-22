@@ -95,7 +95,7 @@ export const LandingPage: React.FC = () => {
             </ul>
 
             <div className="nav-actions">
-              <Link href="/login" className="login-link" title="Login" aria-label="Login">
+              <Link href="/sign-in" className="login-link" title="Login" aria-label="Login">
                 <svg
                   width="16"
                   height="16"
@@ -112,17 +112,12 @@ export const LandingPage: React.FC = () => {
                 </svg>
                 Login
               </Link>
-              <a
+              <Link
+                href="/sign-up"
                 className="landing-btn btn-primary btn-sm"
-                href="https://www.youtube.com/@adepteduverse"
-                target="_blank"
-                rel="noopener noreferrer"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
-                </svg>
-                Free Demo Class
-              </a>
+                Create account
+              </Link>
             </div>
 
             <button
@@ -157,8 +152,11 @@ export const LandingPage: React.FC = () => {
           <a href="#faq" className="mobile-link" onClick={closeMobileMenu}>
             Frequently Asked Questions
           </a>
-          <Link href="/login" className="mobile-link" onClick={closeMobileMenu}>
+          <Link href="/sign-in" className="mobile-link" onClick={closeMobileMenu}>
             Login
+          </Link>
+          <Link href="/sign-up" className="mobile-link" onClick={closeMobileMenu}>
+            Create account
           </Link>
           <a
             href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Adept%20Eduverse%20classes"
@@ -830,7 +828,7 @@ export const LandingPage: React.FC = () => {
               >
                 Enroll via WhatsApp (+91 93825 57693)
               </a>
-              <Link href="/login" className="landing-btn btn-glass">
+              <Link href="/sign-in" className="landing-btn btn-glass">
                 Student Portal Login
               </Link>
               <a
@@ -929,10 +927,10 @@ export const LandingPage: React.FC = () => {
               <h4>Direct Access</h4>
               <ul className="footer-links">
                 <li>
-                  <Link href="/login">Student Portal Login</Link>
+                  <Link href="/sign-in">Student Portal Login</Link>
                 </li>
                 <li>
-                  <Link href="/register">Student Registration</Link>
+                  <Link href="/sign-up">Student Registration</Link>
                 </li>
                 <li>
                   <a href="https://wa.me/919382557693" target="_blank" rel="noopener noreferrer">
@@ -974,7 +972,7 @@ export const LandingPage: React.FC = () => {
         >
           WhatsApp Desk
         </a>
-        <Link href="/login" className="landing-btn btn-primary">
+        <Link href="/sign-in" className="landing-btn btn-primary">
           Login
         </Link>
       </div>

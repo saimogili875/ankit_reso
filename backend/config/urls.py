@@ -8,7 +8,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from apps.core.views import health_check, healthz, health_deep
-from apps.accounts.views import CSRFTokenView
+from apps.accounts.views import CSRFTokenView, StudentOnboardingView
 from apps.content.views import AnnouncementListView, StudentDoubtListView
 from apps.content.schedule_views import (
     ScheduleListView,
@@ -61,6 +61,8 @@ urlpatterns = [
     path('api/notifications/', NotificationListView.as_view(), name='notifications-list'),
     path('api/notifications/mark-all-read/', NotificationMarkReadView.as_view(), {'pk': 'all'}, name='notifications-mark-all-read'),
     path('api/notifications/<str:pk>/read/', NotificationMarkReadView.as_view(), name='notifications-mark-read'),
+    path('api/students/onboarding/', StudentOnboardingView.as_view(), name='student-onboarding'),
+    path('api/students/onboarding', StudentOnboardingView.as_view(), name='student-onboarding-noslash'),
     path('api/announcements/', AnnouncementListView.as_view(), name='announcements'),
     path('api/doubts/', StudentDoubtListView.as_view(), name='doubts'),
     path('api/doubts/my/', StudentDoubtListView.as_view(), name='doubts-my'),

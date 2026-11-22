@@ -1,9 +1,20 @@
 # Environment files
 .env
+.env*
+*.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+e2e/.env*
+e2e/clerk_audit_results.json
+e2e/mobile_audit_results.json
+e2e/screenshots/
+e2e/mobile-screenshots/
+e2e/extracted_design.html
+e2e/design_*
+Student home - mobile design.html
+*.html.bak
 
 # Python
 __pycache__/

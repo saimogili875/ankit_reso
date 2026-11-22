@@ -432,12 +432,42 @@ export function HlsVideoPlayer({
 
   const toggleFullscreen = () => {
     const container = containerRef.current;
+    const video = videoRef.current;
     if (!container) return;
 
     if (!document.fullscreenElement) {
-      container.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
+      if (container.requestFullscreen) {
+        container.requestFullscreen().then(() => {
+          setIsFullscreen(true);
+          if (typeof screen !== 'undefined' && screen.orientation && 'lock' in screen.orientation) {
+            type ScreenOrientationWithLock = ScreenOrientation & {
+              lock: (orientation: string) => Promise<void>;
+            };
+            const orientationWithLock = screen.orientation as unknown as ScreenOrientationWithLock;
+            orientationWithLock.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {
+          type VideoWithWebkit = HTMLVideoElement & {
+            webkitEnterFullscreen?: () => void;
+          };
+          const videoWebkit = video as unknown as VideoWithWebkit;
+          if (videoWebkit?.webkitEnterFullscreen) {
+            videoWebkit.webkitEnterFullscreen();
+          }
+        });
+      } else if (video) {
+        type VideoWithWebkit = HTMLVideoElement & {
+          webkitEnterFullscreen?: () => void;
+        };
+        const videoWebkit = video as unknown as VideoWithWebkit;
+        if (videoWebkit?.webkitEnterFullscreen) {
+          videoWebkit.webkitEnterFullscreen();
+        }
+      }
     } else {
-      document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      }
     }
   };
 
@@ -516,16 +546,24 @@ export function HlsVideoPlayer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [volume, isMuted, isPlaying, toggleMute]);
 
-  // 10. Auto-hide controls
+  // 10. Auto-hide controls & Touch toggle
   const handleMouseMove = () => {
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
       if (isPlaying) setShowControls(false);
-    }, 3000);
+    }, 3500);
   };
 
-  // 11. Seekbar Progress & Thumbnail Hover calculation
+  const handleTouchContainer = () => {
+    setShowControls((prev) => !prev);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) setShowControls(false);
+    }, 3500);
+  };
+
+  // 11. Seekbar Progress & Thumbnail Hover calculation (with Touch Scrubbing)
   const handleSeekMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const bar = progressBarRef.current;
     if (!bar || !duration) return;
@@ -543,6 +581,18 @@ export function HlsVideoPlayer({
     const rect = bar.getBoundingClientRect();
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     video.currentTime = pos * duration;
+    reportProgress();
+  };
+
+  const handleTouchSeek = (e: React.TouchEvent<HTMLDivElement>) => {
+    const bar = progressBarRef.current;
+    const video = videoRef.current;
+    if (!bar || !video || !duration || !e.touches[0]) return;
+    const rect = bar.getBoundingClientRect();
+    const touch = e.touches[0];
+    const pos = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+    video.currentTime = pos * duration;
+    setCurrentTime(pos * duration);
     reportProgress();
   };
 
@@ -582,6 +632,7 @@ export function HlsVideoPlayer({
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
+      onTouchStart={handleTouchContainer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
       className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl select-none group font-sans"
     >
@@ -642,7 +693,9 @@ export function HlsVideoPlayer({
           onMouseMove={handleSeekMouseMove}
           onMouseLeave={() => setHoverTime(null)}
           onClick={handleSeekClick}
-          className="relative w-full h-2 hover:h-3 bg-slate-700/60 rounded-full cursor-pointer mb-3 transition-all"
+          onTouchStart={handleTouchSeek}
+          onTouchMove={handleTouchSeek}
+          className="relative w-full h-3 bg-slate-700/60 rounded-full cursor-pointer mb-3 transition-all py-1 -my-1"
         >
           {/* Buffered Progress */}
           <div
@@ -678,12 +731,13 @@ export function HlsVideoPlayer({
         {/* Controls Row */}
         <div className="flex items-center justify-between text-white text-xs font-semibold">
           {/* Left: Play/Pause, Skips, Time */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={togglePlay}
-              className="p-1.5 hover:text-blue-400 transition-colors"
+              className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl hover:text-blue-400 hover:bg-white/10 transition-colors"
               title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current" />}
             </button>
@@ -691,8 +745,9 @@ export function HlsVideoPlayer({
             <button
               type="button"
               onClick={() => handleSkip(-10)}
-              className="p-1.5 hover:text-blue-400 transition-colors text-slate-300"
+              className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl hover:text-blue-400 hover:bg-white/10 transition-colors text-slate-300"
               title="Skip back 10s (J)"
+              aria-label="Skip back 10s"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -700,15 +755,16 @@ export function HlsVideoPlayer({
             <button
               type="button"
               onClick={() => handleSkip(10)}
-              className="p-1.5 hover:text-blue-400 transition-colors text-slate-300"
+              className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl hover:text-blue-400 hover:bg-white/10 transition-colors text-slate-300"
               title="Skip forward 10s (L)"
+              aria-label="Skip forward 10s"
             >
               <RotateCw className="w-4 h-4" />
             </button>
 
             {/* Volume control */}
-            <div className="flex items-center gap-1.5 group/vol">
-              <button type="button" onClick={toggleMute} className="p-1 hover:text-blue-400">
+            <div className="hidden sm:flex items-center gap-1.5 group/vol">
+              <button type="button" onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'} className="w-10 h-10 flex items-center justify-center rounded-xl hover:text-blue-400">
                 {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4" />}
               </button>
               <input
@@ -729,7 +785,7 @@ export function HlsVideoPlayer({
           </div>
 
           {/* Right: Quality, Speed, Fullscreen */}
-          <div className="flex items-center gap-2 relative">
+          <div className="flex items-center gap-1 sm:gap-2 relative">
             {/* Speed Selector */}
             <div className="relative">
               <button
@@ -738,19 +794,20 @@ export function HlsVideoPlayer({
                   setIsSpeedMenuOpen(!isSpeedMenuOpen);
                   setIsQualityMenuOpen(false);
                 }}
-                className="px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-[11px] font-bold text-slate-200 transition-colors"
+                className="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors flex items-center justify-center"
+                aria-label="Playback speed"
               >
                 {playbackSpeed}x
               </button>
 
               {isSpeedMenuOpen && (
-                <div className="absolute bottom-9 right-0 w-28 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-30 space-y-0.5">
+                <div className="absolute bottom-11 right-0 w-28 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-30 space-y-0.5">
                   {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((sp) => (
                     <button
                       key={sp}
                       type="button"
                       onClick={() => changeSpeed(sp)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold transition-colors min-h-[36px] ${
                         playbackSpeed === sp ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
                       }`}
                     >
@@ -771,7 +828,8 @@ export function HlsVideoPlayer({
                     setIsQualityMenuOpen(!isQualityMenuOpen);
                     setIsSpeedMenuOpen(false);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-[11px] font-bold text-slate-200 transition-colors"
+                  className="min-h-[40px] flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors"
+                  aria-label="Video quality"
                 >
                   <Settings className="w-3.5 h-3.5 text-slate-400" />
                   <span>
@@ -782,13 +840,13 @@ export function HlsVideoPlayer({
                 </button>
 
                 {isQualityMenuOpen && (
-                  <div className="absolute bottom-9 right-0 w-32 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-30 space-y-0.5">
+                  <div className="absolute bottom-11 right-0 w-36 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-30 space-y-0.5">
                     {qualityLevels.map((lvl) => (
                       <button
                         key={lvl.index}
                         type="button"
                         onClick={() => changeQuality(lvl.index)}
-                        className={`w-full flex items-center justify-between px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold transition-colors min-h-[36px] ${
                           selectedQuality === lvl.index ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
                         }`}
                       >
@@ -805,10 +863,11 @@ export function HlsVideoPlayer({
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="p-1.5 hover:text-blue-400 transition-colors text-slate-300"
+              className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl hover:text-blue-400 hover:bg-white/10 transition-colors text-slate-300"
               title="Fullscreen (F)"
+              aria-label="Fullscreen"
             >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
         </div>

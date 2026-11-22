@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { apiClient, clearAuthCookies } from '@/lib/api-client';
 
 export interface StudentProfileData {
@@ -45,6 +46,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const isFetchingRef = useRef(false);
@@ -85,6 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMountedRef.current = false;
     };
   }, [fetchUser]);
+
+  useEffect(() => {
+    if (clerkLoaded && clerkUser) {
+      fetchUser();
+    }
+  }, [fetchUser, clerkLoaded, clerkUser?.id]);
 
   const logout = useCallback(async () => {
     await apiClient.logout();

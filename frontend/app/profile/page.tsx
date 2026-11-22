@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { UserButton, useClerk } from '@clerk/nextjs';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ interface UserData {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { openUserProfile, signOut } = useClerk();
   const { user: authUser, isLoading: authLoading, refresh } = useAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,8 +101,9 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     try {
       await apiClient.logout();
+      await signOut().catch(() => null);
     } finally {
-      router.push('/login');
+      router.push('/sign-in');
     }
   };
 
@@ -175,15 +178,27 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSignOut}
-          className="border-slate-800 text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
-        >
-          <LogOut className="w-3.5 h-3.5 mr-1.5" />
-          Sign Out
-        </Button>
+        <div className="flex items-center gap-3 shrink-0">
+          <UserButton />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => openUserProfile()}
+            className="border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 text-xs font-semibold"
+          >
+            Manage Account
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSignOut}
+            className="border-slate-800 text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5 mr-1.5" />
+            Sign Out
+          </Button>
+        </div>
       </Card>
 
       {/* Profile Form */}
