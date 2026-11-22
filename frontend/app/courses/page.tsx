@@ -21,6 +21,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { asList } from '@/lib/api-utils';
 import { EnrollmentModal } from '@/components/home/enrollment-modal';
+import { BookCatalogSection } from '@/components/books/BookCatalogSection';
 
 interface CourseData {
   id: string;
@@ -43,7 +44,7 @@ interface CourseData {
   subjects?: Array<{ id: number; name: string }>;
 }
 
-type FilterChip = 'all' | 'enrolled' | 'free' | 'paid';
+type FilterChip = 'all' | 'books' | 'enrolled' | 'free' | 'paid';
 
 export default function CoursesCatalogPage() {
   const [courses, setCourses] = useState<CourseData[]>([]);
@@ -106,7 +107,8 @@ export default function CoursesCatalogPage() {
       {/* Filter Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
-          { key: 'all', label: 'All Courses' },
+          { key: 'all', label: 'All Programs' },
+          { key: 'books', label: '📚 Books & Question Banks' },
           { key: 'enrolled', label: 'My Courses' },
           { key: 'free', label: 'Free Batches' },
           { key: 'paid', label: 'Paid Programs' },
@@ -144,33 +146,50 @@ export default function CoursesCatalogPage() {
         </div>
       )}
 
-      {isLoading ? (
-        <div className="p-16 flex flex-col items-center justify-center text-slate-400 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#2B2FB8]" />
-          <p className="text-sm">Loading course programs...</p>
-        </div>
-      ) : filteredCourses.length === 0 ? (
-        <Card className="p-10 text-center bg-white dark:bg-slate-900 border-[#E3E7EE] dark:border-slate-800 space-y-3">
-          <BookOpen className="w-12 h-12 text-slate-400 mx-auto" />
-          <h3 className="font-heading text-base font-bold text-[#101828] dark:text-slate-200">
-            {activeFilter === 'enrolled' ? 'You have no enrolled courses yet' : 'No Courses Found'}
-          </h3>
-          <p className="text-xs text-[#5B6475] dark:text-slate-400 max-w-sm mx-auto">
-            {activeFilter === 'enrolled'
-              ? 'Select any course below to begin learning or purchase a batch.'
-              : 'Faculty and administrators will publish upcoming JEE batches here.'}
-          </p>
-          {activeFilter !== 'all' && (
-            <button
-              onClick={() => setActiveFilter('all')}
-              className="text-xs font-bold text-[#2B2FB8] dark:text-blue-400 underline pt-2"
-            >
-              View all courses
-            </button>
-          )}
-        </Card>
+      {activeFilter === 'books' ? (
+        <BookCatalogSection />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+        <>
+          {activeFilter === 'all' && <BookCatalogSection />}
+
+          {activeFilter === 'all' && (
+            <div className="pt-6 pb-2 border-b border-[#E3E7EE] dark:border-slate-800">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#101828] dark:text-white tracking-tight">
+                Academic Video Batches & Programs
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5B6475] dark:text-slate-400 mt-1">
+                Full-year live immersion & recorded lecture programs for JEE preparation.
+              </p>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="p-16 flex flex-col items-center justify-center text-slate-400 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[#2B2FB8]" />
+              <p className="text-sm">Loading course programs...</p>
+            </div>
+          ) : filteredCourses.length === 0 ? (
+            <Card className="p-10 text-center bg-white dark:bg-slate-900 border-[#E3E7EE] dark:border-slate-800 space-y-3">
+              <BookOpen className="w-12 h-12 text-slate-400 mx-auto" />
+              <h3 className="font-heading text-base font-bold text-[#101828] dark:text-slate-200">
+                {activeFilter === 'enrolled' ? 'You have no enrolled courses yet' : 'No Courses Found'}
+              </h3>
+              <p className="text-xs text-[#5B6475] dark:text-slate-400 max-w-sm mx-auto">
+                {activeFilter === 'enrolled'
+                  ? 'Select any course below to begin learning or purchase a batch.'
+                  : 'Faculty and administrators will publish upcoming JEE batches here.'}
+              </p>
+              {activeFilter !== 'all' && (
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className="text-xs font-bold text-[#2B2FB8] dark:text-blue-400 underline pt-2"
+                >
+                  View all courses
+                </button>
+              )}
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {filteredCourses.map((course) => {
             const priceNum = Number(course.price) || 0;
             const originalPriceNum = Number(course.original_price) || 0;
@@ -301,6 +320,8 @@ export default function CoursesCatalogPage() {
           })}
         </div>
       )}
+    </>
+  )}
 
       {/* Enrollment Modal */}
       {enrollModalTarget && (
