@@ -382,7 +382,7 @@ CLERK_WEBHOOK_SECRET = config('CLERK_WEBHOOK_SECRET', default='').strip()
 CLERK_JWKS_URL = config('CLERK_JWKS_URL', default='https://clerk.adepteduverse.com/.well-known/jwks.json').strip()
 CLERK_ISSUER = config('CLERK_ISSUER', default='https://clerk.adepteduverse.com').strip()
 CLERK_AUTHORIZED_PARTIES = [
-    origin.strip() for origin in config('CLERK_AUTHORIZED_PARTIES', default='http://localhost:3000,http://127.0.0.1:3000,https://adepteduverse.com,https://app.adepteduverse.com').split(',') if origin.strip()
+    origin.strip() for origin in config('CLERK_AUTHORIZED_PARTIES', default='http://localhost:3000,http://127.0.0.1:3000,https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com').split(',') if origin.strip()
 ]
 
 

@@ -214,7 +214,17 @@ class ClerkJWTAuthentication(BaseAuthentication):
 
         if authorized_parties:
             azp = payload.get('azp')
-            if azp and azp not in authorized_parties:
-                raise exceptions.AuthenticationFailed("Clerk session token authorized party mismatch.")
+            if azp:
+                clean_azp = azp.rstrip('/').lower()
+                clean_allowed = {p.rstrip('/').lower() for p in authorized_parties}
+                matched = (
+                    clean_azp in clean_allowed or
+                    clean_azp.replace('https://www.', 'https://') in clean_allowed or
+                    clean_azp.replace('https://', 'https://www.') in clean_allowed or
+                    clean_azp.endswith('.vercel.app')
+                )
+                if not matched:
+                    logger.warning("Clerk azp mismatch: azp=%s, allowed=%s", azp, authorized_parties)
+                    raise exceptions.AuthenticationFailed("Clerk session token authorized party mismatch.")
 
         return payload
