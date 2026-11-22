@@ -103,5 +103,103 @@ class StudentProfile(TimeStampedModel):
     avatar_url = models.URLField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
 
+    # Step 1 – Student details
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=30, blank=True, default='')
+    academic_session = models.CharField(max_length=20, default='2026-27', blank=True)
+    student_phone = models.CharField(max_length=20, blank=True, default='')
+
+    # Step 2 – School and location
+    school_name = models.CharField(max_length=255, blank=True, default='')
+    board = models.CharField(max_length=50, blank=True, default='')
+    state_board_name = models.CharField(max_length=100, blank=True, default='')
+    medium = models.CharField(max_length=50, default='English', blank=True)
+    pincode = models.CharField(max_length=10, blank=True, default='')
+
+    # Step 3 – Parent details and consent
+    parent_name = models.CharField(max_length=150, blank=True, default='')
+    parent_relationship = models.CharField(max_length=50, blank=True, default='')
+    parent_phone = models.CharField(max_length=20, blank=True, default='')
+    parent_phone_on_whatsapp = models.BooleanField(default=True)
+    parent_email = models.EmailField(blank=True, default='')
+    has_emergency_contact = models.BooleanField(default=False)
+    emergency_contact_name = models.CharField(max_length=150, blank=True, default='')
+    emergency_contact_relationship = models.CharField(max_length=50, blank=True, default='')
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, default='')
+    communication_language = models.CharField(max_length=50, default='English', blank=True)
+    consent_email = models.BooleanField(default=False)
+    consent_sms = models.BooleanField(default=False)
+    consent_whatsapp = models.BooleanField(default=False)
+
+    # Step 4 – Academic details (skippable)
+    target_exams = models.JSONField(default=list, blank=True)
+    subjects_needed = models.JSONField(default=list, blank=True)
+    last_exam_percentage = models.CharField(max_length=50, blank=True, default='')
+    current_coaching = models.CharField(max_length=50, blank=True, default='None')
+    preferred_batch_mode = models.CharField(max_length=50, blank=True, default='Live online')
+    goal_this_year = models.TextField(blank=True, default='')
+    hear_about_us = models.CharField(max_length=50, blank=True, default='')
+    profile_photo = models.TextField(blank=True, default='')
+    profile_completeness = models.IntegerField(default=75)
+
+    class Meta:
+        db_table = 'student_profiles'
+
     def __str__(self):
         return f"Student Profile: {self.user.email}"
+
+
+class ConsentRecord(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consent_records')
+    clerk_id = models.CharField(max_length=255, blank=True, default='')
+    policy_version = models.CharField(max_length=50, default='v1.0')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'consent_records'
+
+
+class ProfileChangeRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='change_requests')
+    field_name = models.CharField(max_length=50)  # 'student_name', 'date_of_birth', 'academic_class'
+    old_value = models.TextField(blank=True, default='')
+    new_value = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    review_note = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_change_requests')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'profile_change_requests'
+
+
+class DeletionRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        COMPLETED = 'completed', 'Completed'
+        REJECTED = 'rejected', 'Rejected'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='deletion_requests')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reason = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'deletion_requests'
+
+
+class ProfileAuditLog(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audit_logs')
+    action = models.CharField(max_length=100)
+    changed_by = models.CharField(max_length=255, blank=True, default='')
+    changes = models.JSONField(default=dict, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'profile_audit_logs'
+
