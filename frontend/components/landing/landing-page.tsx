@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/hooks/use-auth';
 import { GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 
@@ -45,7 +46,7 @@ export const LandingPage: React.FC = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { logout } = useAuth();
 
   const userRole = ((user?.publicMetadata?.role as string) || 'student').toLowerCase();
   const dashboardHref = userRole === 'admin' || userRole === 'teacher' ? '/admin' : '/';
@@ -119,7 +120,7 @@ export const LandingPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => signOut({ redirectUrl: '/sign-in' })}
+                      onClick={() => logout()}
                       className="login-link text-xs flex items-center gap-1 text-slate-400 hover:text-white"
                       title="Sign out"
                     >
@@ -202,7 +203,7 @@ export const LandingPage: React.FC = () => {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => signOut({ redirectUrl: '/sign-in' })}
+                  onClick={() => logout()}
                   className="text-xs text-rose-400 font-semibold ml-auto"
                 >
                   Sign out

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { apiClient, clearAuthCookies } from '@/lib/api-client';
 
 export interface StudentProfileData {
@@ -88,16 +88,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchUser]);
 
+  const { signOut } = useClerk();
+
   useEffect(() => {
-    if (clerkLoaded && clerkUser) {
-      fetchUser();
+    if (clerkLoaded) {
+      if (!clerkUser) {
+        setUser(null);
+        clearAuthCookies();
+        setIsLoading(false);
+      } else {
+        fetchUser();
+      }
     }
-  }, [fetchUser, clerkLoaded, clerkUser?.id]);
+  }, [fetchUser, clerkLoaded, clerkUser]);
 
   const logout = useCallback(async () => {
-    await apiClient.logout();
-    setUser(null);
-  }, []);
+    try {
+      clearAuthCookies();
+      await apiClient.logout();
+    } catch {
+      // Ignored
+    } finally {
+      setUser(null);
+      await signOut({ redirectUrl: '/sign-in' });
+    }
+  }, [signOut]);
 
   const value: AuthContextValue = {
     user,

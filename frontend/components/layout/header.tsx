@@ -35,7 +35,7 @@ interface NotificationResponse {
 
 export const Header: React.FC = () => {
   const router = useRouter();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -90,11 +90,8 @@ export const Header: React.FC = () => {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await apiClient.logout();
-    } finally {
-      router.push('/sign-in');
-    }
+    setIsProfileMenuOpen(false);
+    await logout();
   };
 
   const handleMarkAllRead = async () => {

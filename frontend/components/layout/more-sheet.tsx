@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   X,
   CalendarDays,
@@ -16,7 +15,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { apiClient } from '@/lib/api-client';
 
 interface MoreSheetProps {
   isOpen: boolean;
@@ -24,18 +22,13 @@ interface MoreSheetProps {
 }
 
 export const MoreSheet: React.FC<MoreSheetProps> = ({ isOpen, onClose }) => {
-  const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   if (!isOpen) return null;
 
   const handleLogout = async () => {
     onClose();
-    try {
-      await apiClient.logout();
-    } finally {
-      router.push('/sign-in');
-    }
+    await logout();
   };
 
   const menuItems = [
