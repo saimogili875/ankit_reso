@@ -16,7 +16,7 @@ from apps.academics.models import Lecture
 from apps.accounts.permissions import IsAdminRole
 from .models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt, VideoPlaybackStat,
-    LandingBanner, LandingBannerSettings
+    LandingBanner, LandingBannerSettings, StudentResult
 )
 from .serializers import (
     VideoSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     DoubtSerializer,
     LandingBannerSerializer,
     LandingBannerSettingsSerializer,
+    StudentResultSerializer,
 )
 from .chatbot_service import generate_chatbot_response
 
@@ -512,4 +513,21 @@ class ChatbotView(APIView):
 
         reply = generate_chatbot_response(message, sanitized_history)
         return Response({'reply': reply}, status=status.HTTP_200_OK)
+
+
+class StudentResultListView(generics.ListAPIView):
+    """
+    Public API returning verified student achievements.
+    Strictly filters for is_published=True AND consent_flag=True.
+    No minor's result is served without parental/student consent on file.
+    """
+    serializer_class = StudentResultSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return StudentResult.objects.filter(
+            is_published=True,
+            consent_flag=True
+        ).order_by('display_order', '-year', 'created_at')
+
 

@@ -294,3 +294,32 @@ class LandingBannerSettings(TimeStampedModel):
         return f"Landing Banner Settings (Display: {self.display_count})"
 
 
+class StudentResult(TimeStampedModel):
+    """
+    Verified exam rank or academic achievement with explicit student/parental consent on file.
+    Only entries with consent_flag=True and is_published=True are shown publicly.
+    No student photo or name may be shown without consent_flag=True (students are minors).
+    """
+    name = models.CharField(max_length=150)
+    exam = models.CharField(max_length=100, help_text="e.g. JEE Advanced, JEE Main, CBSE Class X")
+    rank = models.CharField(max_length=50, help_text="e.g. AIR 125, 99.8%ile, 98.4%")
+    year = models.IntegerField(default=2024)
+    photo = models.CharField(max_length=1000, blank=True, help_text="Photo URL (R2 or WebP)")
+    consent_flag = models.BooleanField(
+        default=False,
+        help_text="Explicit written/parental consent on file to display student name/photo/rank (mandatory for minors)"
+    )
+    is_published = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    notes = models.TextField(blank=True, help_text="Internal verification notes / consent document reference")
+
+    class Meta:
+        ordering = ['display_order', '-year', 'created_at']
+        verbose_name = 'Student Result'
+        verbose_name_plural = 'Student Results'
+
+    def __str__(self):
+        return f"{self.name} - {self.exam} ({self.rank}, {self.year}) [Consent: {self.consent_flag}]"
+
+
+

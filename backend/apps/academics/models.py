@@ -202,6 +202,7 @@ class Batch(TimeStampedModel):
     image = models.CharField(max_length=1000, blank=True, help_text="Cloudflare R2 image URL or static image path")
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    has_live_classes = models.BooleanField(default=False, help_text="Set to True only if batch conducts live classes")
     display_order = models.IntegerField(default=0)
     is_published = models.BooleanField(default=True, db_index=True)
 

@@ -82,7 +82,7 @@ class BatchPublicSerializer(serializers.ModelSerializer):
         model = Batch
         fields = [
             'id', 'name', 'slug', 'card_key', 'academic_class_name', 'academic_class_slug',
-            'tagline', 'description', 'image', 'price', 'original_price',
+            'tagline', 'description', 'image', 'price', 'original_price', 'has_live_classes',
             'display_order', 'is_published', 'items', 'features'
         ]
 

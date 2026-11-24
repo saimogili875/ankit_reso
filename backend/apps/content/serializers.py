@@ -3,8 +3,26 @@ from django.utils import timezone
 from .models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
     ScheduleEvent, Notification,
-    LandingBanner, LandingBannerSettings
+    LandingBanner, LandingBannerSettings, StudentResult
 )
+
+class StudentResultSerializer(serializers.ModelSerializer):
+    """
+    Public student/parent-facing serializer for verified achievements.
+    Excludes internal verification notes and raw consent flags.
+    """
+    class Meta:
+        model = StudentResult
+        fields = [
+            'id',
+            'name',
+            'exam',
+            'rank',
+            'year',
+            'photo',
+            'display_order',
+        ]
+        read_only_fields = fields
 
 class VideoSerializer(serializers.ModelSerializer):
     lecture_title = serializers.CharField(source='lecture.title', read_only=True)

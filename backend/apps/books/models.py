@@ -24,12 +24,31 @@ class BookProduct(TimeStampedModel):
     """
     Official study book, problem bank, or publication published by the institute.
     """
+    class BookType(models.TextChoices):
+        QUESTION_BANK = 'QUESTION_BANK', 'Question Bank'
+        PYQ = 'PYQ', 'Previous Years Questions (PYQ)'
+        TEXTBOOK = 'TEXTBOOK', 'Complete Textbook'
+        REASONING = 'REASONING', 'Mental Ability & Reasoning'
+        OTHER = 'OTHER', 'Study Material'
+
+    class ExamBoard(models.TextChoices):
+        CBSE = 'CBSE', 'CBSE'
+        ICSE = 'ICSE', 'ICSE'
+        JEE = 'JEE', 'JEE Main & Advanced'
+        OLYMPIAD = 'OLYMPIAD', 'Olympiad / NTSE'
+        ALL_BOARDS = 'ALL_BOARDS', 'All Boards'
+
     slug = models.SlugField(max_length=150, unique=True, db_index=True)
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=500, blank=True)
     description = models.TextField(blank=True)
     cover_image = models.CharField(max_length=1000, blank=True, help_text="Cover image URL (R2 or public WebP)")
     class_label = models.CharField(max_length=100, blank=True, default='Class 10th', help_text="e.g. Class 10th, JEE Foundation")
+    book_type = models.CharField(max_length=50, choices=BookType.choices, default=BookType.QUESTION_BANK)
+    exam_board = models.CharField(max_length=50, choices=ExamBoard.choices, default=ExamBoard.CBSE)
+    pages = models.PositiveIntegerField(default=0, help_text="Total printed page count")
+    has_solutions = models.BooleanField(default=True, help_text="Includes step-by-step verified solutions")
+    sample_images = models.JSONField(default=list, blank=True, help_text="List of sample page image URLs")
     digital_price = models.DecimalField(max_digits=10, decimal_places=2, default=299.00)
     hardcopy_price = models.DecimalField(max_digits=10, decimal_places=2, default=399.00)
     original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Original printed MRP / strikethrough price")

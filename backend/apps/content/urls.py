@@ -17,9 +17,11 @@ from .views import (
     StudentDoubtListView,
     LandingBannerListView,
     ChatbotView,
+    StudentResultListView,
 )
 
 urlpatterns = [
+    path('results/', StudentResultListView.as_view(), name='student-results'),
     path('landing-banners/', LandingBannerListView.as_view(), name='landing-banners'),
     path('chatbot/', ChatbotView.as_view(), name='chatbot'),
     path('hero-slides/', HeroSlideListView.as_view(), name='hero-slides'),
