@@ -780,19 +780,19 @@ export const LandingPage: React.FC = () => {
               <h4>Programs</h4>
               <ul className="footer-links">
                 <li>
-                  <a href="#batches">Class 11 &amp; 12 Live Batch</a>
+                  <a href="#batches">Class VI-X Foundation Batches</a>
+                </li>
+                <li>
+                  <a href="#batches">Class 11 &amp; 12 JEE + Board</a>
                 </li>
                 <li>
                   <a href="#batches">Dropper Immersion Batch</a>
                 </li>
                 <li>
-                  <a href="#batches">Self-Paced Recorded Vault</a>
+                  <Link href="/books">Official Book Store</Link>
                 </li>
                 <li>
-                  <a href="#pedagogy">JEE Advanced Problem Solving</a>
-                </li>
-                <li>
-                  <a href="#faq">Sunday All-India Mock Tests</a>
+                  <a href="#faq">Fee &amp; Payment Details</a>
                 </li>
               </ul>
             </div>
@@ -819,8 +819,26 @@ export const LandingPage: React.FC = () => {
                     Official YouTube Channel
                   </a>
                 </li>
+              </ul>
+            </div>
+
+            <div className="footer-col">
+              <h4>Legal &amp; Policies</h4>
+              <ul className="footer-links">
                 <li>
-                  <a href="#faq">Fee &amp; Payment Details</a>
+                  <Link href="/terms">Terms &amp; Conditions</Link>
+                </li>
+                <li>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </li>
+                <li>
+                  <Link href="/refund">Refund &amp; Cancellation</Link>
+                </li>
+                <li>
+                  <Link href="/shipping">Shipping &amp; Delivery</Link>
+                </li>
+                <li>
+                  <Link href="/contact">Contact &amp; Support</Link>
                 </li>
               </ul>
             </div>
@@ -829,9 +847,9 @@ export const LandingPage: React.FC = () => {
           <div className="footer-bottom">
             <p>&copy; {new Date().getFullYear()} Adept Eduverse. All rights reserved. Founded by Ankit Kumar (B.Tech, IIT Kharagpur).</p>
             <div className="trust-badges">
-              <span>✦ 100% Verified IIT Faculty</span>
-              <span>✦ AIR 125 Proven Results</span>
-              <span>✦ Secure Student Platform</span>
+              <span>✦ IIT Kharagpur Founder</span>
+              <span>✦ Complete Syllabus Coverage</span>
+              <span>✦ Dedicated WhatsApp Doubt Support</span>
             </div>
           </div>
         </div>
