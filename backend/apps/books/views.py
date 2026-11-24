@@ -3,7 +3,7 @@ import hmac
 import uuid
 import hashlib
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
 
 from django.conf import settings
@@ -37,6 +37,15 @@ from .services import (
     send_order_confirmation_email,
     send_admin_order_notification,
     send_shipping_update_email,
+    get_client_ip,
+    finalize_book_order,
+)
+from .throttles import (
+    BookOrderCreateIPMinThrottle,
+    BookOrderCreateIPHourThrottle,
+    BookOrderCreatePhoneThrottle,
+    BookOrderVerifyIPThrottle,
+    BookOrderDownloadIPThrottle,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,8 +104,14 @@ class BookOrderCreateView(APIView):
     POST /api/books/orders/
     Guest checkout endpoint: initiates purchase for a digital or physical book.
     Prices and GST are strictly computed on the server from the database.
+    Throttled: 5/min & 20/hour per IP, 3/hour per buyer_phone.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [
+        BookOrderCreateIPMinThrottle,
+        BookOrderCreateIPHourThrottle,
+        BookOrderCreatePhoneThrottle,
+    ]
 
     def post(self, request):
         serializer = BookOrderCreateSerializer(data=request.data)
@@ -112,7 +127,7 @@ class BookOrderCreateView(APIView):
         except BookProduct.DoesNotExist:
             return Response({'error': f"Book '{product_slug}' not found or unpublished."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Server-side pricing calculation
+        # Server-side pricing calculation strictly using Decimal (no float)
         if order_format == BookOrder.Format.HARDCOPY:
             base_amount = product.hardcopy_price
             if product.stock_hardcopy is not None and product.stock_hardcopy <= 0:
@@ -120,10 +135,11 @@ class BookOrderCreateView(APIView):
         else:
             base_amount = product.digital_price
 
-        gst_percent = product.gst_percent or Decimal('18.00')
-        gst_amount = round(base_amount * (gst_percent / Decimal('100.00')), 2)
-        total_amount = base_amount + gst_amount
-        total_amount_paise = int(round(float(total_amount) * 100))
+        base_amount = Decimal(str(base_amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        gst_percent = Decimal(str(product.gst_percent or '18.00'))
+        gst_amount = (base_amount * (gst_percent / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_amount = (base_amount + gst_amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_amount_paise = int((total_amount * Decimal('100')).to_integral_value())
 
         # Initialize Razorpay order
         try:
@@ -153,9 +169,8 @@ class BookOrderCreateView(APIView):
             logger.exception("Failed to create Razorpay order for book checkout: %s", exc)
             return Response({'error': 'Payment gateway error initiating order. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Client IP for audit
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        ip = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR')
+        # Client IP for audit using NUM_PROXIES
+        ip = get_client_ip(request)
 
         # Create BookOrder record
         book_order = BookOrder.objects.create(
@@ -199,10 +214,12 @@ class BookOrderCreateView(APIView):
 class BookOrderVerifyView(APIView):
     """
     POST /api/books/orders/verify/
-    Verifies Razorpay payment signature, marks order PAID idempotently,
+    Verifies Razorpay payment signature, marks order PAID idempotently via shared finalize_book_order,
     generates secure download tokens for digital books, and triggers email receipts.
+    Throttled: 20/min per IP.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [BookOrderVerifyIPThrottle]
 
     def post(self, request):
         data = request.data
@@ -220,24 +237,12 @@ class BookOrderVerifyView(APIView):
         if not order:
             return Response({'error': 'Book order not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Idempotency check: if order is already marked PAID, return existing details immediately
-        if order.status == BookOrder.Status.PAID:
-            return Response({
-                'success': True,
-                'message': 'Order already verified.',
-                'order_public_id': str(order.public_id),
-                'format': order.format,
-                'invoice_number': order.invoice_number,
-                'download_token': order.download_token if order.format == BookOrder.Format.DIGITAL else None,
-                'download_url': f"/api/books/orders/{order.public_id}/download/?token={order.download_token}" if order.format == BookOrder.Format.DIGITAL and order.download_token else None,
-            }, status=status.HTTP_200_OK)
-
         _, key_secret = get_razorpay_keys()
         if not key_secret:
             logger.error("RAZORPAY_KEY_SECRET missing during book order verify.")
             return Response({'error': 'Payment gateway credentials unconfigured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Verify HMAC signature
+        # 1. Verify HMAC signature FIRST (before already PAID shortcut)
         is_valid = False
         try:
             client = get_razorpay_client()
@@ -257,9 +262,27 @@ class BookOrderVerifyView(APIView):
                 is_valid = True
 
         if not is_valid:
-            order.status = BookOrder.Status.FAILED
-            order.save(update_fields=['status'])
+            # Do NOT set order.status = FAILED on a bad signature (just return 400 and log)
+            logger.warning("Invalid payment signature attempt for book order %s (status remains %s)", order.public_id, order.status)
             return Response({'error': 'Invalid payment signature.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check if already PAID (idempotent shortcut now safe because signature is verified)
+        if order.status == BookOrder.Status.PAID:
+            from django.core.cache import cache
+            raw_token = cache.get(f"book_raw_token_{order.id}")
+            download_url = None
+            if order.format == BookOrder.Format.DIGITAL and raw_token:
+                download_url = f"/api/books/orders/{order.public_id}/download/?token={raw_token}"
+
+            return Response({
+                'success': True,
+                'message': 'Order already verified.',
+                'order_public_id': str(order.public_id),
+                'format': order.format,
+                'invoice_number': order.invoice_number,
+                'download_token': raw_token if order.format == BookOrder.Format.DIGITAL else None,
+                'download_url': download_url,
+            }, status=status.HTTP_200_OK)
 
         # Optional: check payment status and amount with Razorpay API
         try:
@@ -274,54 +297,24 @@ class BookOrderVerifyView(APIView):
         except Exception as exc:
             logger.warning("Could not fetch payment from Razorpay API (proceeding with HMAC check): %s", exc)
 
-        # Atomic finalize
-        with transaction.atomic():
-            locked = BookOrder.objects.select_for_update().get(id=order.id)
-            if locked.status == BookOrder.Status.PAID:
-                # Race condition handled
-                return Response({
-                    'success': True,
-                    'order_public_id': str(locked.public_id),
-                    'format': locked.format,
-                    'invoice_number': locked.invoice_number,
-                }, status=status.HTTP_200_OK)
-
-            locked.status = BookOrder.Status.PAID
-            locked.razorpay_payment_id = razorpay_payment_id
-            locked.razorpay_signature = razorpay_signature
-            locked.paid_at = timezone.now()
-
-            # Invoice number: INV-BK-YYYYMMDD-XXXX
-            today_str = timezone.now().strftime('%Y%m%d')
-            locked.invoice_number = f"INV-BK-{today_str}-{locked.public_id.hex[:4].upper()}"
-
-            if locked.format == BookOrder.Format.DIGITAL:
-                locked.download_token = uuid.uuid4().hex + uuid.uuid4().hex  # 64-char secure token
-                locked.download_expires_at = timezone.now() + timedelta(days=7)
-                locked.shipping_status = BookOrder.ShippingStatus.NA
-            else:
-                locked.shipping_status = BookOrder.ShippingStatus.PENDING
-                if locked.product.stock_hardcopy is not None and locked.product.stock_hardcopy > 0:
-                    locked.product.stock_hardcopy -= 1
-                    locked.product.save(update_fields=['stock_hardcopy'])
-
-            locked.save()
-
-        # Send notifications asynchronously/safely
-        send_order_confirmation_email(locked)
-        send_admin_order_notification(locked)
+        # 3. Finalize order via shared finalize_book_order service
+        try:
+            order, raw_token = finalize_book_order(order, razorpay_payment_id, razorpay_signature)
+        except ValidationError as e:
+            logger.warning("Order %s verification failed: %s", order.public_id, e)
+            return Response({'error': str(e.detail if hasattr(e, 'detail') else e)}, status=status.HTTP_400_BAD_REQUEST)
 
         download_url = None
-        if locked.format == BookOrder.Format.DIGITAL:
-            download_url = f"/api/books/orders/{locked.public_id}/download/?token={locked.download_token}"
+        if order.format == BookOrder.Format.DIGITAL and raw_token:
+            download_url = f"/api/books/orders/{order.public_id}/download/?token={raw_token}"
 
         return Response({
             'success': True,
             'message': 'Book purchase verified successfully.',
-            'order_public_id': str(locked.public_id),
-            'format': locked.format,
-            'invoice_number': locked.invoice_number,
-            'download_token': locked.download_token if locked.format == BookOrder.Format.DIGITAL else None,
+            'order_public_id': str(order.public_id),
+            'format': order.format,
+            'invoice_number': order.invoice_number,
+            'download_token': raw_token if order.format == BookOrder.Format.DIGITAL else None,
             'download_url': download_url,
         }, status=status.HTTP_200_OK)
 
@@ -330,7 +323,7 @@ class BookWebhookView(APIView):
     """
     POST /api/books/webhook/
     Listens for Razorpay webhook events ('payment.captured' or 'order.paid').
-    Verifies raw body signature and idempotently marks order PAID.
+    Verifies raw body signature and idempotently marks order PAID via shared finalize_book_order.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -360,28 +353,11 @@ class BookWebhookView(APIView):
 
             if order_id:
                 order = BookOrder.objects.filter(razorpay_order_id=order_id).select_related('product').first()
-                if order and order.status != BookOrder.Status.PAID:
-                    with transaction.atomic():
-                        locked = BookOrder.objects.select_for_update().get(id=order.id)
-                        if locked.status != BookOrder.Status.PAID:
-                            locked.status = BookOrder.Status.PAID
-                            locked.razorpay_payment_id = payment_id or locked.razorpay_payment_id
-                            locked.paid_at = timezone.now()
-                            today_str = timezone.now().strftime('%Y%m%d')
-                            locked.invoice_number = f"INV-BK-{today_str}-{locked.public_id.hex[:4].upper()}"
-
-                            if locked.format == BookOrder.Format.DIGITAL:
-                                if not locked.download_token:
-                                    locked.download_token = uuid.uuid4().hex + uuid.uuid4().hex
-                                    locked.download_expires_at = timezone.now() + timedelta(days=7)
-                                locked.shipping_status = BookOrder.ShippingStatus.NA
-                            else:
-                                locked.shipping_status = BookOrder.ShippingStatus.PENDING
-
-                            locked.save()
-
-                    send_order_confirmation_email(locked)
-                    send_admin_order_notification(locked)
+                if order:
+                    try:
+                        finalize_book_order(order, payment_id)
+                    except Exception as e:
+                        logger.exception("Error finalizing book order %s from books webhook: %s", order.id, e)
 
         return Response({'status': 'ok'}, status=status.HTTP_200_OK)
 
@@ -389,11 +365,13 @@ class BookWebhookView(APIView):
 class BookOrderDownloadView(APIView):
     """
     GET /api/books/orders/<public_id>/download/?token=<download_token>
-    Verifies order is PAID, format is DIGITAL, token matches, expiry has not passed,
-    and download limit has not been exceeded.
+    Verifies order is PAID, format is DIGITAL, token matches SHA-256 hash in DB,
+    expiry has not passed, and download limit has not been exceeded.
     Returns 302 redirect to 10-minute presigned R2 URL, or JSON URL if requested.
+    Throttled: 30/min per IP.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [BookOrderDownloadIPThrottle]
 
     def get(self, request, public_id):
         token = request.query_params.get('token')
@@ -409,7 +387,9 @@ class BookOrderDownloadView(APIView):
         if not order:
             return Response({'error': 'Order not found, unpaid, or not a digital purchase.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not hmac.compare_digest(order.download_token or '', token):
+        # Hash incoming token with SHA-256 and compare with stored hash using constant-time comparison
+        incoming_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        if not hmac.compare_digest(order.download_token or '', incoming_hash):
             return Response({'error': 'Invalid download token.'}, status=status.HTTP_403_FORBIDDEN)
 
         if order.download_expires_at and timezone.now() > order.download_expires_at:
@@ -420,9 +400,9 @@ class BookOrderDownloadView(APIView):
                 'error': f'Maximum download limit ({order.max_downloads} downloads) exceeded for this purchase.'
             }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-        # Increment download count
-        order.download_count += 1
-        order.save(update_fields=['download_count'])
+        # Increment download count atomically with F()
+        BookOrder.objects.filter(id=order.id).update(download_count=models.F('download_count') + 1)
+        order.refresh_from_db(fields=['download_count'])
 
         # Generate temporary 10-minute presigned URL
         presigned_url = get_book_download_url(order.product.pdf_key, expiration_seconds=600)
@@ -615,12 +595,23 @@ class BookOrderAdminViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='export-csv')
     def export_csv(self, request):
-        """Exports filtered orders as a downloadable CSV spreadsheet."""
+        """
+        Exports filtered orders as a downloadable CSV spreadsheet.
+        Neutralizes formula injection by escaping any leading [=, +, -, @].
+        """
         qs = self.get_queryset()
 
-        response = HttpResponse(content_type='text/csv')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         filename = f"book_orders_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        def sanitize_cell(value):
+            if value is None:
+                return ''
+            s = str(value)
+            if s and s[0] in ('=', '+', '-', '@', '\t', '\r'):
+                return f"'{s}"
+            return s
 
         writer = csv.writer(response)
         writer.writerow([
@@ -649,27 +640,27 @@ class BookOrderAdminViewSet(viewsets.ModelViewSet):
 
         for o in qs:
             writer.writerow([
-                str(o.public_id),
-                o.invoice_number,
-                o.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                o.product.title,
-                o.format,
-                f"{o.total_amount_paise / 100:.2f}",
-                o.status,
-                o.buyer_name,
-                o.buyer_email,
-                o.buyer_phone,
-                o.shipping_address.replace('\n', ', '),
-                o.city,
-                o.state,
-                o.pincode,
-                o.shipping_status,
-                o.courier,
-                o.tracking_id,
-                o.razorpay_order_id,
-                o.razorpay_payment_id or '',
-                o.download_count,
-                o.admin_note,
+                sanitize_cell(str(o.public_id)),
+                sanitize_cell(o.invoice_number or ''),
+                sanitize_cell(o.created_at.strftime('%Y-%m-%d %H:%M:%S')),
+                sanitize_cell(o.product.title),
+                sanitize_cell(o.format),
+                sanitize_cell(f"{o.total_amount_paise / 100:.2f}"),
+                sanitize_cell(o.status),
+                sanitize_cell(o.buyer_name),
+                sanitize_cell(o.buyer_email),
+                sanitize_cell(o.buyer_phone),
+                sanitize_cell(o.shipping_address.replace('\n', ', ')),
+                sanitize_cell(o.city),
+                sanitize_cell(o.state),
+                sanitize_cell(o.pincode),
+                sanitize_cell(o.shipping_status),
+                sanitize_cell(o.courier),
+                sanitize_cell(o.tracking_id),
+                sanitize_cell(o.razorpay_order_id),
+                sanitize_cell(o.razorpay_payment_id or ''),
+                sanitize_cell(o.download_count),
+                sanitize_cell(o.admin_note),
             ])
 
         return response
