@@ -31,8 +31,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'AdeptEduverse — Premier JEE Main & Advanced Prep Platform',
-  description: 'A professional EdTech platform for JEE Main & JEE Advanced preparation with video lectures, PYQs, mock tests, and detailed performance analytics.',
+  title: 'Adept Eduverse — Class VI–XII & JEE Mathematics | Ankit Kumar (IIT Kharagpur)',
+  description: 'Official platform for Class VI–XII mathematics, board mastery, and JEE preparation founded by Ankit Kumar (B.Tech, IIT Kharagpur). Video lessons, official publications, and WhatsApp doubt support.',
   icons: {
     icon: '/images/logo-icon.png',
     apple: '/app/apple-icon.png',

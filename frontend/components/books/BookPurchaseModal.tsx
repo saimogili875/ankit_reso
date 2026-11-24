@@ -32,30 +32,26 @@ export function getBookCoverImage(book?: { slug?: string; title?: string; cover_
   const slug = (book.slug || '').toLowerCase();
   const title = (book.title || '').toLowerCase();
 
-  // If the cover is an Ankit Sir personal headshot or empty, map strictly to the real book cover
-  const isPersonalPhoto = !rawCover || rawCover.includes('ankit-sir');
+  // If a valid book cover exists and is not a personal headshot of Ankit Sir, check if it's a real book image
+  if (rawCover && rawCover.startsWith('/images/books/')) {
+    return rawCover;
+  }
 
-  if (slug.includes('pyq') || title.includes('previous years') || title.includes('pyq')) {
+  // Strict semantic resolution to official published book covers (never show author face in book cover slot)
+  if (slug.includes('pyq') || title.includes('previous years') || title.includes('pyq') || title.includes('solved')) {
     return '/images/books/cbse-10-pyq-mathematics.jpg';
   }
-  if (slug.includes('mental-ability') || title.includes('mental ability') || title.includes('logical reasoning')) {
+  if (slug.includes('mental-ability') || title.includes('mental ability') || title.includes('reasoning') || title.includes('logical')) {
     return '/images/books/cbse-10-mental-ability-reasoning.jpg';
   }
-  if (slug.includes('complete') || title.includes('complete syllabus') || title.includes('best school book')) {
+  if (slug.includes('complete') || title.includes('complete syllabus') || title.includes('best school book') || title.includes('textbook')) {
     return '/images/books/cbse-10-mathematics-complete.jpg';
   }
-  if (slug.includes('advanced-question-bank') || slug.includes('adv-qb') || title.includes('question bank') || title.includes('advanced level')) {
-    return '/images/books/cbse-10-advanced-question-bank.jpg';
-  }
-  if (slug.includes('adv-prob') || title.includes('advanced problem')) {
+  if (slug.includes('advanced') || slug.includes('adv-qb') || slug.includes('adv-prob') || title.includes('question bank') || title.includes('advanced level') || title.includes('problem book')) {
     return '/images/books/cbse-10-advanced-question-bank.jpg';
   }
 
-  if (isPersonalPhoto) {
-    return '/images/books/cbse-10-pyq-mathematics.jpg';
-  }
-
-  return rawCover;
+  return '/images/books/cbse-10-pyq-mathematics.jpg';
 }
 
 interface BookPurchaseModalProps {

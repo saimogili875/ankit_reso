@@ -5,10 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
-import { GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 import { BatchesSection } from './batches-section';
 import { BooksSection } from './books-section';
+import { StudentResultsSection } from './student-results-section';
 
 interface FAQItemData {
   question: string;
@@ -17,29 +18,29 @@ interface FAQItemData {
 
 const FAQ_ITEMS: FAQItemData[] = [
   {
-    question: 'What are the live class timings, and what if I miss a lecture?',
+    question: 'How do courses work and how can I access study materials?',
     answer:
-      'Live classes for Class 11 and 12 run Monday through Saturday from 6:30 PM to 8:30 PM, while the Droppers Immersion batch meets Monday through Saturday from 9:00 AM to 12:00 PM. If you miss any session due to school exams or personal emergencies, high-definition video recordings are processed and uploaded to your student portal within 2 hours, accessible 24/7 for the entire academic year.',
+      'All batches provide 24/7 self-paced video lecture access, downloadable chapter-wise notes, and step-by-step problem solutions. You can study on your own schedule across mobile, tablet, or desktop with no expiration during the academic session.',
   },
   {
-    question: 'Is this curriculum sufficient for both JEE Mains and JEE Advanced?',
+    question: 'Is this curriculum aligned with CBSE Board and JEE exams?',
     answer:
-      'Yes, absolutely. Ankit Sir’s pedagogy begins with first-principles conceptual derivations aligned with CBSE/NCERT theory, and progressively escalates into single-correct, multi-correct, matrix-match, and paragraph-style numerical problems taken from the toughest JEE Advanced archives and original Olympiad-level extensions.',
+      'Yes, absolutely. Ankit Sir’s pedagogy begins with first-principles conceptual derivations strictly aligned with CBSE/NCERT theory, and systematically escalates into advanced problem-solving bridging foundational board mastery with JEE Main and Advanced problem types.',
   },
   {
-    question: 'How are student doubts cleared during and after class?',
+    question: 'How does doubt support work?',
     answer:
-      'During live sessions, students interact directly via audio and chat with Ankit Sir. Outside class hours, students have access to a dedicated WhatsApp Academic Desk (+91 93825 57693) and weekly live doubt-clearing sessions to ensure no conceptual backlog accumulates.',
+      'Students get direct academic doubt assistance through our dedicated WhatsApp desk (+91 93825 57693) and the in-app doubt solver, where Ankit Sir and the academic team provide step-by-step written or video explanations.',
   },
   {
-    question: 'What study materials and test series are included in the batches?',
+    question: 'What study materials and practice papers are included in each batch?',
     answer:
-      'All enrolled students receive chapter-wise Daily Practice Problem (DPP) sheets with complete step-by-step solutions, formula sheets, revision mind maps, and admission to our Sunday All-India computer-based mock tests with percentile benchmarking and personalized error analysis.',
+      'Depending on the selected class batch, enrollments include sample papers, previous years solved questions (PYQs), mental ability modules, Olympiad drills, and comprehensive chapter-wise tests with detailed solutions.',
   },
   {
-    question: 'How do I enroll and what payment options are supported?',
+    question: 'How do I purchase books or enroll in a batch?',
     answer:
-      'You can click any "Get Fee Details on WhatsApp" button or reach out directly at +91 93825 57693. Our admissions counselors will verify batch availability, discuss your academic goals, and provide a secure payment link supporting UPI, all major credit/debit cards, and Net Banking.',
+      'Books can be purchased directly as instant Digital PDFs or ordered as printed hard copies delivered to your doorstep with no login required. Batch enrollments can be completed via our secure Razorpay checkout or assisted through our WhatsApp admissions desk (+91 93825 57693).',
   },
 ];
 
@@ -89,19 +90,13 @@ export const LandingPage: React.FC = () => {
           <nav className="landing-nav" aria-label="Main Navigation">
             <ul className="nav-links">
               <li>
-                <a href="#batches">Batches</a>
+                <a href="#batches">Courses</a>
               </li>
               <li>
-                <a href="#books">Books</a>
+                <Link href="/books">Books</Link>
               </li>
               <li>
-                <a href="#teacher">Faculty</a>
-              </li>
-              <li>
-                <a href="#results">Results</a>
-              </li>
-              <li>
-                <a href="#pedagogy">Methodology</a>
+                <a href="#teacher">About Ankit Sir</a>
               </li>
               <li>
                 <a href="#faq">FAQ</a>
@@ -109,6 +104,15 @@ export const LandingPage: React.FC = () => {
             </ul>
 
             <div className="nav-actions">
+              <a
+                href="https://wa.me/919382557693?text=Hi%2C%20I%20have%20an%20inquiry%20regarding%20Adept%20Eduverse%20courses"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>+91 93825 57693</span>
+              </a>
               {isLoaded && isSignedIn && user ? (
                 <div className="flex items-center gap-3">
                   <Link
@@ -181,19 +185,13 @@ export const LandingPage: React.FC = () => {
         {/* Mobile Dropdown Menu */}
         <div className={`mobile-menu ${mobileMenuOpen ? 'active' : ''}`} id="mobileMenu">
           <a href="#batches" className="mobile-link" onClick={closeMobileMenu}>
-            JEE Batches
+            Batches &amp; Curriculum
           </a>
-          <a href="#books" className="mobile-link" onClick={closeMobileMenu}>
-            Books &amp; Publications
-          </a>
+          <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
+            Official Books
+          </Link>
           <a href="#teacher" className="mobile-link" onClick={closeMobileMenu}>
-            IIT Faculty
-          </a>
-          <a href="#results" className="mobile-link" onClick={closeMobileMenu}>
-            Rank Results (AIR 125)
-          </a>
-          <a href="#pedagogy" className="mobile-link" onClick={closeMobileMenu}>
-            How We Teach
+            About Ankit Sir
           </a>
           <a href="#faq" className="mobile-link" onClick={closeMobileMenu}>
             Frequently Asked Questions
@@ -267,64 +265,47 @@ export const LandingPage: React.FC = () => {
               </h1>
 
               <p className="hero-subtitle">
-                Elite live and recorded JEE Mains &amp; Advanced mathematics mentorship by{' '}
-                <strong className="text-white font-semibold">Ankit Kumar, B.Tech IIT Kharagpur</strong>.
-                Uncompromising conceptual depth engineered for Class 11, Class 12, and Dropper aspirants.
+                Rigorous mathematics mentorship for Class VI–XII, JEE Mains &amp; Advanced by{' '}
+                <strong className="text-white font-semibold">Ankit Kumar, B.Tech IIT Kharagpur (2019)</strong>.
+                Uncompromising conceptual depth, verified problem banks, and 24/7 self-paced access.
               </p>
 
               <div className="hero-actions">
+                <a className="landing-btn btn-primary" href="#batches">
+                  <span>Explore Batches</span>
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <Link className="landing-btn btn-glass" href="/books">
+                  <span>Buy Official Books</span>
+                  <BookOpen className="w-4 h-4" />
+                </Link>
                 <a
-                  className="landing-btn btn-primary"
-                  href="https://www.youtube.com/@adepteduverse"
+                  className="landing-btn btn-whatsapp sm:hidden"
+                  href="https://wa.me/919382557693"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Watch a Free Class
-                </a>
-                <a className="landing-btn btn-glass" href="#batches">
-                  Explore Batches &amp; Fees
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M5 12h14" />
-                    <path d="m12 5 7 7-7 7" />
-                  </svg>
+                  WhatsApp Desk
                 </a>
               </div>
 
               <div className="hero-trust">
                 <div className="trust-item">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                  </svg>
+                  <GraduationCap className="w-4 h-4 text-amber-400" />
                   <span>
-                    <strong>96%</strong> Positive Rating
+                    <strong>IIT Kharagpur</strong> Founder
                   </span>
                 </div>
                 <div className="trust-item">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                  </svg>
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span>
-                    <strong>AIR 125</strong> Best JEE Adv Rank
+                    <strong>Complete</strong> Curriculum Coverage
                   </span>
                 </div>
                 <div className="trust-item">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" />
-                  </svg>
+                  <MessageCircle className="w-4 h-4 text-blue-400" />
                   <span>
-                    <strong>2,700+</strong> YouTube Video Lectures
+                    <strong>WhatsApp</strong> Doubt Assistance
                   </span>
                 </div>
               </div>
@@ -354,29 +335,71 @@ export const LandingPage: React.FC = () => {
           <div className="landing-wrap">
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-number">96%</div>
-                <div className="stat-label">Positive Student &amp; Parent Feedback (2025–26)</div>
+                <div className="stat-number">Class VI–XII</div>
+                <div className="stat-label">Complete Mathematics &amp; Foundation Series</div>
               </div>
               <div className="stat-card">
                 <div className="stat-number">2,700+</div>
                 <div className="stat-label">Free In-Depth Video Lectures on YouTube</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">AIR 125</div>
-                <div className="stat-label">Top All India Rank in JEE Advanced 2025</div>
+                <div className="stat-number">IIT Kharagpur</div>
+                <div className="stat-label">B.Tech Mechanical Engineering (2019)</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">IIT Kharagpur</div>
-                <div className="stat-label">B.Tech Engineering Alma Mater of Your Teacher</div>
+                <div className="stat-number">24 / 7</div>
+                <div className="stat-label">Self-Paced Learning &amp; WhatsApp Doubt Desk</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* ====================================================================
-             BATCHES (COURSES) - DYNAMIC PRICING SYSTEM
+             BATCHES (COURSES) - DYNAMIC PRICING SYSTEM & CLASS SELECTOR
              ==================================================================== */}
         <BatchesSection />
+
+        {/* ====================================================================
+             THREE STEPS TO JOIN (ROADMAP)
+             ==================================================================== */}
+        <section className="landing-section steps-section">
+          <div className="landing-wrap">
+            <div className="section-tag center">Seamless Onboarding</div>
+            <h2>Three Steps to Your IIT Journey</h2>
+            <p className="section-subtitle">
+              We make enrollment transparent, supportive, and focused entirely on the student&apos;s academic alignment.
+            </p>
+
+            <div className="steps-grid">
+              <div className="step-card">
+                <span className="step-number">01</span>
+                <h3>Experience the Pedagogy</h3>
+                <p>
+                  Watch our comprehensive video series on YouTube covering complex topics like Calculus and Coordinate
+                  Geometry. Observe how intuition replaces memory.
+                </p>
+              </div>
+
+              <div className="step-card">
+                <span className="step-number">02</span>
+                <h3>Consult the Academic Desk</h3>
+                <p>
+                  Reach out via WhatsApp (+91 93825 57693). Discuss your current grade, syllabus coverage, and target JEE
+                  year to select the optimal foundation or advanced batch.
+                </p>
+              </div>
+
+              <div className="step-card">
+                <span className="step-number">03</span>
+                <h3>Step into the Arena</h3>
+                <p>
+                  Receive your verified credentials to access the Adept Eduverse classroom, digital notes archive,
+                  daily assignment vault, and chapter mock examinations.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ====================================================================
              OFFICIAL BOOKS & PUBLICATIONS SECTION
@@ -391,7 +414,7 @@ export const LandingPage: React.FC = () => {
             <div className="teacher-portrait-box" id="faculty-profile-card">
               <div className="portrait-halo">
                 <Image
-                  src="/images/ankit-sir-headshot.jpg"
+                  src="/images/ankit/ankit-teacher.webp"
                   alt="Ankit Kumar, B.Tech IIT Kharagpur – Founder Adept Eduverse"
                   width={320}
                   height={320}
@@ -404,13 +427,13 @@ export const LandingPage: React.FC = () => {
                 <GraduationCap className="seal-icon" width={22} height={22} />
                 <div className="seal-text-group">
                   <span className="seal-title">IIT Kharagpur</span>
-                  <span className="seal-sub">B.Tech Engineering Alumnus</span>
+                  <span className="seal-sub">B.Tech Engineering Alumnus (2019)</span>
                 </div>
               </div>
 
               <div className="teacher-caption">
                 <h3 className="teacher-name">Ankit Kumar</h3>
-                <div className="teacher-deg">B.Tech, IIT Kharagpur | JEE Math Specialist</div>
+                <div className="teacher-deg">B.Tech, IIT Kharagpur | Mathematics Specialist</div>
               </div>
             </div>
 
@@ -426,7 +449,7 @@ export const LandingPage: React.FC = () => {
                 and executing calculations with calm precision under timed pressure.
               </p>
               <p className="teacher-bio" style={{ marginTop: -10 }}>
-                For over a decade, Ankit Sir has personally mentored thousands of high-school aspirants, demystifying
+                Ankit Sir mentors students across Classes VI through XII, demystifying
                 Calculus, Coordinate Geometry, and Algebra into structured visual frameworks that turn math from a
                 fearful obstacle into a student&apos;s highest scoring strength.
               </p>
@@ -483,8 +506,8 @@ export const LandingPage: React.FC = () => {
                     Continuous Mentor Guidance
                   </div>
                   <div className="pillar-desc">
-                    Direct communication with Ankit Sir to clear emotional hurdles, exam anxiety, and mathematical
-                    doubts throughout the year.
+                    Direct communication with Ankit Sir on WhatsApp to clear doubts, study hurdles, and exam preparation
+                    questions throughout the year.
                   </div>
                 </div>
               </div>
@@ -492,7 +515,7 @@ export const LandingPage: React.FC = () => {
               <div className="teacher-actions">
                 <a
                   className="landing-btn btn-whatsapp"
-                  href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20JEE%20Mathematics%20batch"
+                  href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20Mathematics%20batch"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -512,138 +535,9 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* ====================================================================
-             THREE STEPS TO JOIN (ROADMAP)
+             RESULTS & WALL OF FAME (Only renders if verified consent exists)
              ==================================================================== */}
-        <section className="landing-section steps-section">
-          <div className="landing-wrap">
-            <div className="section-tag center">Seamless Onboarding</div>
-            <h2>Three Steps to Your IIT Journey</h2>
-            <p className="section-subtitle">
-              We make enrollment transparent, supportive, and focused entirely on the student&apos;s academic alignment.
-            </p>
-
-            <div className="steps-grid">
-              <div className="step-card">
-                <span className="step-number">01</span>
-                <h3>Experience the Pedagogy</h3>
-                <p>
-                  Watch our comprehensive video series on YouTube covering complex topics like Calculus and Coordinate
-                  Geometry. Observe how intuition replaces memory.
-                </p>
-              </div>
-
-              <div className="step-card">
-                <span className="step-number">02</span>
-                <h3>Consult the Academic Desk</h3>
-                <p>
-                  Reach out via WhatsApp (+91 93825 57693). Discuss your current grade, syllabus coverage, and target JEE
-                  year to select the optimal live or recorded batch.
-                </p>
-              </div>
-
-              <div className="step-card">
-                <span className="step-number">03</span>
-                <h3>Step into the Arena</h3>
-                <p>
-                  Receive your verified credentials to access the Adept Eduverse live classroom, digital notes archive,
-                  daily assignment vault, and Sunday mock examinations.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================================
-             RESULTS & WALL OF FAME
-             ==================================================================== */}
-        <section className="landing-section results-section" id="results">
-          <div className="landing-wrap">
-            <div className="section-tag center">Proven Track Record</div>
-            <h2>Results Engineered by Dedication</h2>
-            <p className="section-subtitle">
-              Our students consistently breach the elite rank thresholds of JEE Advanced and gain admission into India’s
-              foremost engineering institutions.
-            </p>
-
-            <div className="results-layout">
-              {/* Featured Rank Card */}
-              <div className="featured-rank-card">
-                <div className="topper-badge">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                  Top JEE Advanced Performer
-                </div>
-                <div className="big-rank">AIR 125</div>
-                <div className="big-rank-sub">JEE Advanced 2025</div>
-
-                <div className="topper-details">
-                  <div className="topper-name">Subhashish Panda</div>
-                  <div className="topper-college">IIT Bombay</div>
-                  <div className="topper-branch">Computer Science &amp; Engineering</div>
-                </div>
-              </div>
-
-              {/* Toppers List Grid */}
-              <div className="toppers-grid">
-                <div className="topper-row">
-                  <div className="topper-rank-tag">
-                    <div className="rank-badge-box">AIR 482</div>
-                    <div className="topper-student-info">
-                      <div className="student-name">Pritam Sen</div>
-                      <div className="student-achievement">JEE Advanced · 99.6%ile Math</div>
-                    </div>
-                  </div>
-                  <span className="college-pill">IIT Delhi (EE)</span>
-                </div>
-
-                <div className="topper-row">
-                  <div className="topper-rank-tag">
-                    <div className="rank-badge-box">AIR 815</div>
-                    <div className="topper-student-info">
-                      <div className="student-name">Ananya Sharma</div>
-                      <div className="student-achievement">JEE Advanced · Math Score: 92/120</div>
-                    </div>
-                  </div>
-                  <span className="college-pill">IIT Kanpur (M&amp;SC)</span>
-                </div>
-
-                <div className="topper-row">
-                  <div className="topper-rank-tag">
-                    <div className="rank-badge-box">AIR 1140</div>
-                    <div className="topper-student-info">
-                      <div className="student-name">Aryan Verma</div>
-                      <div className="student-achievement">JEE Advanced · 99.4%ile Overall</div>
-                    </div>
-                  </div>
-                  <span className="college-pill">IIT Kharagpur (ME)</span>
-                </div>
-
-                <div className="topper-row">
-                  <div className="topper-rank-tag">
-                    <div className="rank-badge-box">AIR 1680</div>
-                    <div className="topper-student-info">
-                      <div className="student-name">Rishabh Ghosh</div>
-                      <div className="student-achievement">JEE Advanced · Top 0.5% State</div>
-                    </div>
-                  </div>
-                  <span className="college-pill">IIT Roorkee (DS&amp;AI)</span>
-                </div>
-
-                <div className="topper-row">
-                  <div className="topper-rank-tag">
-                    <div className="rank-badge-box">99.85 %ile</div>
-                    <div className="topper-student-info">
-                      <div className="student-name">Devansh Gupta</div>
-                      <div className="student-achievement">JEE Main 2025 · 100/100 Mathematics</div>
-                    </div>
-                  </div>
-                  <span className="college-pill">NIT Trichy (CSE)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <StudentResultsSection />
 
         {/* ====================================================================
              FAQ ACCORDION
@@ -684,40 +578,53 @@ export const LandingPage: React.FC = () => {
              FINAL HIGH-IMPACT CALL TO ACTION
              ==================================================================== */}
         <section className="final-cta">
-          <div className="landing-wrap">
-            <h2>
-              Your IIT Dream Begins with a <span className="gold-text">Single Decision.</span>
-            </h2>
-            <p>
-              Join Ankit Sir&apos;s mentorship today and experience mathematics transformed from a daunting subject into your
-              highest scoring weapon on exam day.
-            </p>
+          <div className="landing-wrap !max-w-5xl">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 text-left">
+              <div className="flex-1 space-y-4">
+                <h2 className="!text-left !m-0">
+                  Your IIT &amp; Board Goal Begins with a <span className="gold-text">Single Decision.</span>
+                </h2>
+                <p className="!text-left !m-0 text-slate-300 text-sm sm:text-base leading-relaxed">
+                  Join Ankit Sir&apos;s mentorship today and experience mathematics transformed from a daunting subject into your
+                  highest scoring strength on exam day.
+                </p>
 
-            <div className="final-actions">
-              <a
-                className="landing-btn btn-whatsapp"
-                href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20ready%20to%20enroll%20in%20Adept%20Eduverse"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Enroll via WhatsApp (+91 93825 57693)
-              </a>
-              <Link href="/sign-in" className="landing-btn btn-glass">
-                Student Portal Login
-              </Link>
-              <a
-                className="landing-btn btn-primary"
-                href="https://www.youtube.com/@adepteduverse"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Watch Free Demo on YouTube
-              </a>
-            </div>
+                <div className="final-actions !justify-start !pt-2 flex-wrap">
+                  <a
+                    className="landing-btn btn-whatsapp"
+                    href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20ready%20to%20enroll%20in%20Adept%20Eduverse"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Enroll via WhatsApp (+91 93825 57693)
+                  </a>
+                  <Link href="/books" className="landing-btn btn-glass">
+                    Official Books
+                  </Link>
+                  <Link href="/sign-in" className="landing-btn btn-primary">
+                    Student Login
+                  </Link>
+                </div>
 
-            <div className="final-support-note">
-              <span></span>
-              Admissions currently open for 2025–26 academic batches. Batch sizes strictly capped.
+                <div className="final-support-note !justify-start text-xs text-slate-400">
+                  <span></span>
+                  Admissions open for 2025–26 session. Founder: Ankit Kumar (B.Tech Mechanical, IIT Kharagpur, 2019).
+                </div>
+              </div>
+
+              {/* Ankit Sir Thumbs Up Photo with Gold Halo Frame */}
+              <div className="relative w-44 h-44 sm:w-56 sm:h-56 shrink-0">
+                <div className="absolute inset-0 rounded-3xl bg-amber-400/20 blur-xl pointer-events-none" />
+                <div className="relative w-full h-full rounded-3xl overflow-hidden border-2 border-amber-400/60 shadow-2xl bg-slate-900">
+                  <Image
+                    src="/images/ankit/ankit-thumbsup.webp"
+                    alt="Ankit Kumar Sir giving thumbs up"
+                    fill
+                    sizes="(max-width: 640px) 176px, 224px"
+                    className="object-cover object-top"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>

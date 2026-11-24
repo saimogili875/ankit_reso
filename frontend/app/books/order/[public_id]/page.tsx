@@ -310,7 +310,7 @@ export default function BookOrderReceiptPage() {
         {/* Footer Support Notice */}
         <div className="text-center text-xs text-slate-500 space-y-1">
           <p>Need help with your order? Email us at <strong className="text-slate-400">support@adepteduverse.com</strong></p>
-          <p>Adept Eduverse • Kota Methodology JEE Mastery • Ankit Sir</p>
+          <p>Adept Eduverse • IIT Kharagpur Pedagogy • Ankit Sir</p>
         </div>
       </div>
     </div>

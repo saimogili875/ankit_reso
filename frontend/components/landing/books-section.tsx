@@ -32,7 +32,7 @@ const DEFAULT_BOOKS: BookItem[] = [
       '10+ Years of chapter-wise CBSE official board questions',
       'Official CBSE marking scheme step-by-step point presentation',
       'High-weightage recurring question trend analysis',
-      'Authored by Kota veteran Ankit Kumar Sir (B.Tech, IIT Kharagpur, 2019)',
+      'Authored by Ankit Kumar Sir (B.Tech Mechanical, IIT Kharagpur, 2019)',
     ],
   },
   {
@@ -140,7 +140,7 @@ export const BooksSection: React.FC = () => {
         </div>
         <h2>Study Books &amp; Problem Banks by Ankit Sir</h2>
         <p className="section-subtitle">
-          Authored by Kota veteran Ankit Sir (B.Tech, IIT Kharagpur). Choose instant <strong>Digital PDF access</strong> or have the premium printed <strong>Physical Book delivered</strong> to your doorstep. No login required.
+          Authored by Ankit Kumar Sir (B.Tech, IIT Kharagpur, 2019). Choose instant <strong>Digital PDF access</strong> or have the premium printed <strong>Physical Book delivered</strong> to your doorstep. No login required.
         </p>
 
         {/* 4-Column Books Grid (or responsive) */}

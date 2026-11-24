@@ -36,7 +36,7 @@ const OFFICIAL_BOOKS: BookItem[] = [
       '10+ Years of chapter-wise CBSE official board questions',
       'Official CBSE marking scheme step-by-step point presentation',
       'High-weightage recurring question trend analysis',
-      'Authored by Kota veteran Ankit Kumar Sir (B.Tech, IIT Kharagpur, 2019)',
+      'Authored by Ankit Kumar Sir (B.Tech Mechanical, IIT Kharagpur, 2019)',
     ],
   },
   {
@@ -109,10 +109,10 @@ const OFFICIAL_BOOKS: BookItem[] = [
     gst_percent: 18,
     cover_image: '/images/books/cbse-10-advanced-question-bank.jpg',
     highlights: [
-      'Targeted for JEE Advanced Top 500 rank aspirants',
+      'Targeted for JEE Advanced Top rank aspirants',
       'Non-routine problems bridging Calculus, Algebra & Coordinate Geometry',
       'Multiple solution techniques: analytical, graphical, and elegant shortcuts',
-      'Detailed historical exam insights from Kota coaching methodology',
+      'Detailed analytical problem breakdowns with IIT Kharagpur pedagogical rigor',
     ],
   },
 ];
@@ -453,7 +453,7 @@ export default function BooksPage() {
               </div>
               <h3 className="text-sm font-bold text-white">IIT Kharagpur Pedagogy</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Authored by Ankit Sir (B.Tech IIT KGP). Every question is structured with Kota coaching rigor and official marking criteria.
+                Authored by Ankit Sir (B.Tech IIT KGP). Every question is structured with first-principles depth and official marking criteria.
               </p>
             </div>
 

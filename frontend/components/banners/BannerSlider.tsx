@@ -163,7 +163,7 @@ export function BannerSlider({ placement, className = '', isCompact = false }: B
             </h3>
 
             <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 max-w-sm">
-              10+ years coaching top JEE Advanced &amp; Main rankers with rigorous physics &amp; mathematics fundamentals.
+              B.Tech Mechanical Engineering, IIT Kharagpur (2019). Rigorous conceptual mathematics for Class VI–XII and JEE Advanced.
             </p>
 
             <div className="pt-1 flex items-center gap-2">
@@ -185,11 +185,11 @@ export function BannerSlider({ placement, className = '', isCompact = false }: B
           <div className="relative w-28 h-28 sm:w-40 sm:h-40 md:w-48 md:h-48 flex-shrink-0 self-center">
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-indigo-500/30 blur-md pointer-events-none" />
             <Image
-              src="/images/ankit-sir.jpg"
-              alt="Ankit Sir - Founder Adept Eduverse"
+              src="/images/ankit/ankit-hero.webp"
+              alt="Ankit Kumar - Founder Adept Eduverse"
               fill
               sizes="(max-width: 640px) 120px, 192px"
-              className="object-cover rounded-2xl border border-slate-700/80 shadow-xl"
+              className="object-cover rounded-2xl border-2 border-amber-400/40 shadow-xl"
               priority
             />
           </div>
