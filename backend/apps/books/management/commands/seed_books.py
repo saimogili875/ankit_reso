@@ -105,7 +105,7 @@ BOOKS_DATA = [
         'original_price': Decimal('599.00'),
         'gst_percent': Decimal('18.00'),
         'pdf_key': 'books/pdfs/adv-prob-math.pdf',
-        'cover_image': '/images/ankit-sir-headshot.jpg',
+        'cover_image': '/images/books/cbse-10-advanced-question-bank.jpg',
         'badge': 'JEE Elite',
         'display_order': 5,
         'is_published': True,
@@ -118,11 +118,26 @@ BOOKS_DATA = [
     },
 ]
 
+OBSOLETE_SLUGS = ['adv-qb-10', 'pyq-cbse-10']
+
 
 class Command(BaseCommand):
     help = 'Seeds official publication books for guest checkout.'
 
     def handle(self, *args, **options):
+        # 1. Clean up obsolete/duplicate book products
+        for old_slug in OBSOLETE_SLUGS:
+            old_product = BookProduct.objects.filter(slug=old_slug).first()
+            if old_product:
+                if old_product.orders.exists():
+                    old_product.is_published = False
+                    old_product.save(update_fields=['is_published'])
+                    self.stdout.write(f"  [Unpublished obsolete] {old_slug}")
+                else:
+                    old_product.delete()
+                    self.stdout.write(f"  [Deleted obsolete] {old_slug}")
+
+        # 2. Seed active official books
         self.stdout.write("Seeding BookProduct catalog...")
         count = 0
         for item in BOOKS_DATA:
@@ -132,7 +147,7 @@ class Command(BaseCommand):
                 defaults=item
             )
             verb = "Created" if created else "Updated"
-            self.stdout.write(f"  [{verb}] {book.title} (slug: {book.slug}) - ₹{book.digital_price}/₹{book.hardcopy_price}")
+            self.stdout.write(f"  [{verb}] {book.title} (slug: {book.slug}) - cover: {book.cover_image}")
             count += 1
 
         self.stdout.write(self.style.SUCCESS(f"Successfully seeded {count} official books!"))

@@ -26,6 +26,38 @@ export interface BookItem {
   coverColor?: string;
 }
 
+export function getBookCoverImage(book?: { slug?: string; title?: string; cover_image?: string } | null): string {
+  if (!book) return '/images/books/cbse-10-pyq-mathematics.jpg';
+  const rawCover = (book.cover_image || '').trim();
+  const slug = (book.slug || '').toLowerCase();
+  const title = (book.title || '').toLowerCase();
+
+  // If the cover is an Ankit Sir personal headshot or empty, map strictly to the real book cover
+  const isPersonalPhoto = !rawCover || rawCover.includes('ankit-sir');
+
+  if (slug.includes('pyq') || title.includes('previous years') || title.includes('pyq')) {
+    return '/images/books/cbse-10-pyq-mathematics.jpg';
+  }
+  if (slug.includes('mental-ability') || title.includes('mental ability') || title.includes('logical reasoning')) {
+    return '/images/books/cbse-10-mental-ability-reasoning.jpg';
+  }
+  if (slug.includes('complete') || title.includes('complete syllabus') || title.includes('best school book')) {
+    return '/images/books/cbse-10-mathematics-complete.jpg';
+  }
+  if (slug.includes('advanced-question-bank') || slug.includes('adv-qb') || title.includes('question bank') || title.includes('advanced level')) {
+    return '/images/books/cbse-10-advanced-question-bank.jpg';
+  }
+  if (slug.includes('adv-prob') || title.includes('advanced problem')) {
+    return '/images/books/cbse-10-advanced-question-bank.jpg';
+  }
+
+  if (isPersonalPhoto) {
+    return '/images/books/cbse-10-pyq-mathematics.jpg';
+  }
+
+  return rawCover;
+}
+
 interface BookPurchaseModalProps {
   book: BookItem | null;
   initialFormat?: 'DIGITAL' | 'HARDCOPY' | 'digital' | 'hardcopy';

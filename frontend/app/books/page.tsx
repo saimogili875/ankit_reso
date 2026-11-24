@@ -16,7 +16,7 @@ import {
   Layers,
   GraduationCap
 } from 'lucide-react';
-import { BookPurchaseModal, BookItem } from '@/components/books/BookPurchaseModal';
+import { BookPurchaseModal, BookItem, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
 
 const OFFICIAL_BOOKS: BookItem[] = [
@@ -107,7 +107,7 @@ const OFFICIAL_BOOKS: BookItem[] = [
     hardcopy_price: 399,
     original_price: 599,
     gst_percent: 18,
-    cover_image: '/images/ankit-sir-headshot.jpg',
+    cover_image: '/images/books/cbse-10-advanced-question-bank.jpg',
     highlights: [
       'Targeted for JEE Advanced Top 500 rank aspirants',
       'Non-routine problems bridging Calculus, Algebra & Coordinate Geometry',
@@ -130,9 +130,18 @@ export default function BooksPage() {
         const res = await fetch(buildApiUrl('/api/books/'), { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          const items = Array.isArray(data) ? data : (data.results || []);
+          const items: BookItem[] = Array.isArray(data) ? data : (data.results || []);
           if (items.length > 0) {
-            setBooks(items);
+            // Strictly filter out obsolete duplicates and ensure real book covers
+            const sanitized = items
+              .filter((b) => b.slug !== 'adv-qb-10' && b.slug !== 'pyq-cbse-10')
+              .map((b) => ({
+                ...b,
+                cover_image: getBookCoverImage(b),
+              }));
+            if (sanitized.length > 0) {
+              setBooks(sanitized);
+            }
           }
         }
       } catch (err) {
@@ -310,6 +319,7 @@ export default function BooksPage() {
             const rawHardcopy = Number(book.hardcopy_price ?? book.hardcopyPrice ?? 399);
             const rawOriginal = Number(book.original_price ?? book.originalPrice ?? (rawHardcopy + 100));
             const discountPercent = Math.round(((rawOriginal - rawDigital) / rawOriginal) * 100);
+            const coverUrl = getBookCoverImage(book);
 
             return (
               <div
@@ -340,20 +350,13 @@ export default function BooksPage() {
 
                     {/* Authentic 3D Book Cover View */}
                     <div className="relative aspect-[3/4] w-full max-w-[210px] rounded-xl overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:-translate-y-1 bg-slate-950">
-                      {book.cover_image ? (
-                        <Image
-                          src={book.cover_image}
-                          alt={book.title}
-                          fill
-                          className="object-cover object-top"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center p-4 text-center">
-                          <BookOpen className="w-12 h-12 text-indigo-400 mb-2" />
-                          <span className="text-xs font-bold text-white">{book.title}</span>
-                        </div>
-                      )}
+                      <Image
+                        src={coverUrl}
+                        alt={book.title}
+                        fill
+                        className="object-cover object-top"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      />
                     </div>
                   </div>
 

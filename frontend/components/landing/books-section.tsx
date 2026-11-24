@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
-  BookOpen, 
   Download, 
   Truck, 
   CheckCircle2, 
@@ -13,7 +12,7 @@ import {
   ShieldCheck,
   GraduationCap
 } from 'lucide-react';
-import { BookItem, BookPurchaseModal } from '@/components/books/BookPurchaseModal';
+import { BookItem, BookPurchaseModal, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
 
 const DEFAULT_BOOKS: BookItem[] = [
@@ -106,9 +105,18 @@ export const BooksSection: React.FC = () => {
         const res = await fetch(buildApiUrl('/api/books/'), { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          const items = Array.isArray(data) ? data : (data.results || []);
+          const items: BookItem[] = Array.isArray(data) ? data : (data.results || []);
           if (items.length > 0) {
-            setBooks(items);
+            // Strictly filter out obsolete duplicates and ensure real book covers
+            const sanitized = items
+              .filter((b) => b.slug !== 'adv-qb-10' && b.slug !== 'pyq-cbse-10')
+              .map((b) => ({
+                ...b,
+                cover_image: getBookCoverImage(b),
+              }));
+            if (sanitized.length > 0) {
+              setBooks(sanitized);
+            }
           }
         }
       } catch (err) {
@@ -142,6 +150,7 @@ export const BooksSection: React.FC = () => {
             const rawHardcopy = Number(book.hardcopy_price ?? book.hardcopyPrice ?? 399);
             const rawOriginal = Number(book.original_price ?? book.originalPrice ?? 499);
             const discountPercent = Math.round(((rawOriginal - rawDigital) / rawOriginal) * 100);
+            const coverUrl = getBookCoverImage(book);
 
             return (
               <div
@@ -172,20 +181,13 @@ export const BooksSection: React.FC = () => {
 
                     {/* Book Cover */}
                     <div className="relative aspect-[3/4] w-full max-w-[190px] rounded-xl overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:-translate-y-1 bg-slate-950">
-                      {book.cover_image ? (
-                        <Image
-                          src={book.cover_image}
-                          alt={book.title}
-                          fill
-                          className="object-cover object-top"
-                          sizes="(max-width: 768px) 100vw, 25vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center p-4 text-center">
-                          <BookOpen className="w-10 h-10 text-indigo-400 mb-2" />
-                          <span className="text-xs font-bold text-white">{book.title}</span>
-                        </div>
-                      )}
+                      <Image
+                        src={coverUrl}
+                        alt={book.title}
+                        fill
+                        className="object-cover object-top"
+                        sizes="(max-width: 768px) 100vw, 25vw"
+                      />
                     </div>
                   </div>
 
