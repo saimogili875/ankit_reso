@@ -10,6 +10,11 @@ export default async function ShortBookRedirectPage({ params }: ShortBookPagePro
   const clean = (code || '').toLowerCase().trim();
   const alias = SHORT_BOOK_ALIASES[clean] || clean || 'advanced-10';
 
-  // Instant redirect to the main front page directly anchored to the target book
+  // If it's PYQ or Mental Ability, direct to internal /books catalog page
+  if (alias.includes('pyq') || alias.includes('reasoning') || clean.includes('pyq') || clean.includes('reasoning')) {
+    redirect(`/books#${alias}`);
+  }
+
+  // Flagship textbooks are directly on the main landing page
   redirect(`/#${alias}`);
 }

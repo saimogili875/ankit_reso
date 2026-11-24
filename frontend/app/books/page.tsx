@@ -190,8 +190,8 @@ export default function BooksPage() {
     if (typeof window === 'undefined') return;
     const origin = window.location.origin;
     const shortAlias = getBookShortAlias(book);
-    // Clean, short link: https://www.adepteduverse.com/#advanced-10
-    const shareUrl = `${origin}/#${shortAlias}`;
+    const isInternalOnly = shortAlias.includes('pyq') || shortAlias.includes('reasoning');
+    const shareUrl = isInternalOnly ? `${origin}/books#${shortAlias}` : `${origin}/#${shortAlias}`;
 
     const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
 

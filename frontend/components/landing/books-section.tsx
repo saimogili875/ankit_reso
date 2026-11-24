@@ -25,25 +25,6 @@ import { buildApiUrl } from '@/lib/api-client';
 
 const DEFAULT_BOOKS: BookItem[] = [
   {
-    id: 'cbse-10-pyq-mathematics',
-    slug: 'cbse-10-pyq-mathematics',
-    title: "CBSE Class X — Chapter-Wise Previous Years' Questions (Mathematics)",
-    subtitle: 'Past 10 Years Chapter-Wise Solved Questions with IITian Pedagogical Insights',
-    class_label: 'CBSE Class X',
-    badge: 'Official PYQ',
-    digital_price: 299,
-    hardcopy_price: 399,
-    original_price: 499,
-    gst_percent: 18,
-    cover_image: '/images/books/cbse-10-pyq-mathematics.jpg',
-    highlights: [
-      '10+ Years of chapter-wise CBSE official board questions',
-      'Official CBSE marking scheme step-by-step point presentation',
-      'High-weightage recurring question trend analysis',
-      'Authored by Ankit Kumar Sir (B.Tech Mechanical, IIT Kharagpur, 2019)',
-    ],
-  },
-  {
     id: 'cbse-10-mathematics-complete',
     slug: 'cbse-10-mathematics-complete',
     title: 'Mathematics Complete Syllabus — Class X',
@@ -59,25 +40,6 @@ const DEFAULT_BOOKS: BookItem[] = [
       'Complete NCERT & CBSE board syllabus with deep conceptual derivations',
       'Over 1,500+ solved examples, graded practice problems & theorems',
       'Special board exam presentation tips to avoid common step mistakes',
-      'Authored by Ankit Kumar Sir (B.Tech Mechanical, IIT Kharagpur, 2019)',
-    ],
-  },
-  {
-    id: 'cbse-10-mental-ability-reasoning',
-    slug: 'cbse-10-mental-ability-reasoning',
-    title: 'Mental Ability & Logical Reasoning — Class X',
-    subtitle: 'Verbal, Non-Verbal, Numerical & Analytical Critical Thinking',
-    class_label: 'CBSE Class X',
-    badge: 'Olympiad & NTSE',
-    digital_price: 299,
-    hardcopy_price: 399,
-    original_price: 499,
-    gst_percent: 18,
-    cover_image: '/images/books/cbse-10-mental-ability-reasoning.jpg',
-    highlights: [
-      'Verbal & Non-Verbal reasoning patterns with visual mental models',
-      'Numerical ability shortcuts and speed math techniques',
-      'Targeted for NTSE, Olympiads, and early competitive aptitude tests',
       'Authored by Ankit Kumar Sir (B.Tech Mechanical, IIT Kharagpur, 2019)',
     ],
   },
@@ -139,6 +101,13 @@ export const BooksSection: React.FC = () => {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }, 350);
+        } else {
+          // If the book is one of the internal catalog books (e.g. pyq or reasoning),
+          // route to /books#<target> so the student finds it immediately
+          const clean = target.toLowerCase();
+          if (clean.includes('pyq') || clean.includes('reasoning') || clean.includes('mental')) {
+            window.location.href = `/books#${target}`;
+          }
         }
       }
     }
@@ -156,9 +125,31 @@ export const BooksSection: React.FC = () => {
           const data = await res.json();
           const items: BookItem[] = Array.isArray(data) ? data : (data.results || []);
           if (items.length > 0) {
-            // Strictly filter out obsolete duplicates and ensure real book covers
+            // Strictly keep Mental Ability and PYQ inside the internal /books store,
+            // while featuring the flagship Class X textbooks on the landing page
             const sanitized = items
-              .filter((b) => b.slug !== 'adv-qb-10' && b.slug !== 'pyq-cbse-10')
+              .filter((b) => {
+                const slug = (b.slug || b.id || '').toLowerCase();
+                const title = (b.title || '').toLowerCase();
+                if (slug === 'adv-qb-10' || slug === 'pyq-cbse-10') return false;
+                if (
+                  slug.includes('mental-ability') || 
+                  slug.includes('reasoning') || 
+                  title.includes('mental ability') || 
+                  title.includes('reasoning')
+                ) {
+                  return false;
+                }
+                if (
+                  slug.includes('pyq') || 
+                  title.includes('previous years') || 
+                  title.includes('chapter-wise') || 
+                  title.includes('pyq')
+                ) {
+                  return false;
+                }
+                return true;
+              })
               .map((b) => ({
                 ...b,
                 cover_image: getBookCoverImage(b),
@@ -259,9 +250,9 @@ export const BooksSection: React.FC = () => {
           Authored by Ankit Kumar Sir (B.Tech, IIT Kharagpur, 2019). Choose instant <strong>Digital PDF access</strong> or have the premium printed <strong>Physical Book delivered</strong> to your doorstep. No login required.
         </p>
 
-        {/* 4-Column Books Grid (or responsive) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
-          {books.slice(0, 4).map((book) => {
+        {/* Flagship Class X Books Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mt-10">
+          {books.slice(0, 2).map((book) => {
             const rawDigital = Number(book.digital_price ?? book.digitalPrice ?? 299);
             const rawHardcopy = Number(book.hardcopy_price ?? book.hardcopyPrice ?? 399);
             const rawOriginal = Number(book.original_price ?? book.originalPrice ?? 499);
@@ -440,16 +431,16 @@ export const BooksSection: React.FC = () => {
           })}
         </div>
 
-        {/* Bottom CTA linking to full /books store */}
-        <div className="mt-10 text-center">
+        {/* Bottom CTA linking to full /books internal store */}
+        <div className="mt-12 text-center">
           <Link
             href="/books"
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm bg-[#0B1120] border border-slate-700 hover:border-indigo-500 text-slate-200 hover:text-white transition-all shadow-md group"
+            className="inline-flex items-center gap-2.5 px-7 py-4 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/40 hover:border-amber-400 text-white hover:text-amber-300 transition-all shadow-xl hover:shadow-indigo-950/50 group"
           >
-            <span>View All Official Publications &amp; Class X Textbooks</span>
-            <ArrowRight className="w-4 h-4 text-indigo-400 group-hover:translate-x-1 transition-transform" />
+            <span>View All Official Publications &amp; Class X Textbooks (Including PYQ &amp; Mental Ability)</span>
+            <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1.5 transition-transform" />
           </Link>
-          <div className="flex items-center justify-center gap-2 mt-3 text-xs text-slate-400">
+          <div className="flex items-center justify-center gap-2 mt-3.5 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>Instant guest checkout via Razorpay • UPI, Cards, Netbanking • Official GST Invoice</span>
           </div>
