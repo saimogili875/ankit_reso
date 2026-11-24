@@ -84,6 +84,61 @@ export function getBookCoverImage(book?: { slug?: string; title?: string; cover_
   return '/images/books/cbse-10-pyq-mathematics.jpg';
 }
 
+export const SHORT_BOOK_ALIASES: Record<string, string> = {
+  // Advanced Question Bank
+  'cbse-10-advanced-question-bank': 'advanced-10',
+  'adv-prob-math': 'advanced-10',
+  'adv-qb-10': 'advanced-10',
+  'advanced-10': 'advanced-10',
+  'advanced': 'advanced-10',
+
+  // PYQ Mathematics
+  'cbse-10-pyq-mathematics': 'pyq-10',
+  'pyq-cbse-10': 'pyq-10',
+  'pyq-10': 'pyq-10',
+  'pyq': 'pyq-10',
+
+  // Mathematics Complete Syllabus
+  'cbse-10-mathematics-complete': 'maths-10',
+  'maths-10': 'maths-10',
+  'maths': 'maths-10',
+
+  // Mental Ability & Reasoning
+  'cbse-10-mental-ability-reasoning': 'reasoning-10',
+  'reasoning-10': 'reasoning-10',
+  'reasoning': 'reasoning-10',
+};
+
+export function getBookShortAlias(bookOrSlug: string | BookItem | null | undefined): string {
+  if (!bookOrSlug) return 'advanced-10';
+  const slug = typeof bookOrSlug === 'string' ? bookOrSlug : (bookOrSlug.slug || bookOrSlug.id || '');
+  const lower = slug.toLowerCase().trim();
+  if (SHORT_BOOK_ALIASES[lower]) return SHORT_BOOK_ALIASES[lower];
+  if (lower.includes('advanced') || lower.includes('question-bank')) return 'advanced-10';
+  if (lower.includes('pyq')) return 'pyq-10';
+  if (lower.includes('complete') || lower.includes('math')) return 'maths-10';
+  if (lower.includes('reasoning') || lower.includes('mental')) return 'reasoning-10';
+  return lower.replace(/^cbse-10-/, '').replace(/-complete$/, '');
+}
+
+export function isBookMatch(book: BookItem, target: string): boolean {
+  if (!target) return false;
+  const cleanTarget = target.toLowerCase().replace(/^book-/, '').replace(/^#/, '').trim();
+  const bookSlug = (book.slug || book.id || '').toLowerCase();
+  const alias = getBookShortAlias(bookSlug);
+
+  if (cleanTarget === alias) return true;
+  if (cleanTarget === bookSlug) return true;
+  if (SHORT_BOOK_ALIASES[cleanTarget] === alias) return true;
+
+  if (alias === 'advanced-10' && (cleanTarget === 'advanced' || cleanTarget.includes('advanced') || cleanTarget.includes('qb'))) return true;
+  if (alias === 'pyq-10' && (cleanTarget === 'pyq' || cleanTarget.includes('pyq'))) return true;
+  if (alias === 'maths-10' && (cleanTarget === 'maths' || cleanTarget === 'math' || cleanTarget.includes('complete'))) return true;
+  if (alias === 'reasoning-10' && (cleanTarget === 'reasoning' || cleanTarget.includes('reasoning') || cleanTarget.includes('mental'))) return true;
+
+  return false;
+}
+
 interface BookPurchaseModalProps {
   book: BookItem | null;
   initialFormat?: 'DIGITAL' | 'HARDCOPY' | 'digital' | 'hardcopy';

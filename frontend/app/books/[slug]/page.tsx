@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
@@ -18,7 +18,7 @@ import {
   Share2,
   Check
 } from 'lucide-react';
-import { BookItem, BookPurchaseModal, getBookCoverImage } from '@/components/books/BookPurchaseModal';
+import { BookItem, BookPurchaseModal, getBookCoverImage, getBookShortAlias } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
 
 const FALLBACK_BOOKS: Record<string, BookItem & { 
@@ -217,30 +217,62 @@ export default function BookDetailPage() {
   const [format, setFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const isSharingInProgress = useRef(false);
 
+  const currentBook = book || FALLBACK_BOOKS[slug] || FALLBACK_BOOKS['cbse-10-pyq-mathematics'];
+
+  /**
+   * Clean, debounced single-copy share handler for detail page:
+   * Directs to the clean short anchor on the main landing page or current book
+   */
   const handleShareBook = async () => {
-    if (typeof window === 'undefined') return;
-    const shareUrl = window.location.href;
+    if (isSharingInProgress.current) return;
+    isSharingInProgress.current = true;
+    setTimeout(() => {
+      isSharingInProgress.current = false;
+    }, 1200);
 
-    if (navigator.share) {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const shortAlias = getBookShortAlias(currentBook);
+    const shareUrl = `${origin}/#${shortAlias}`;
+
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+
+    if (isMobile && typeof navigator.share === 'function') {
       try {
         await navigator.share({
           title: `${currentBook.title} | Adept Eduverse`,
-          text: `Check out "${currentBook.title}" by Ankit Kumar Sir (IIT Kharagpur) on Adept Eduverse!`,
           url: shareUrl,
         });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
         return;
-      } catch {
-        // Fallback
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
       }
     }
 
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
     } catch {
-      prompt('Copy this link to share:', shareUrl);
+      prompt('Copy this short link:', shareUrl);
     }
   };
 
@@ -267,7 +299,6 @@ export default function BookDetailPage() {
     }
   }, [slug]);
 
-  const currentBook = book || FALLBACK_BOOKS[slug] || FALLBACK_BOOKS['cbse-10-pyq-mathematics'];
   const coverImage = getBookCoverImage(currentBook);
 
   const price = format === 'DIGITAL' 
