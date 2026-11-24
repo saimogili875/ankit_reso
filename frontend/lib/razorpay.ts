@@ -111,6 +111,8 @@ export function loadRazorpayScript(): Promise<boolean> {
  */
 export async function processRazorpayPayment(params: {
   courseId?: string;
+  batchId?: string;
+  addonItemIds?: string[];
   courseTitle?: string;
   amountPaise?: number;
   description?: string;
@@ -130,7 +132,7 @@ export async function processRazorpayPayment(params: {
   }
 
   let targetCourseId = params.courseId;
-  if (!targetCourseId && !params.amountPaise) {
+  if (!params.batchId && !targetCourseId && !params.amountPaise) {
     try {
       const coursesRes = await apiClient.get<Array<{ id: string; is_free?: boolean }>>('/courses/');
       if (Array.isArray(coursesRes) && coursesRes.length > 0) {
@@ -140,10 +142,18 @@ export async function processRazorpayPayment(params: {
     } catch {}
   }
 
-  // STEP 1: Backend - Create Order
-  const orderPayload = targetCourseId
-    ? { course_id: targetCourseId }
-    : { amount: params.amountPaise || 100 };
+  // STEP 1: Backend - Create Order (Price calculated strictly server-side)
+  const orderPayload: Record<string, unknown> = {};
+  if (params.batchId) {
+    orderPayload.batch_id = params.batchId;
+    if (params.addonItemIds && params.addonItemIds.length > 0) {
+      orderPayload.addon_item_ids = params.addonItemIds;
+    }
+  } else if (targetCourseId) {
+    orderPayload.course_id = targetCourseId;
+  } else if (params.amountPaise) {
+    orderPayload.amount = params.amountPaise;
+  }
 
   const order = await apiClient.post<CreateOrderResponse>('/payments/create-order/', orderPayload);
 

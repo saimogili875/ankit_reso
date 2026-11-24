@@ -40,8 +40,33 @@ const BOOKS: BookItem[] = [
 ];
 
 export const BookCatalogSection: React.FC = () => {
+  const [booksList, setBooksList] = useState<BookItem[]>(BOOKS);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<'digital' | 'hardcopy'>('digital');
+
+  React.useEffect(() => {
+    fetch('/api/payments/books/')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: BookItem[] = data.map((b, idx) => ({
+            id: b.id,
+            title: b.title,
+            subtitle: b.subtitle || '',
+            badge: b.badge || 'Official Book',
+            pdfFileName: `${b.title}.pdf`,
+            digitalPrice: Number(b.digital_price) || 299,
+            hardcopyPrice: Number(b.hardcopy_price) || 399,
+            highlights: Array.isArray(b.highlights) && b.highlights.length > 0
+              ? b.highlights
+              : (BOOKS[idx % BOOKS.length]?.highlights || []),
+            coverColor: idx === 0 ? 'from-indigo-600 to-blue-700' : 'from-amber-600 to-orange-700',
+          }));
+          setBooksList(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleOpenPurchase = (book: BookItem, format: 'digital' | 'hardcopy') => {
     setSelectedBook(book);
@@ -67,7 +92,7 @@ export const BookCatalogSection: React.FC = () => {
 
       {/* Book Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-        {BOOKS.map((book) => (
+        {booksList.map((book) => (
           <div
             key={book.id}
             className="bg-white dark:bg-slate-900 border border-[#E3E7EE] dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between"

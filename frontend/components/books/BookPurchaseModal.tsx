@@ -160,9 +160,9 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
       }
 
       setSuccessData({
-        downloadUrl: verifyData.downloadUrl,
-        fileName: verifyData.fileName,
-        paymentId: verifyData.payment_id,
+        downloadUrl: verifyData.downloadUrl || verifyData.download_url,
+        fileName: verifyData.fileName || verifyData.book_title,
+        paymentId: verifyData.payment_id || verifyData.paymentId,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';

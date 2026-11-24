@@ -17,7 +17,7 @@ from apps.content.schedule_views import (
     NotificationMarkReadView,
 )
 from apps.academics.views import CourseListView, CourseDetailView
-from apps.payments.views import CreateOrderView, VerifyPaymentView, AdminPaymentListView
+from apps.payments.views import CreateOrderView, VerifyPaymentView, AdminPaymentListView, AdminGrantEnrollmentView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -52,6 +52,7 @@ urlpatterns = [
     # Application API endpoints
     path('api/auth/', include('apps.accounts.urls')),
     path('api/academics/', include('apps.academics.urls')),
+    path('api/pricing/', include('apps.academics.pricing_urls')),
     path('api/enrollment/', include('apps.academics.enrollment_urls')),
     path('api/content/', include('apps.content.urls')),
     path('api/courses/', CourseListView.as_view(), name='courses-list'),
@@ -73,6 +74,7 @@ urlpatterns = [
     path('api/analytics/', include('apps.analytics.urls')),
     path('api/admin-panel/', include('apps.adminpanel.urls')),
     path('api/admin/payments/', AdminPaymentListView.as_view(), name='admin-payments-list'),
+    path('api/admin/payments/grant-enrollment/', AdminGrantEnrollmentView.as_view(), name='admin-payments-grant-enrollment'),
     path('api/admin-panel/payments/', AdminPaymentListView.as_view(), name='adminpanel-payments-list'),
     path('api/banners/', include('apps.banners.urls')),
 

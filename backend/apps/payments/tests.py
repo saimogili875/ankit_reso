@@ -381,3 +381,218 @@ class RazorpayPaymentsTestCase(TestCase):
         results = res_admin.data.get('results', res_admin.data)
         self.assertTrue(len(results) >= 1)
         self.assertEqual(results[0]['razorpay_order_id'], 'order_admin_test_1')
+import hmac
+import hashlib
+from decimal import Decimal
+from unittest.mock import patch
+from django.test import TestCase, override_settings
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+from rest_framework import status
+
+from apps.academics.models import PricingCard, Batch, BatchItem, Course, Enrollment
+from apps.payments.models import Payment, Book, BookOrder
+
+User = get_user_model()
+
+TEST_RAZORPAY_KEY_ID = "rzp_test_samplekey123"
+TEST_RAZORPAY_KEY_SECRET = "sample_secret_key_456"
+TEST_WEBHOOK_SECRET = "test_webhook_secret_789"
+
+
+@override_settings(
+    RAZORPAY_KEY_ID=TEST_RAZORPAY_KEY_ID,
+    RAZORPAY_KEY_SECRET=TEST_RAZORPAY_KEY_SECRET,
+    RAZORPAY_WEBHOOK_SECRET=TEST_WEBHOOK_SECRET,
+)
+class BatchPaymentSecurityTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.student = User.objects.create_user(
+            email='rahul@adepteduverse.com',
+            username='rahul',
+            password='TestPassword123!',
+            role=User.Role.STUDENT,
+        )
+        self.client.force_authenticate(user=self.student)
+
+        self.card = PricingCard.objects.create(
+            key='senior',
+            title='Class XI & XII',
+            is_published=True,
+            order=1
+        )
+        self.course = Course.objects.create(
+            title='JEE Comprehensive Class 11',
+            slug='jee-comp-11',
+            price=Decimal('5500.00'),
+            is_free=False,
+            is_published=True,
+        )
+        self.batch = Batch.objects.create(
+            card=self.card,
+            name='JEE Foundation Batch',
+            slug='jee-foundation-class-11',
+            course=self.course,
+            price=Decimal('5500.00'),
+            is_published=True,
+        )
+        self.addon_book = BatchItem.objects.create(
+            batch=self.batch,
+            item_type=BatchItem.ItemType.ADVANCED_BOOK_DIGITAL,
+            title='Digital Advanced Book',
+            price=Decimal('299.00'),
+            is_addon=True,
+        )
+
+    @patch('apps.payments.views.get_razorpay_client')
+    def test_create_order_uses_db_price_ignoring_client_price(self, mock_get_client):
+        """
+        Verify that even if an attacker passes a fake client price (e.g. ₹1.00),
+        the server strictly queries the database price: batch.price (5500) + addon.price (299) = 5799.00.
+        """
+        fake_client = mock_get_client.return_value
+        fake_client.order.create.return_value = {
+            'id': 'order_rzp_mock123',
+            'amount': 579900,
+            'currency': 'INR',
+        }
+
+        tampered_payload = {
+            'batch_id': str(self.batch.id),
+            'addon_item_ids': [str(self.addon_book.id)],
+            'amount': 100,  # Attacker tries paying ₹1 instead of ₹5799
+            'price': 1.00,
+        }
+
+        res = self.client.post('/api/payments/create-order/', tampered_payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        # Verify Razorpay was called with 579900 paise (₹5,799.00)
+        call_args = fake_client.order.create.call_args[0][0]
+        self.assertEqual(call_args['amount'], 579900)
+
+        payment = Payment.objects.get(razorpay_order_id='order_rzp_mock123')
+        self.assertEqual(payment.amount_paise, 579900)
+        self.assertEqual(payment.user, self.student)
+        self.assertEqual(payment.batch, self.batch)
+
+    def test_bad_signature_rejected(self):
+        """
+        Verify that forged Razorpay payment signature fails verification and marks payment FAILED.
+        """
+        payment = Payment.objects.create(
+            user=self.student,
+            batch=self.batch,
+            course=self.course,
+            amount_paise=550000,
+            currency='INR',
+            razorpay_order_id='order_tamper_456',
+            status=Payment.Status.CREATED,
+        )
+
+        res = self.client.post('/api/payments/verify/', {
+            'razorpay_order_id': payment.razorpay_order_id,
+            'razorpay_payment_id': 'pay_fake_999',
+            'razorpay_signature': 'invalid_forged_hmac_signature',
+        })
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.FAILED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    def test_verify_idempotent(self):
+        """
+        Verify that calling payment verify multiple times on a paid order is idempotent
+        and does not duplicate enrollments.
+        """
+        order_id = 'order_valid_789'
+        payment_id = 'pay_valid_789'
+        msg = f"{order_id}|{payment_id}".encode('utf-8')
+        valid_signature = hmac.new(TEST_RAZORPAY_KEY_SECRET.encode('utf-8'), msg, hashlib.sha256).hexdigest()
+
+        payment = Payment.objects.create(
+            user=self.student,
+            batch=self.batch,
+            course=self.course,
+            amount_paise=550000,
+            currency='INR',
+            razorpay_order_id=order_id,
+            status=Payment.Status.CREATED,
+        )
+
+        payload = {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': valid_signature,
+        }
+
+        # First verification
+        res1 = self.client.post('/api/payments/verify/', payload)
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertTrue(res1.json()['enrolled'])
+        self.assertEqual(Enrollment.objects.filter(user=self.student, course=self.course).count(), 1)
+
+        # Second verification (idempotent repeat)
+        res2 = self.client.post('/api/payments/verify/', payload)
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(Enrollment.objects.filter(user=self.student, course=self.course).count(), 1)
+
+    def test_webhook_bad_signature_returns_400(self):
+        """
+        Verify that incoming webhook with invalid X-Razorpay-Signature is rejected with 400.
+        """
+        raw_body = '{"event": "payment.captured", "payload": {}}'
+        res = self.client.post(
+            '/api/payments/webhook/',
+            raw_body,
+            content_type='application/json',
+            HTTP_X_RAZORPAY_SIGNATURE='bad_signature_here'
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_paid_enroll_without_payment_returns_402(self):
+        """
+        Security check: Ensure students cannot bypass payment and directly self-enroll
+        in paid courses/batches via /api/enrollment/enroll/.
+        """
+        res = self.client.post('/api/enrollment/enroll/', {'course_id': str(self.course.id)})
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    def test_pdf_url_not_accessible_without_payment(self):
+        """
+        Verify that digital book downloads cannot be accessed with invalid or unpaid tokens.
+        """
+        # Bogus token
+        res = self.client.get('/api/payments/books/download/bogus_token_123/')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Unpaid book order
+        book = Book.objects.create(
+            id='test-book',
+            title='Test Physics Problem Book',
+            pdf_key='books/pdfs/secret_physics.pdf',
+            digital_price=Decimal('299.00'),
+            is_published=True,
+        )
+        unpaid_order = BookOrder.objects.create(
+            book=book,
+            user=self.student,
+            format=BookOrder.Format.DIGITAL,
+            base_price=Decimal('299.00'),
+            gst_amount=Decimal('53.82'),
+            total_amount=Decimal('352.82'),
+            amount_paise=35282,
+            buyer_name='Rahul',
+            buyer_email='rahul@adepteduverse.com',
+            buyer_phone='9999999999',
+            razorpay_order_id='order_unpaid_123',
+            status=BookOrder.Status.CREATED,
+            download_token='unpaid_token_abc',
+        )
+
+        # Still CREATED (not PAID)
+        res_unpaid = self.client.get('/api/payments/books/download/unpaid_token_abc/')
+        self.assertEqual(res_unpaid.status_code, status.HTTP_404_NOT_FOUND)

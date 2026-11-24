@@ -28,8 +28,18 @@ from .views import (
     LandingBannerViewSet,
     LandingBannerSettingsView,
 )
+from apps.academics.pricing_views import (
+    PricingCardAdminViewSet,
+    BatchAdminViewSet,
+    BatchItemAdminViewSet,
+    BatchFeatureAdminViewSet,
+)
 
 router = DefaultRouter()
+router.register('pricing-cards', PricingCardAdminViewSet, basename='admin-pricing-cards')
+router.register('batches', BatchAdminViewSet, basename='admin-batches')
+router.register('batch-items', BatchItemAdminViewSet, basename='admin-batch-items')
+router.register('batch-features', BatchFeatureAdminViewSet, basename='admin-batch-features')
 router.register('landing-banners', LandingBannerViewSet, basename='admin-landing-banners')
 router.register('hero-slides', HeroSlideViewSet, basename='admin-hero-slides')
 router.register('quick-access', QuickAccessViewSet, basename='admin-quick-access')

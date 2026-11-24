@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Exam, AcademicClass, Subject, Course, Category, Chapter, Topic, Lecture, Enrollment
+from .models import (
+    Exam, AcademicClass, Subject, Course, Category, Chapter, Topic, Lecture, Enrollment,
+    PricingCard, Batch, BatchFeature, BatchItem
+)
 
 class AcademicClassSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,3 +57,93 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enrollment
         fields = ['id', 'user', 'course', 'enrolled_at', 'status']
+
+
+class BatchItemPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BatchItem
+        fields = ['id', 'item_type', 'title', 'price', 'is_addon']
+
+
+class BatchFeaturePublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BatchFeature
+        fields = ['id', 'text', 'order']
+
+
+class BatchPublicSerializer(serializers.ModelSerializer):
+    card_key = serializers.CharField(source='card.key', read_only=True)
+    academic_class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
+    academic_class_slug = serializers.CharField(source='academic_class.slug', read_only=True, default='')
+    items = serializers.SerializerMethodField()
+    features = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Batch
+        fields = [
+            'id', 'name', 'slug', 'card_key', 'academic_class_name', 'academic_class_slug',
+            'tagline', 'description', 'image', 'price', 'original_price',
+            'display_order', 'is_published', 'items', 'features'
+        ]
+
+    def get_items(self, obj):
+        return BatchItemPublicSerializer(obj.items.all().order_by('is_addon', 'price'), many=True).data
+
+    def get_features(self, obj):
+        features = obj.features.all().order_by('order')
+        if not features.exists() and obj.card:
+            features = obj.card.features.all().order_by('order')
+        return BatchFeaturePublicSerializer(features, many=True).data
+
+
+class PricingCardPublicSerializer(serializers.ModelSerializer):
+    batches = serializers.SerializerMethodField()
+    features = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PricingCard
+        fields = [
+            'id', 'key', 'title', 'tagline', 'badge',
+            'rotate_seconds', 'cta_label', 'cta_url', 'order',
+            'batches', 'features'
+        ]
+
+    def get_batches(self, obj):
+        qs = obj.batches.filter(is_published=True).order_by('display_order', 'created_at')
+        return BatchPublicSerializer(qs, many=True).data
+
+    def get_features(self, obj):
+        return BatchFeaturePublicSerializer(obj.features.all().order_by('order'), many=True).data
+
+
+class BatchItemAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BatchItem
+        fields = '__all__'
+
+
+class BatchFeatureAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BatchFeature
+        fields = '__all__'
+
+
+class BatchAdminSerializer(serializers.ModelSerializer):
+    card_key = serializers.CharField(source='card.key', read_only=True)
+    academic_class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
+    items = BatchItemAdminSerializer(many=True, read_only=True)
+    features = BatchFeatureAdminSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Batch
+        fields = '__all__'
+
+
+class PricingCardAdminSerializer(serializers.ModelSerializer):
+    batches_count = serializers.IntegerField(source='batches.count', read_only=True)
+    features = BatchFeatureAdminSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PricingCard
+        fields = '__all__'
+

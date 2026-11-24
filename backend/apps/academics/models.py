@@ -159,3 +159,105 @@ class Enrollment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user.email} -> {self.course.title} ({self.status})"
+
+
+class PricingCard(TimeStampedModel):
+    """
+    Top-level pricing category cards displayed on the landing page (school, senior, dropper).
+    """
+    class CardKey(models.TextChoices):
+        SCHOOL = 'school', 'School Batches (Class VI-X)'
+        SENIOR = 'senior', 'Senior Batches (Class XI & XII)'
+        DROPPER = 'dropper', 'Dropper Batch'
+
+    key = models.CharField(max_length=50, choices=CardKey.choices, unique=True, db_index=True)
+    title = models.CharField(max_length=255)
+    tagline = models.CharField(max_length=500, blank=True)
+    badge = models.CharField(max_length=100, blank=True)
+    rotate_seconds = models.IntegerField(default=5, help_text="Carousel auto-advance speed in seconds")
+    cta_label = models.CharField(max_length=100, default='Explore Batches')
+    cta_url = models.CharField(max_length=255, default='/batches/school')
+    is_published = models.BooleanField(default=True, db_index=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        return f"{self.title} [{self.key}]"
+
+
+class Batch(TimeStampedModel):
+    """
+    Individual batch product (e.g. Foundation Star Batch, JEE Mains + Advanced).
+    Tied to a pricing category card, optional academic class, and optional Course.
+    """
+    card = models.ForeignKey(PricingCard, on_delete=models.CASCADE, related_name='batches')
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, db_index=True)
+    course = models.OneToOneField(Course, on_delete=models.SET_NULL, null=True, blank=True, related_name='batch')
+    academic_class = models.ForeignKey(AcademicClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='batches')
+    tagline = models.CharField(max_length=500, blank=True)
+    description = models.TextField(blank=True)
+    image = models.CharField(max_length=1000, blank=True, help_text="Cloudflare R2 image URL or static image path")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    display_order = models.IntegerField(default=0)
+    is_published = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ['display_order', 'created_at']
+        verbose_name_plural = "Batches"
+
+    def __str__(self):
+        return f"{self.name} (₹{self.price})"
+
+
+class BatchFeature(TimeStampedModel):
+    """
+    Checkmark bullet points attached to a PricingCard or directly to an individual Batch.
+    """
+    card = models.ForeignKey(PricingCard, on_delete=models.CASCADE, null=True, blank=True, related_name='features')
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, null=True, blank=True, related_name='features')
+    text = models.CharField(max_length=500)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        parent = self.batch.name if self.batch else (self.card.title if self.card else 'Unattached')
+        return f"{parent} -> {self.text[:40]}"
+
+
+class BatchItem(TimeStampedModel):
+    """
+    Itemized curriculum components and add-ons that make up a Batch.
+    """
+    class ItemType(models.TextChoices):
+        SP = 'SP', 'Subject Practice / Sheet Practice'
+        PP = 'PP', 'Problem Practice'
+        PYQ = 'PYQ', 'Previous Years Questions'
+        MENTAL_ABILITY = 'MENTAL_ABILITY', 'Mental Ability & Reasoning'
+        OLYMPIAD = 'OLYMPIAD', 'Olympiad Material'
+        TEST_SERIES = 'TEST_SERIES', 'Test Series'
+        ADVANCED_BOOK_DIGITAL = 'ADVANCED_BOOK_DIGITAL', 'Digital Advanced Problem Book'
+        MODULE = 'MODULE', 'Complete Module'
+        JEE_MAINS_TEST = 'JEE_MAINS_TEST', 'JEE Mains Mock Tests'
+        JEE_ADVANCED_TEST = 'JEE_ADVANCED_TEST', 'JEE Advanced Mock Tests'
+        SHORT_NOTES = 'SHORT_NOTES', 'Revision Short Notes'
+        COACHING_TEST_SERIES = 'COACHING_TEST_SERIES', 'National Coaching Test Series'
+
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='items')
+    item_type = models.CharField(max_length=50, choices=ItemType.choices)
+    title = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    is_addon = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['is_addon', 'price', 'created_at']
+
+    def __str__(self):
+        addon_flag = " [ADDON]" if self.is_addon else ""
+        return f"{self.batch.name}: {self.title} - ₹{self.price}{addon_flag}"
+

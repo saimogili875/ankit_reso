@@ -15,6 +15,8 @@ import {
   Image as ImageIcon,
   Bell,
   ShieldCheck,
+  Tag,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -43,7 +45,9 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     title: 'Academics',
     items: [
-      { label: 'Courses & Batches', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses, batches and pricing' },
+      { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses and course modules' },
+      { label: 'Batches & Pricing', href: '/admin/batches', icon: Layers, hint: 'Manage batches, prices, items and images' },
+      { label: 'Pricing Cards', href: '/admin/pricing-cards', icon: Tag, hint: 'Manage landing pricing category cards' },
       { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree, hint: 'Subjects, chapters, lectures and DPPs' },
       { label: 'Schedule', href: '/admin/schedule', icon: Calendar, hint: 'Live classes and daily timetable' },
     ],
