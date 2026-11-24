@@ -121,7 +121,6 @@ export default function BooksPage() {
   const [books, setBooks] = useState<BookItem[]>(OFFICIAL_BOOKS);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedFormat, setSelectedFormat] = useState<'all' | 'DIGITAL' | 'HARDCOPY'>('all');
   const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high' | 'discount'>('featured');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalBook, setActiveModalBook] = useState<BookItem | null>(null);
@@ -362,7 +361,7 @@ export default function BooksPage() {
                 <span className="text-slate-500 text-[11px]">Sort:</span>
                 <select
                   value={sortBy}
-                  onChange={(e: any) => setSortBy(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value as 'featured' | 'price-low' | 'price-high' | 'discount')}
                   className="px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-amber-400"
                 >
                   <option value="featured">Featured First</option>

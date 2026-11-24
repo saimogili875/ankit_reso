@@ -14,7 +14,6 @@ import {
   Layers,
   ShieldCheck,
   MessageCircle,
-  Video,
   BookOpen,
   Check,
   HelpCircle,
@@ -412,7 +411,7 @@ export function BatchesSection() {
           setCards(data);
         }
       })
-      .catch((err) => {
+      .catch(() => {
         // Fall back cleanly to seeded defaults
       });
 

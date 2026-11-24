@@ -3,23 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { 
   ArrowLeft, 
   Download, 
   Truck, 
   CheckCircle2, 
   ShieldCheck, 
-  Star, 
   BookOpen, 
-  Clock, 
-  Share2, 
   FileText, 
-  GraduationCap, 
   ChevronRight,
   MessageCircle,
   HelpCircle,
-  Check
 } from 'lucide-react';
 import { BookItem, BookPurchaseModal, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
@@ -214,26 +209,24 @@ const FALLBACK_BOOKS: Record<string, BookItem & {
 
 export default function BookDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = String(params?.slug || '');
 
-  const [book, setBook] = useState<any>(FALLBACK_BOOKS[slug] || null);
+  const [book, setBook] = useState<BookItem | null>(FALLBACK_BOOKS[slug] || null);
   const [format, setFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
   const [modalOpen, setModalOpen] = useState(false);
-  const [activePreview, setActivePreview] = useState<string>('');
 
   useEffect(() => {
     async function loadBook() {
       try {
         const res = await fetch(buildApiUrl(`/api/books/${slug}/`));
         if (res.ok) {
-          const data = await res.json();
+          const data: BookItem = await res.json();
           if (data && data.slug) {
-            setBook((prev: any) => ({
+            setBook({
               ...(FALLBACK_BOOKS[slug] || {}),
               ...data,
               cover_image: getBookCoverImage(data),
-            }));
+            });
           }
         }
       } catch {
@@ -352,7 +345,7 @@ export default function BookDetailPage() {
 
               <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
                 <Image
-                  src={activePreview || coverImage}
+                  src={coverImage}
                   alt={currentBook.title}
                   fill
                   className="object-contain"

@@ -11,6 +11,7 @@ export interface BookItem {
   slug?: string;
   title: string;
   subtitle?: string;
+  description?: string;
   badge?: string;
   pdfFileName?: string;
   digital_price?: number | string;
@@ -24,6 +25,10 @@ export interface BookItem {
   highlights?: string[];
   cover_image?: string;
   coverColor?: string;
+  pages?: number;
+  has_solutions?: boolean;
+  chapters?: string[];
+  sample_previews?: string[];
 }
 
 export function getBookCoverImage(book?: { slug?: string; title?: string; cover_image?: string } | null): string {

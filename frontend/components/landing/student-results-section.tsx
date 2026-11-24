@@ -30,7 +30,7 @@ export function StudentResultsSection() {
             setResults(data);
           }
         }
-      } catch (err) {
+      } catch {
         // Silently catch - compliance requirement: only render when verified entries exist
       } finally {
         if (isMounted) setLoaded(true);

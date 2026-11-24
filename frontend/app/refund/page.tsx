@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { RotateCcw, ArrowLeft, Mail, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RotateCcw, ArrowLeft, Mail, Phone, CheckCircle2 } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {

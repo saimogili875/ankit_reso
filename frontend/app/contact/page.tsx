@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Mail, Phone, MessageSquare, MapPin, ArrowLeft, GraduationCap, Clock } from 'lucide-react';
+import { Mail, Phone, MessageSquare, ArrowLeft, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
