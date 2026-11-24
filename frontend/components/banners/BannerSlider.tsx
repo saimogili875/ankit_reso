@@ -174,7 +174,7 @@ export function BannerSlider({ placement, className = '', isCompact = false }: B
                 Explore Batches →
               </a>
               <a
-                href="#teacher"
+                href="#about"
                 className="inline-flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-700/80 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition-colors"
               >
                 Meet Faculty

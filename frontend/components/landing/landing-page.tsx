@@ -96,7 +96,7 @@ export const LandingPage: React.FC = () => {
                 <Link href="/books">Books</Link>
               </li>
               <li>
-                <a href="#teacher">About Ankit Sir</a>
+                <a href="#about">About</a>
               </li>
               <li>
                 <a href="#faq">FAQ</a>
@@ -207,8 +207,8 @@ export const LandingPage: React.FC = () => {
           <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
             Official Books
           </Link>
-          <a href="#teacher" className="mobile-link" onClick={closeMobileMenu}>
-            About Ankit Sir
+          <a href="#about" className="mobile-link" onClick={closeMobileMenu}>
+            About
           </a>
           <a href="#faq" className="mobile-link" onClick={closeMobileMenu}>
             Frequently Asked Questions
@@ -424,9 +424,11 @@ export const LandingPage: React.FC = () => {
         <BooksSection />
 
         {/* ====================================================================
-             TEACHER & PEDAGOGY SHOWCASE (ANKIT SIR)
+             ABOUT / TEACHER & PEDAGOGY SHOWCASE (ANKIT SIR)
              ==================================================================== */}
-        <section className="landing-section teacher-section" id="teacher">
+        <section className="landing-section teacher-section" id="about">
+          {/* Support both #about and legacy #teacher anchor */}
+          <div id="teacher" className="scroll-mt-24" />
           <div className="landing-wrap teacher-grid">
             <div className="teacher-portrait-box" id="faculty-profile-card">
               <div className="portrait-halo">
