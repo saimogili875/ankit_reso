@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
-import { GraduationCap, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 import { BatchesSection } from './batches-section';
 import { BooksSection } from './books-section';
@@ -165,6 +165,23 @@ export const LandingPage: React.FC = () => {
                   </Link>
                 </>
               )}
+            </div>
+
+            {/* Mobile Header Quick Actions */}
+            <div className="flex items-center gap-1.5 lg:hidden mr-1">
+              <a
+                href="#batches"
+                className="px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold text-slate-200 bg-slate-800/90 border border-slate-700/80 hover:text-white"
+              >
+                Courses
+              </a>
+              <Link
+                href="/books"
+                className="px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 flex items-center gap-1"
+              >
+                <BookOpen className="w-3 h-3" />
+                <span>Books</span>
+              </Link>
             </div>
 
             <button
@@ -763,24 +780,49 @@ export const LandingPage: React.FC = () => {
       </footer>
 
       {/* ====================================================================
-           MOBILE FLOATING CONCIERGE DOCK
+           MOBILE BOTTOM NAVIGATION BAR
            ==================================================================== */}
-      <div className="mobile-dock">
+      <nav className="mobile-dock" aria-label="Mobile Navigation">
+        <a href="#top" className="mobile-dock-tab" aria-label="Home">
+          <Home className="w-5 h-5" />
+          <span>Home</span>
+        </a>
+        <a href="#batches" className="mobile-dock-tab" aria-label="Courses & Batches">
+          <GraduationCap className="w-5 h-5 text-indigo-400" />
+          <span>Courses</span>
+        </a>
+        <Link href="/books" className="mobile-dock-tab highlight" aria-label="Official Books">
+          <div className="relative">
+            <BookOpen className="w-5 h-5 text-amber-400" />
+            <span className="absolute -top-1 -right-2 px-1 py-0.2 bg-amber-500 text-[8px] font-black text-slate-950 rounded-full leading-tight">
+              HOT
+            </span>
+          </div>
+          <span className="text-amber-400 font-bold">Books</span>
+        </Link>
         <a
-          href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20to%20know%20more%20about%20Adept%20Eduverse%20JEE%20classes"
+          href="https://wa.me/919382557693?text=Hi%2C%20I%20have%20an%20inquiry%20regarding%20Adept%20Eduverse"
           target="_blank"
           rel="noopener noreferrer"
-          className="landing-btn btn-whatsapp"
+          className="mobile-dock-tab"
+          aria-label="WhatsApp Support"
         >
-          WhatsApp Desk
+          <MessageCircle className="w-5 h-5 text-emerald-400" />
+          <span>WhatsApp</span>
         </a>
         <Link
           href={isLoaded && isSignedIn && user ? dashboardHref : "/sign-in"}
-          className="landing-btn btn-primary"
+          className="mobile-dock-tab"
+          aria-label={isLoaded && isSignedIn && user ? "Dashboard" : "Login"}
         >
-          {isLoaded && isSignedIn && user ? "Dashboard" : "Login"}
+          {isLoaded && isSignedIn && user ? (
+            <LayoutDashboard className="w-5 h-5 text-sky-400" />
+          ) : (
+            <LogIn className="w-5 h-5 text-rose-400" />
+          )}
+          <span>{isLoaded && isSignedIn && user ? "Portal" : "Login"}</span>
         </Link>
-      </div>
+      </nav>
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import {
   Home,
   BookOpen,
+  BookCheck,
   Edit3,
   CalendarDays,
   BarChart3,
@@ -20,10 +21,11 @@ import {
 
 export const navItems = [
   { label: 'Home', href: '/', icon: Home },
+  { label: 'Courses', href: '/courses', icon: GraduationCap },
+  { label: 'Books', href: '/books', icon: BookCheck },
   { label: 'Learn', href: '/learn', icon: BookOpen },
   { label: 'Practice', href: '/practice', icon: Edit3 },
   { label: 'Schedule', href: '/schedule', icon: CalendarDays },
-  { label: 'Courses', href: '/courses', icon: GraduationCap },
   { label: 'Analysis', href: '/analysis', icon: BarChart3 },
   { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare },
   { label: 'Profile', href: '/profile', icon: User },

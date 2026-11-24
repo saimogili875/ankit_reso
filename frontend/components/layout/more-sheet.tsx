@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -32,6 +33,7 @@ export const MoreSheet: React.FC<MoreSheetProps> = ({ isOpen, onClose }) => {
   };
 
   const menuItems = [
+    { label: 'Official Bookstore', href: '/books', icon: BookOpen, desc: 'Class 10 & JEE question banks, digital & print' },
     { label: 'Schedule & Timetable', href: '/schedule', icon: CalendarDays, desc: 'Live classes, exams & deadlines' },
     { label: 'Performance Analysis', href: '/analysis', icon: BarChart3, desc: 'Rank predictor, accuracy & test metrics' },
     { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare, desc: '24/7 expert JEE faculty solutions' },
