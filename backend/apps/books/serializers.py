@@ -1,4 +1,6 @@
 import re
+import hmac
+import hashlib
 from rest_framework import serializers
 from .models import BookProduct, BookOrder
 from .services import normalize_indian_phone
@@ -182,8 +184,16 @@ class BookOrderPublicSerializer(serializers.ModelSerializer):
     def get_download_url(self, obj):
         if not self.get_can_download(obj):
             return None
-        # Return download endpoint with token
-        return f"/api/books/orders/{obj.public_id}/download/?token={obj.download_token}"
+        request = self.context.get('request')
+        if not request:
+            return None
+        token = request.query_params.get('token')
+        if not token:
+            return None
+        incoming_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        if not hmac.compare_digest(obj.download_token or '', incoming_hash):
+            return None
+        return f"/api/books/orders/{obj.public_id}/download/?token={token}"
 
 
 class BookOrderAdminSerializer(serializers.ModelSerializer):
