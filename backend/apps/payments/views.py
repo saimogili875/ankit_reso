@@ -425,6 +425,16 @@ class WebhookView(APIView):
                                 if enrollment.status != 'ACTIVE':
                                     enrollment.status = 'ACTIVE'
                                     enrollment.save(update_fields=['status'])
+                else:
+                    # Look up BookOrder by razorpay_order_id when no Course Payment matches
+                    try:
+                        from apps.books.models import BookOrder
+                        from apps.books.services import finalize_book_order
+                        book_order = BookOrder.objects.filter(razorpay_order_id=order_id).first()
+                        if book_order:
+                            finalize_book_order(book_order, payment_id)
+                    except Exception as exc:
+                        logger.exception("Failed to finalize book order %s from payments webhook: %s", order_id, exc)
 
             return Response({'status': 'ok', 'message': 'Event processed successfully.'}, status=status.HTTP_200_OK)
 

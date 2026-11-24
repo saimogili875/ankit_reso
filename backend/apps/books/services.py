@@ -2,10 +2,16 @@ import os
 import io
 import re
 import uuid
+import secrets
+import hashlib
 import logging
 import tempfile
 from typing import Optional, Tuple
+from datetime import timedelta
 from django.conf import settings
+from django.utils import timezone
+from django.db import transaction, models
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from rest_framework.exceptions import ValidationError
 from storage.service import storage_service
@@ -41,6 +47,121 @@ def normalize_indian_phone(phone_str: str) -> str:
         raise ValidationError("Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.")
 
     return f"+91{cleaned}"
+
+
+def get_client_ip(request) -> str:
+    """
+    Extracts client IP using NUM_PROXIES setting (defaults to 2):
+    takes the Nth address from the right of X-Forwarded-For header,
+    falling back to REMOTE_ADDR.
+    """
+    num_proxies = 2
+    if hasattr(settings, 'REST_FRAMEWORK') and isinstance(settings.REST_FRAMEWORK, dict):
+        num_proxies = settings.REST_FRAMEWORK.get('NUM_PROXIES', 2)
+    elif hasattr(settings, 'NUM_PROXIES'):
+        num_proxies = getattr(settings, 'NUM_PROXIES', 2)
+
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        parts = [p.strip() for p in xff.split(',') if p.strip()]
+        if parts:
+            idx = min(num_proxies, len(parts))
+            return parts[-idx]
+
+    return request.META.get('REMOTE_ADDR') or ''
+
+
+def generate_next_invoice_number(now_dt=None) -> str:
+    """
+    Generates next sequential invoice number: INV-BK-YYYYMMDD-0001
+    Guarantees uniqueness across concurrent transactions via select_for_update().
+    """
+    from .models import InvoiceSequence
+    if now_dt is None:
+        now_dt = timezone.now()
+    date_str = now_dt.strftime('%Y%m%d')
+
+    seq_obj, _ = InvoiceSequence.objects.select_for_update().get_or_create(
+        date_str=date_str,
+        defaults={'last_seq': 0}
+    )
+    seq_obj.last_seq += 1
+    seq_obj.save(update_fields=['last_seq'])
+
+    return f"INV-BK-{date_str}-{seq_obj.last_seq:04d}"
+
+
+def finalize_book_order(order_or_id, payment_id: str, signature: Optional[str] = None) -> Tuple[object, Optional[str]]:
+    """
+    Idempotently finalizes a BookOrder upon verified payment.
+    - Locked transaction with select_for_update().
+    - If already PAID, returns (order, cached_raw_token).
+    - Checks hardcopy stock: if out of stock, flags admin_note and raises ValidationError for manual refund.
+    - Decrements hardcopy stock using F() atomic expression.
+    - Generates sequential invoice number: INV-BK-YYYYMMDD-0001 via InvoiceSequence.
+    - For digital books: generates secure 64-char raw token, stores SHA-256 hash in DB, caches raw token.
+    - Dispatches confirmation email (with raw token) and admin notification.
+    - Returns (locked_order, raw_download_token).
+    """
+    from .models import BookOrder, BookProduct
+    order_id = order_or_id.id if hasattr(order_or_id, 'id') else order_or_id
+    raw_token = None
+
+    with transaction.atomic():
+        locked = BookOrder.objects.select_for_update().select_related('product').get(id=order_id)
+
+        # Idempotency check: if already PAID, return without duplicating invoice, tokens, or stock
+        if locked.status == BookOrder.Status.PAID:
+            cached_token = cache.get(f"book_raw_token_{locked.id}")
+            return locked, cached_token
+
+        is_out_of_stock = False
+        # Check hardcopy stock
+        if locked.format == BookOrder.Format.HARDCOPY:
+            if locked.product.stock_hardcopy is not None:
+                if locked.product.stock_hardcopy <= 0:
+                    locked.admin_note = (locked.admin_note + "\nREFUND_REQUIRED: Out of stock at payment verification.").strip()
+                    if payment_id:
+                        locked.razorpay_payment_id = payment_id
+                    locked.save(update_fields=['admin_note', 'razorpay_payment_id'])
+                    is_out_of_stock = True
+                else:
+                    # Atomic decrement using F() expression
+                    BookProduct.objects.filter(id=locked.product_id).update(stock_hardcopy=models.F('stock_hardcopy') - 1)
+                    locked.product.refresh_from_db(fields=['stock_hardcopy'])
+
+        if not is_out_of_stock:
+            locked.status = BookOrder.Status.PAID
+            locked.razorpay_payment_id = payment_id or locked.razorpay_payment_id
+            if signature:
+                locked.razorpay_signature = signature
+            locked.paid_at = timezone.now()
+
+            # Generate unique sequential invoice number
+            locked.invoice_number = generate_next_invoice_number(locked.paid_at)
+
+            if locked.format == BookOrder.Format.DIGITAL:
+                raw_token = secrets.token_hex(32)  # 64 hex characters
+                token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+                locked.download_token = token_hash
+                locked.download_expires_at = timezone.now() + timedelta(days=7)
+                locked.shipping_status = BookOrder.ShippingStatus.NA
+                # Cache raw token for 7 days so subsequent verify calls can return the raw token
+                cache.set(f"book_raw_token_{locked.id}", raw_token, timeout=86400 * 7)
+            else:
+                locked.shipping_status = BookOrder.ShippingStatus.PENDING
+
+            locked.save()
+
+    if is_out_of_stock:
+        raise ValidationError("Hard copy is currently out of stock. Order flagged for manual refund.")
+
+    # Outside atomic block: send notifications safely
+    send_order_confirmation_email(locked, raw_download_token=raw_token)
+    send_admin_order_notification(locked)
+
+    return locked, raw_token
+
 
 
 def get_book_download_url(pdf_key: str, expiration_seconds: int = 600) -> Optional[str]:
@@ -267,10 +388,10 @@ def upload_book_pdf_private(pdf_file, filename: str) -> Optional[str]:
         return None
 
 
-def send_order_confirmation_email(order) -> bool:
+def send_order_confirmation_email(order, raw_download_token: Optional[str] = None) -> bool:
     """
     Sends order receipt & fulfillment instructions to the buyer.
-    Never fails the transaction if SMTP fails.
+    Never fails the transaction if SMTP fails. Never logs raw download tokens.
     """
     if not order or not order.buyer_email:
         return False
@@ -279,7 +400,8 @@ def send_order_confirmation_email(order) -> bool:
         product_title = order.product.title
         total_inr = f"₹{order.total_amount_paise / 100:.2f}"
         base_url = getattr(settings, 'FRONTEND_URL', 'https://adepteduverse.com').rstrip('/')
-        receipt_url = f"{base_url}/books/order/{order.public_id}"
+        token_param = f"?token={raw_download_token}" if raw_download_token else ""
+        receipt_url = f"{base_url}/books/order/{order.public_id}{token_param}"
 
         subject = f"Order Confirmed: {product_title} [{order.get_format_display()}] - {order.invoice_number or str(order.public_id)[:8]}"
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'ANKIT JEE <no-reply@adepteduverse.com>')
