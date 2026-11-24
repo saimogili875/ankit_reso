@@ -26,10 +26,10 @@ class Command(BaseCommand):
             class_map = {}
             for num, name, slug, code in class_defs:
                 ac, _ = AcademicClass.objects.update_or_create(
-                    slug=slug,
+                    code=code,
                     defaults={
                         'name': name,
-                        'code': code,
+                        'slug': slug,
                         'order': num,
                     }
                 )
