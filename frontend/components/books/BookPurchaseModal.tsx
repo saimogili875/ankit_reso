@@ -17,7 +17,10 @@ export interface BookItem {
   digitalPrice?: number;
   hardcopy_price?: number | string;
   hardcopyPrice?: number;
+  original_price?: number | string;
+  originalPrice?: number;
   gst_percent?: number | string;
+  class_label?: string;
   highlights?: string[];
   cover_image?: string;
   coverColor?: string;

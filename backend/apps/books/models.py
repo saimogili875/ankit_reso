@@ -16,6 +16,7 @@ class BookProduct(TimeStampedModel):
     class_label = models.CharField(max_length=100, blank=True, default='Class 10th', help_text="e.g. Class 10th, JEE Foundation")
     digital_price = models.DecimalField(max_digits=10, decimal_places=2, default=299.00)
     hardcopy_price = models.DecimalField(max_digits=10, decimal_places=2, default=399.00)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Original printed MRP / strikethrough price")
     gst_percent = models.DecimalField(max_digits=4, decimal_places=2, default=18.00)
     pdf_key = models.CharField(max_length=500, blank=True, help_text="Private Cloudflare R2 object key")
     is_published = models.BooleanField(default=True, db_index=True)
