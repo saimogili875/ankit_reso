@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 import { BatchesSection } from './batches-section';
+import { BooksSection } from './books-section';
 
 interface FAQItemData {
   question: string;
@@ -91,7 +92,7 @@ export const LandingPage: React.FC = () => {
                 <a href="#batches">Batches</a>
               </li>
               <li>
-                <Link href="/books">Books</Link>
+                <a href="#books">Books</a>
               </li>
               <li>
                 <a href="#teacher">Faculty</a>
@@ -182,9 +183,9 @@ export const LandingPage: React.FC = () => {
           <a href="#batches" className="mobile-link" onClick={closeMobileMenu}>
             JEE Batches
           </a>
-          <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
+          <a href="#books" className="mobile-link" onClick={closeMobileMenu}>
             Books &amp; Publications
-          </Link>
+          </a>
           <a href="#teacher" className="mobile-link" onClick={closeMobileMenu}>
             IIT Faculty
           </a>
@@ -376,6 +377,11 @@ export const LandingPage: React.FC = () => {
              BATCHES (COURSES) - DYNAMIC PRICING SYSTEM
              ==================================================================== */}
         <BatchesSection />
+
+        {/* ====================================================================
+             OFFICIAL BOOKS & PUBLICATIONS SECTION
+             ==================================================================== */}
+        <BooksSection />
 
         {/* ====================================================================
              TEACHER & PEDAGOGY SHOWCASE (ANKIT SIR)
