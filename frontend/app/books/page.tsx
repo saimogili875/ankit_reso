@@ -14,7 +14,9 @@ import {
   Star,
   Search,
   Layers,
-  GraduationCap
+  GraduationCap,
+  Share2,
+  Check
 } from 'lucide-react';
 import { BookPurchaseModal, BookItem, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
@@ -125,6 +127,69 @@ export default function BooksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalBook, setActiveModalBook] = useState<BookItem | null>(null);
   const [modalFormat, setModalFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
+  const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+
+  // Check URL hash or query param (?book=<slug>) to auto-scroll & light up in gold
+  useEffect(() => {
+    function checkHighlight() {
+      if (typeof window === 'undefined') return;
+      let targetSlug = '';
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#book-')) {
+        targetSlug = hash.replace('#book-', '').trim();
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qBook = urlParams.get('book');
+        if (qBook) targetSlug = qBook.trim();
+      }
+
+      if (targetSlug) {
+        setHighlightedSlug(targetSlug);
+        setTimeout(() => {
+          const el = document.getElementById(`book-${targetSlug}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 400);
+      }
+    }
+
+    checkHighlight();
+    window.addEventListener('hashchange', checkHighlight);
+    return () => window.removeEventListener('hashchange', checkHighlight);
+  }, []);
+
+  const handleShareBook = async (e: React.MouseEvent, book: BookItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const targetSlug = book.slug || book.id || '';
+    const shareUrl = `${origin}/books?book=${targetSlug}#book-${targetSlug}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${book.title} | Adept Eduverse Official Bookstore`,
+          text: `Check out "${book.title}" by Ankit Kumar Sir (B.Tech IIT Kharagpur, 2019) on Adept Eduverse! Available in instant Digital PDF & Doorstep Physical Delivery:`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Fallback
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedSlug(targetSlug);
+      setTimeout(() => setCopiedSlug(null), 3000);
+    } catch {
+      prompt('Copy this link to share:', shareUrl);
+    }
+  };
 
   useEffect(() => {
     async function fetchBooks() {
@@ -399,12 +464,27 @@ export default function BooksPage() {
             const rawOriginal = Number(book.original_price ?? book.originalPrice ?? (rawHardcopy + 100));
             const discountPercent = Math.round(((rawOriginal - rawDigital) / rawOriginal) * 100);
             const coverUrl = getBookCoverImage(book);
+            const bookSlug = book.slug || book.id || '';
+            const isHighlighted = highlightedSlug === bookSlug;
 
             return (
               <div
-                key={book.slug || book.id}
-                className="group relative rounded-3xl bg-[#0B1120] border border-slate-800 hover:border-indigo-500/60 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-indigo-950/40"
+                key={bookSlug}
+                id={`book-${bookSlug}`}
+                className={`group relative rounded-3xl bg-[#0B1120] transition-all duration-500 flex flex-col justify-between overflow-hidden shadow-lg ${
+                  isHighlighted
+                    ? 'border-2 border-amber-400 ring-4 ring-amber-400/80 shadow-[0_0_45px_rgba(245,200,66,0.7)] scale-[1.02] z-20'
+                    : 'border border-slate-800 hover:border-indigo-500/60 hover:shadow-2xl hover:shadow-indigo-950/40'
+                }`}
               >
+                {/* Gold Highlight Banner for direct shared link */}
+                {isHighlighted && (
+                  <div className="py-1.5 px-3 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 text-[11px] font-black text-center tracking-wider uppercase shadow-md flex items-center justify-center gap-1.5 animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                    <span>Shared Book Selection • Direct View</span>
+                  </div>
+                )}
+
                 <div>
                   {/* Book Cover Container - Vertical Realistic Book Display */}
                   <div className="relative pt-6 pb-4 px-4 bg-gradient-to-b from-slate-950 to-[#0B1120] flex items-center justify-center border-b border-slate-800/60 overflow-hidden">
@@ -426,6 +506,27 @@ export default function BooksPage() {
                         {book.badge}
                       </div>
                     )}
+
+                    {/* Quick Floating Share Button on Cover */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleShareBook(e, book)}
+                      title="Share this book"
+                      aria-label={`Share ${book.title}`}
+                      className="absolute bottom-3 right-3 z-20 p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700/80 hover:border-amber-400/60 transition-all backdrop-blur-md shadow-md flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedSlug === bookSlug ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[10px] text-emerald-400 font-bold pr-1">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-semibold pr-1">Share</span>
+                        </>
+                      )}
+                    </button>
 
                     {/* Authentic 3D Book Cover View with Link to Details */}
                     <Link
@@ -513,9 +614,29 @@ export default function BooksPage() {
                       <Truck className="w-3.5 h-3.5" /> Hard Copy
                     </button>
                   </div>
+
+                  {/* Dedicated Share Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleShareBook(e, book)}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-amber-300 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedSlug === bookSlug ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300 font-bold">✓ Direct Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Share Book Link</span>
+                      </>
+                    )}
+                  </button>
+
                   <Link
                     href={`/books/${book.slug || book.id}`}
-                    className="block text-center text-[11px] font-semibold text-slate-400 hover:text-amber-400 transition-colors pt-1"
+                    className="block text-center text-[11px] font-semibold text-slate-400 hover:text-amber-400 transition-colors pt-0.5"
                   >
                     View Table of Contents &amp; Previews →
                   </Link>

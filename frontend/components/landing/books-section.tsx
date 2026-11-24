@@ -10,7 +10,9 @@ import {
   Sparkles, 
   ArrowRight,
   ShieldCheck,
-  GraduationCap
+  GraduationCap,
+  Share2,
+  Check
 } from 'lucide-react';
 import { BookItem, BookPurchaseModal, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
@@ -98,6 +100,38 @@ export const BooksSection: React.FC = () => {
   const [books, setBooks] = useState<BookItem[]>(DEFAULT_BOOKS);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [modalFormat, setModalFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
+  const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+
+  // Check URL hash (#book-<slug>) or query parameter (?book=<slug>) to auto-scroll & highlight in gold
+  useEffect(() => {
+    function checkHighlight() {
+      if (typeof window === 'undefined') return;
+      let targetSlug = '';
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#book-')) {
+        targetSlug = hash.replace('#book-', '').trim();
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qBook = urlParams.get('book');
+        if (qBook) targetSlug = qBook.trim();
+      }
+
+      if (targetSlug) {
+        setHighlightedSlug(targetSlug);
+        setTimeout(() => {
+          const el = document.getElementById(`book-${targetSlug}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 400);
+      }
+    }
+
+    checkHighlight();
+    window.addEventListener('hashchange', checkHighlight);
+    return () => window.removeEventListener('hashchange', checkHighlight);
+  }, []);
 
   useEffect(() => {
     async function loadBooks() {
@@ -131,6 +165,38 @@ export const BooksSection: React.FC = () => {
     setModalFormat(format);
   };
 
+  const handleShareBook = async (e: React.MouseEvent, book: BookItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const targetSlug = book.slug || book.id || '';
+    // Direct link to this book without requiring login or account creation
+    const shareUrl = `${origin}/#book-${targetSlug}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${book.title} | Adept Eduverse`,
+          text: `Check out "${book.title}" by Ankit Kumar Sir (B.Tech IIT Kharagpur, 2019) on Adept Eduverse! Available in instant Digital PDF & Doorstep Physical Delivery:`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard if share dialog is cancelled
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedSlug(targetSlug);
+      setTimeout(() => setCopiedSlug(null), 3000);
+    } catch {
+      prompt('Copy this link to share with classmates:', shareUrl);
+    }
+  };
+
   return (
     <section className="landing-section books-section" id="books" aria-label="Official Books and Publications">
       <div className="landing-wrap">
@@ -151,12 +217,27 @@ export const BooksSection: React.FC = () => {
             const rawOriginal = Number(book.original_price ?? book.originalPrice ?? 499);
             const discountPercent = Math.round(((rawOriginal - rawDigital) / rawOriginal) * 100);
             const coverUrl = getBookCoverImage(book);
+            const bookSlug = book.slug || book.id || '';
+            const isHighlighted = highlightedSlug === bookSlug;
 
             return (
               <div
-                key={book.slug || book.id}
-                className="group relative rounded-3xl bg-[#0B1120] border border-slate-800 hover:border-indigo-500/50 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-indigo-950/40"
+                key={bookSlug}
+                id={`book-${bookSlug}`}
+                className={`group relative rounded-3xl bg-[#0B1120] transition-all duration-500 flex flex-col justify-between overflow-hidden shadow-xl ${
+                  isHighlighted
+                    ? 'border-2 border-amber-400 ring-4 ring-amber-400/80 shadow-[0_0_45px_rgba(245,200,66,0.7)] scale-[1.02] z-20'
+                    : 'border border-slate-800 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-950/40'
+                }`}
               >
+                {/* Gold Highlight Banner for direct shared link */}
+                {isHighlighted && (
+                  <div className="py-1.5 px-3 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 text-[11px] font-black text-center tracking-wider uppercase shadow-md flex items-center justify-center gap-1.5 animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                    <span>Shared Book • Direct Focus</span>
+                  </div>
+                )}
+
                 <div>
                   {/* Visual Header / Real Book Cover Display */}
                   <div className="relative pt-6 pb-4 px-4 bg-gradient-to-b from-slate-950 to-[#0B1120] flex items-center justify-center border-b border-slate-800/60 overflow-hidden">
@@ -178,6 +259,27 @@ export const BooksSection: React.FC = () => {
                         {book.badge}
                       </div>
                     )}
+
+                    {/* Quick Floating Share Button on Cover */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleShareBook(e, book)}
+                      title="Share this book"
+                      aria-label={`Share ${book.title}`}
+                      className="absolute bottom-3 right-3 z-20 p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700/80 hover:border-amber-400/60 transition-all backdrop-blur-md shadow-md flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedSlug === bookSlug ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[10px] text-emerald-400 font-bold pr-1">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-semibold pr-1">Share</span>
+                        </>
+                      )}
+                    </button>
 
                     {/* Book Cover */}
                     <div className="relative aspect-[3/4] w-full max-w-[190px] rounded-xl overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:-translate-y-1 bg-slate-950">
@@ -257,6 +359,25 @@ export const BooksSection: React.FC = () => {
                       <Truck className="w-3 h-3" /> Order Book
                     </button>
                   </div>
+
+                  {/* Dedicated Share Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleShareBook(e, book)}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-amber-300 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedSlug === bookSlug ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300 font-bold">✓ Direct Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Share Book Link</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             );

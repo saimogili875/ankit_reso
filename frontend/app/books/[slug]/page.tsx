@@ -15,6 +15,8 @@ import {
   ChevronRight,
   MessageCircle,
   HelpCircle,
+  Share2,
+  Check
 } from 'lucide-react';
 import { BookItem, BookPurchaseModal, getBookCoverImage } from '@/components/books/BookPurchaseModal';
 import { buildApiUrl } from '@/lib/api-client';
@@ -214,6 +216,33 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<BookItem | null>(FALLBACK_BOOKS[slug] || null);
   const [format, setFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
   const [modalOpen, setModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShareBook = async () => {
+    if (typeof window === 'undefined') return;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${currentBook.title} | Adept Eduverse`,
+          text: `Check out "${currentBook.title}" by Ankit Kumar Sir (IIT Kharagpur) on Adept Eduverse!`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Fallback
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      prompt('Copy this link to share:', shareUrl);
+    }
+  };
 
   useEffect(() => {
     async function loadBook() {
@@ -371,13 +400,32 @@ export default function BookDetailPage() {
           {/* Right Column: Book Details & Format Toggle & Order Card (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
             <div>
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  {currentBook.class_label || 'CBSE Class X'}
-                </span>
-                <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  100% Verified Solutions Included
-                </span>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {currentBook.class_label || 'CBSE Class X'}
+                  </span>
+                  <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    100% Verified Solutions Included
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleShareBook}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-amber-400 text-slate-300 hover:text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ml-auto"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-300 font-bold">Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Share Book</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white leading-tight">

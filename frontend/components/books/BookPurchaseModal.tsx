@@ -39,21 +39,46 @@ export function getBookCoverImage(book?: { slug?: string; title?: string; cover_
 
   // If a valid book cover exists and is not a personal headshot of Ankit Sir, check if it's a real book image
   if (rawCover && rawCover.startsWith('/images/books/')) {
+    // If it's an advanced question bank book, strictly ensure it gets the advanced question bank cover
+    if (
+      slug.includes('advanced') || 
+      slug.includes('question-bank') || 
+      slug.includes('adv-qb') || 
+      slug.includes('adv-prob') || 
+      title.includes('advanced') || 
+      title.includes('question bank')
+    ) {
+      return '/images/books/cbse-10-advanced-question-bank.jpg';
+    }
     return rawCover;
   }
 
-  // Strict semantic resolution to official published book covers (never show author face in book cover slot)
+  // 1. Advanced Question Bank (Check first to prevent "complete syllabus" in title from overriding it!)
+  if (
+    slug.includes('advanced') || 
+    slug.includes('question-bank') || 
+    slug.includes('adv-qb') || 
+    slug.includes('adv-prob') || 
+    title.includes('advanced') || 
+    title.includes('question bank') || 
+    title.includes('problem book')
+  ) {
+    return '/images/books/cbse-10-advanced-question-bank.jpg';
+  }
+
+  // 2. Official PYQ (Previous Years Questions)
   if (slug.includes('pyq') || title.includes('previous years') || title.includes('pyq') || title.includes('solved')) {
     return '/images/books/cbse-10-pyq-mathematics.jpg';
   }
+
+  // 3. Mental Ability & Logical Reasoning
   if (slug.includes('mental-ability') || title.includes('mental ability') || title.includes('reasoning') || title.includes('logical')) {
     return '/images/books/cbse-10-mental-ability-reasoning.jpg';
   }
+
+  // 4. Mathematics Complete Syllabus (Textbook)
   if (slug.includes('complete') || title.includes('complete syllabus') || title.includes('best school book') || title.includes('textbook')) {
     return '/images/books/cbse-10-mathematics-complete.jpg';
-  }
-  if (slug.includes('advanced') || slug.includes('adv-qb') || slug.includes('adv-prob') || title.includes('question bank') || title.includes('advanced level') || title.includes('problem book')) {
-    return '/images/books/cbse-10-advanced-question-bank.jpg';
   }
 
   return '/images/books/cbse-10-pyq-mathematics.jpg';
