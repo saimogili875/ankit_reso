@@ -77,6 +77,9 @@ urlpatterns = [
     path('api/admin/payments/grant-enrollment/', AdminGrantEnrollmentView.as_view(), name='admin-payments-grant-enrollment'),
     path('api/admin-panel/payments/', AdminPaymentListView.as_view(), name='adminpanel-payments-list'),
     path('api/banners/', include('apps.banners.urls')),
+    path('api/books/', include('apps.books.urls')),
+    path('api/admin/books/', include('apps.books.admin_urls')),
+    path('api/admin-panel/books/', include('apps.books.admin_urls')),
 
     # Razorpay Standard Web Checkout Endpoints
     path('api/create-order', CreateOrderView.as_view(), name='create-order-noslash'),

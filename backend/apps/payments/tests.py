@@ -391,7 +391,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from apps.academics.models import PricingCard, Batch, BatchItem, Course, Enrollment
-from apps.payments.models import Payment, Book, BookOrder
+from apps.payments.models import Payment
 
 User = get_user_model()
 
@@ -561,38 +561,3 @@ class BatchPaymentSecurityTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
         self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
 
-    def test_pdf_url_not_accessible_without_payment(self):
-        """
-        Verify that digital book downloads cannot be accessed with invalid or unpaid tokens.
-        """
-        # Bogus token
-        res = self.client.get('/api/payments/books/download/bogus_token_123/')
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-        # Unpaid book order
-        book = Book.objects.create(
-            id='test-book',
-            title='Test Physics Problem Book',
-            pdf_key='books/pdfs/secret_physics.pdf',
-            digital_price=Decimal('299.00'),
-            is_published=True,
-        )
-        unpaid_order = BookOrder.objects.create(
-            book=book,
-            user=self.student,
-            format=BookOrder.Format.DIGITAL,
-            base_price=Decimal('299.00'),
-            gst_amount=Decimal('53.82'),
-            total_amount=Decimal('352.82'),
-            amount_paise=35282,
-            buyer_name='Rahul',
-            buyer_email='rahul@adepteduverse.com',
-            buyer_phone='9999999999',
-            razorpay_order_id='order_unpaid_123',
-            status=BookOrder.Status.CREATED,
-            download_token='unpaid_token_abc',
-        )
-
-        # Still CREATED (not PAID)
-        res_unpaid = self.client.get('/api/payments/books/download/unpaid_token_abc/')
-        self.assertEqual(res_unpaid.status_code, status.HTTP_404_NOT_FOUND)

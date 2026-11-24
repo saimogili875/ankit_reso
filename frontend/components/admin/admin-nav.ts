@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Tag,
   Layers,
+  BookOpen,
+  Package,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,6 +58,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     title: 'Content',
     items: [
       { label: 'Videos & Media', href: '/admin/videos', icon: Video, hint: 'YouTube and R2 cloud videos' },
+      { label: 'Books Catalog', href: '/admin/books', icon: BookOpen, hint: 'Manage books, digital & hardcopy prices' },
       { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle, hint: 'Single, multi and numerical questions' },
       { label: 'Study Materials', href: '/admin/materials', icon: FileText, hint: 'PDFs, notes and handouts' },
       { label: 'CBT Mock Tests', href: '/admin/tests', icon: Clock, hint: 'Build and publish timed tests' },
@@ -66,6 +69,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     items: [
       { label: 'Students', href: '/admin/students', icon: Users, hint: 'Accounts, enrolments and progress' },
       { label: 'Payments', href: '/admin/payments', icon: CreditCard, hint: 'Orders, receipts and refunds' },
+      { label: 'Book Orders', href: '/admin/book-orders', icon: Package, hint: 'Guest book orders, shipping & tracking' },
       { label: 'Doubt Solver', href: '/admin/doubts', icon: MessageSquare, hint: 'Reply to student doubts', badgeKey: 'open_doubts_count' },
       { label: 'Test Analytics', href: '/admin/test-analytics', icon: BarChart2, hint: 'Scores, accuracy and attempts' },
     ],

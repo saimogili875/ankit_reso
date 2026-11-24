@@ -1,33 +1,41 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, Download, Truck, ShieldCheck, Loader2, Sparkles, BookOpen, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { X, CheckCircle2, Download, Truck, ShieldCheck, Loader2, BookOpen, AlertCircle, ArrowRight } from 'lucide-react';
 import { loadRazorpayScript, RazorpayOptions } from '@/lib/razorpay';
+import { buildApiUrl } from '@/lib/api-client';
 
 export interface BookItem {
-  id: string;
+  id?: string;
+  slug?: string;
   title: string;
-  subtitle: string;
-  badge: string;
-  pdfFileName: string;
-  digitalPrice: number; // 299
-  hardcopyPrice: number; // 399
-  highlights: string[];
-  coverColor: string;
+  subtitle?: string;
+  badge?: string;
+  pdfFileName?: string;
+  digital_price?: number | string;
+  digitalPrice?: number;
+  hardcopy_price?: number | string;
+  hardcopyPrice?: number;
+  gst_percent?: number | string;
+  highlights?: string[];
+  cover_image?: string;
+  coverColor?: string;
 }
 
 interface BookPurchaseModalProps {
   book: BookItem | null;
-  initialFormat?: 'digital' | 'hardcopy';
+  initialFormat?: 'DIGITAL' | 'HARDCOPY' | 'digital' | 'hardcopy';
   onClose: () => void;
 }
 
 export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
   book,
-  initialFormat = 'digital',
+  initialFormat = 'DIGITAL',
   onClose,
 }) => {
-  const [format, setFormat] = useState<'digital' | 'hardcopy'>(initialFormat);
+  const normalizedInitial = String(initialFormat).toUpperCase() === 'HARDCOPY' ? 'HARDCOPY' : 'DIGITAL';
+  const [format, setFormat] = useState<'DIGITAL' | 'HARDCOPY'>(normalizedInitial);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -39,37 +47,62 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successData, setSuccessData] = useState<{
+    orderPublicId: string;
+    format: 'DIGITAL' | 'HARDCOPY';
+    invoiceNumber?: string;
     downloadUrl?: string | null;
-    fileName?: string | null;
     paymentId?: string;
   } | null>(null);
 
   if (!book) return null;
 
-  const basePrice = format === 'hardcopy' ? book.hardcopyPrice : book.digitalPrice;
-  const gstAmount = Math.round(basePrice * 0.18);
-  const totalAmount = basePrice + gstAmount;
+  const rawDigital = Number(book.digital_price ?? book.digitalPrice ?? 299);
+  const rawHardcopy = Number(book.hardcopy_price ?? book.hardcopyPrice ?? 399);
+  const basePrice = format === 'HARDCOPY' ? rawHardcopy : rawDigital;
+  const gstPercent = Number(book.gst_percent ?? 18);
+  const gstAmount = Math.round(basePrice * (gstPercent / 100) * 100) / 100;
+  const totalAmount = Math.round((basePrice + gstAmount) * 100) / 100;
 
   const handlePayNow = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!fullName.trim()) {
-      setErrorMessage('Please enter your full name.');
+    // Field validations
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMessage('Please enter your full name (minimum 2 characters).');
       return;
     }
-    if (!phone.trim() || phone.replace(/\D/g, '').length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
-    if (format === 'hardcopy') {
-      if (!shippingAddress.trim() || !city.trim() || !stateName.trim() || !pincode.trim()) {
-        setErrorMessage('Please provide complete delivery address, city, state, and pincode.');
+    if (!['6', '7', '8', '9'].includes(cleanPhone.slice(-10)[0])) {
+      setErrorMessage('Indian mobile numbers must start with 6, 7, 8, or 9.');
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@') || !email.includes('.')) {
+      setErrorMessage('Please enter a valid email address to receive your order receipt.');
+      return;
+    }
+
+    if (format === 'HARDCOPY') {
+      if (!shippingAddress.trim() || shippingAddress.trim().length < 5) {
+        setErrorMessage('Please provide your complete delivery street address.');
         return;
       }
-    } else {
-      if (!email.trim() || !email.includes('@')) {
-        setErrorMessage('Please enter a valid email address to receive your receipt.');
+      if (!city.trim()) {
+        setErrorMessage('Please provide your city.');
+        return;
+      }
+      if (!stateName.trim()) {
+        setErrorMessage('Please provide your state.');
+        return;
+      }
+      const cleanPin = pincode.replace(/\D/g, '');
+      if (cleanPin.length !== 6) {
+        setErrorMessage('Please enter a valid 6-digit Indian PIN code.');
         return;
       }
     }
@@ -79,37 +112,43 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
     try {
       const scriptReady = await loadRazorpayScript();
       if (!scriptReady || !window.Razorpay) {
-        throw new Error('Could not load Razorpay payment gateway. Please verify your connection.');
+        throw new Error('Could not load Razorpay payment gateway. Please check your internet connection.');
       }
 
-      // Step 1: Create Order
-      const res = await fetch('/api/payments/create-book-order', {
+      const bookSlug = book.slug || book.id;
+      if (!bookSlug) {
+        throw new Error('Book identifier is missing.');
+      }
+
+      // Step 1: Create Guest Order on Django backend
+      const createRes = await fetch(buildApiUrl('/api/books/orders/'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
-          bookId: book.id,
-          bookTitle: book.title,
+          product_slug: bookSlug,
           format,
-          customer: {
-            name: fullName,
-            email,
-            phone,
-            address: shippingAddress,
-            city,
-            state: stateName,
-            pincode,
-          },
+          buyer_name: fullName.trim(),
+          buyer_phone: cleanPhone.slice(-10),
+          buyer_email: email.trim().toLowerCase(),
+          shipping_address: format === 'HARDCOPY' ? shippingAddress.trim() : '',
+          city: format === 'HARDCOPY' ? city.trim() : '',
+          state: format === 'HARDCOPY' ? stateName.trim() : '',
+          pincode: format === 'HARDCOPY' ? pincode.replace(/\D/g, '') : '',
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to initialize payment order.');
+      if (!createRes.ok) {
+        const errJson = await createRes.json().catch(() => ({}));
+        const errDetail = errJson.error || Object.values(errJson)[0] || 'Failed to initiate book checkout.';
+        throw new Error(String(errDetail));
       }
 
-      const orderData = await res.json();
+      const orderData = await createRes.json();
 
-      // Step 2: Open Razorpay Checkout Modal
+      // Step 2: Open Razorpay Gateway Modal
       const paymentResponse = await new Promise<{
         razorpay_payment_id: string;
         razorpay_order_id: string;
@@ -117,23 +156,23 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
       }>((resolve, reject) => {
         const options: RazorpayOptions = {
           key: orderData.key_id,
-          amount: orderData.amount,
+          amount: orderData.amount_paise,
           currency: orderData.currency || 'INR',
           name: 'Adept Eduverse',
-          description: `${book.title} (${format === 'hardcopy' ? 'Hard Copy Book' : 'Digital PDF'})`,
+          description: `${book.title} (${format === 'HARDCOPY' ? 'Printed Hard Copy' : 'Digital PDF'})`,
           image: '/images/logo.png',
-          order_id: orderData.order_id,
+          order_id: orderData.razorpay_order_id,
           prefill: {
-            name: fullName,
-            email: email || undefined,
-            contact: phone,
+            name: fullName.trim(),
+            email: email.trim(),
+            contact: cleanPhone.slice(-10),
           },
           theme: {
             color: '#2B2FB8',
           },
           handler: (response) => resolve(response),
           modal: {
-            ondismiss: () => reject(new Error('Payment was canceled by user.')),
+            ondismiss: () => reject(new Error('Checkout window closed without payment.')),
           },
         };
 
@@ -141,31 +180,34 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
         rzp.open();
       });
 
-      // Step 3: Verify Payment
-      const verifyRes = await fetch('/api/payments/verify-book-order', {
+      // Step 3: Verify Signature & Finalize Order
+      const verifyRes = await fetch(buildApiUrl('/api/books/orders/verify/'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
           razorpay_order_id: paymentResponse.razorpay_order_id,
           razorpay_payment_id: paymentResponse.razorpay_payment_id,
           razorpay_signature: paymentResponse.razorpay_signature,
-          bookId: book.id,
-          format,
         }),
       });
 
       const verifyData = await verifyRes.json();
-      if (!verifyData.success) {
-        throw new Error(verifyData.error || 'Payment verification failed.');
+      if (!verifyRes.ok || !verifyData.success) {
+        throw new Error(verifyData.error || 'Payment signature verification failed.');
       }
 
       setSuccessData({
-        downloadUrl: verifyData.downloadUrl || verifyData.download_url,
-        fileName: verifyData.fileName || verifyData.book_title,
-        paymentId: verifyData.payment_id || verifyData.paymentId,
+        orderPublicId: verifyData.order_public_id,
+        format: verifyData.format,
+        invoiceNumber: verifyData.invoice_number,
+        downloadUrl: verifyData.download_url ? buildApiUrl(verifyData.download_url) : null,
+        paymentId: paymentResponse.razorpay_payment_id,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
+      const msg = err instanceof Error ? err.message : 'Payment process failed. Please try again.';
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -185,7 +227,9 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
               <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                 {book.title}
               </h2>
-              <span className="text-xs text-slate-500 dark:text-slate-400">{book.badge}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {book.badge || 'Official Publication'}
+              </span>
             </div>
           </div>
           <button
@@ -207,176 +251,196 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
 
               <div className="space-y-1">
                 <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  Payment Successful!
+                  Payment Verified!
                 </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Invoice: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{successData.invoiceNumber}</span>
+                </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Payment ID: <span className="font-mono text-indigo-600 dark:text-indigo-400">{successData.paymentId}</span>
                 </p>
               </div>
 
-              {format === 'digital' && successData.downloadUrl ? (
+              {successData.format === 'DIGITAL' && successData.downloadUrl ? (
                 <div className="p-5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800 space-y-3">
                   <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
-                    Your digital edition is ready for instant download. Click below to save your PDF copy:
+                    Your digital edition is ready! Click below to download your secure PDF:
                   </p>
                   <a
                     href={successData.downloadUrl}
-                    download={successData.fileName || book.pdfFileName}
-                    className="inline-flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-[#2B2FB8] hover:bg-[#202494] text-white font-bold text-sm shadow-md transition-all"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#2B2FB8] hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Download {successData.fileName || book.pdfFileName}</span>
+                    <Download className="w-4 h-4" /> Download Book (PDF)
                   </a>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Your link is valid for 7 days (up to 5 downloads). A copy has also been sent to <strong>{email}</strong>.
+                  </p>
                 </div>
               ) : (
-                <div className="p-5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 text-left space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                    <Truck className="w-5 h-5" />
-                    <span>Order Confirmed for Hard Copy Delivery</span>
+                <div className="p-5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 space-y-2 text-left">
+                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
+                    <Truck className="w-4 h-4" /> Hard Copy Order Confirmed
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    We have received your delivery order for <strong>{fullName}</strong>. Your physical book will be packaged and dispatched to <strong>{shippingAddress}, {city}, {stateName} - {pincode}</strong> within 24-48 business hours. Tracking link will be sent to your phone.
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    We have received your physical order. Our team is packaging your book for dispatch. As soon as it ships, tracking details will be emailed to <strong>{email}</strong> and SMS sent to <strong>{phone}</strong>.
                   </p>
+                  <div className="pt-2 text-[11px] text-slate-500 dark:text-slate-400 border-t border-emerald-200/50 dark:border-emerald-800/50">
+                    <strong>Shipping To:</strong> {shippingAddress}, {city}, {stateName} - {pincode}
+                  </div>
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full h-11 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-              >
-                Done
-              </button>
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <Link
+                  href={`/books/order/${successData.orderPublicId}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors"
+                >
+                  View Order Status & Receipt <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handlePayNow} className="space-y-5">
               {/* Format Switcher */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
                   Select Format
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setFormat('digital')}
-                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                      format === 'digital'
-                        ? 'border-[#2B2FB8] bg-indigo-50/60 dark:bg-indigo-950/30 text-[#2B2FB8] dark:text-indigo-400 ring-2 ring-[#2B2FB8]/20'
-                        : 'border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400'
+                    onClick={() => setFormat('DIGITAL')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+                      format === 'DIGITAL'
+                        ? 'border-[#2B2FB8] bg-indigo-50/50 dark:bg-indigo-950/30 ring-2 ring-[#2B2FB8]/20'
+                        : 'border-[#E3E7EE] dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-xs font-bold">Digital PDF Book</span>
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Download className="w-3.5 h-3.5 text-indigo-600" /> Digital PDF
+                      </span>
+                      {format === 'DIGITAL' && (
+                        <div className="w-2 h-2 rounded-full bg-[#2B2FB8]" />
+                      )}
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-base font-extrabold text-slate-900 dark:text-white">₹299</span>
-                      <span className="text-[10px] text-slate-500">+ GST</span>
+                      <span className="text-base font-extrabold text-slate-900 dark:text-white">₹{rawDigital}</span>
+                      <span className="text-[10px] text-slate-500">+18% GST</span>
                     </div>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">Instant Access</span>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium block mt-1">
+                      Instant Download
+                    </span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setFormat('hardcopy')}
-                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                      format === 'hardcopy'
-                        ? 'border-[#2B2FB8] bg-indigo-50/60 dark:bg-indigo-950/30 text-[#2B2FB8] dark:text-indigo-400 ring-2 ring-[#2B2FB8]/20'
-                        : 'border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400'
+                    onClick={() => setFormat('HARDCOPY')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+                      format === 'HARDCOPY'
+                        ? 'border-[#2B2FB8] bg-indigo-50/50 dark:bg-indigo-950/30 ring-2 ring-[#2B2FB8]/20'
+                        : 'border-[#E3E7EE] dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-xs font-bold">Hard Copy Book</span>
-                      <Truck className="w-3.5 h-3.5 text-indigo-500" />
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5 text-indigo-600" /> Hard Copy
+                      </span>
+                      {format === 'HARDCOPY' && (
+                        <div className="w-2 h-2 rounded-full bg-[#2B2FB8]" />
+                      )}
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-base font-extrabold text-slate-900 dark:text-white">₹399</span>
-                      <span className="text-[10px] text-slate-500">+ GST</span>
+                      <span className="text-base font-extrabold text-slate-900 dark:text-white">₹{rawHardcopy}</span>
+                      <span className="text-[10px] text-slate-500">+18% GST</span>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-medium mt-1">Doorstep Courier</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium block mt-1">
+                      Printed Book Delivery
+                    </span>
                   </button>
                 </div>
               </div>
 
-              {/* Form Inputs */}
-              <div className="space-y-3 pt-1">
+              {/* Guest Buyer Details */}
+              <div className="space-y-3 pt-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                  Buyer Information (No Login Required)
+                </label>
+
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Student Full Name *
-                  </label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Saikumar Mogili"
-                    className="w-full h-11 px-3.5 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:border-[#2B2FB8] focus:ring-1 focus:ring-[#2B2FB8] outline-none"
+                    placeholder="Student / Buyer Full Name *"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Mobile Number *
-                    </label>
                     <input
                       type="tel"
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="10-digit phone"
-                      className="w-full h-11 px-3.5 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:border-[#2B2FB8] focus:ring-1 focus:ring-[#2B2FB8] outline-none"
+                      placeholder="10-digit WhatsApp / Mobile *"
+                      maxLength={14}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Email Address {format === 'digital' ? '*' : '(Optional)'}
-                    </label>
                     <input
                       type="email"
-                      required={format === 'digital'}
+                      required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="student@example.com"
-                      className="w-full h-11 px-3.5 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:border-[#2B2FB8] focus:ring-1 focus:ring-[#2B2FB8] outline-none"
+                      placeholder="Email Address *"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                     />
                   </div>
                 </div>
 
-                {format === 'hardcopy' && (
+                {/* Hardcopy Shipping Address */}
+                {format === 'HARDCOPY' && (
                   <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-200">
-                      <Truck className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Delivery Shipping Address</span>
-                    </div>
-
-                    <div>
-                      <input
-                        type="text"
-                        required
-                        value={shippingAddress}
-                        onChange={(e) => setShippingAddress(e.target.value)}
-                        placeholder="House / Flat No, Street, Landmark"
-                        className="w-full h-11 px-3.5 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:border-[#2B2FB8] focus:ring-1 focus:ring-[#2B2FB8] outline-none"
-                      />
-                    </div>
-
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                      Delivery Address in India
+                    </span>
+                    <textarea
+                      required
+                      rows={2}
+                      value={shippingAddress}
+                      onChange={(e) => setShippingAddress(e.target.value)}
+                      placeholder="House/Flat No., Building, Street Name, Area *"
+                      className="w-full px-3.5 py-2 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
+                    />
                     <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         required
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
-                        placeholder="City"
-                        className="w-full h-11 px-3 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-xs focus:border-[#2B2FB8] outline-none"
+                        placeholder="City *"
+                        className="w-full px-3 py-2 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                       />
                       <input
                         type="text"
                         required
                         value={stateName}
                         onChange={(e) => setStateName(e.target.value)}
-                        placeholder="State"
-                        className="w-full h-11 px-3 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-xs focus:border-[#2B2FB8] outline-none"
+                        placeholder="State *"
+                        className="w-full px-3 py-2 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                       />
                       <input
                         type="text"
@@ -384,8 +448,8 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
                         maxLength={6}
                         value={pincode}
                         onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-                        placeholder="PIN Code"
-                        className="w-full h-11 px-3 rounded-xl border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-xs focus:border-[#2B2FB8] outline-none"
+                        placeholder="PIN Code *"
+                        className="w-full px-3 py-2 rounded-xl text-xs border border-[#E3E7EE] dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2B2FB8]/30"
                       />
                     </div>
                   </div>
@@ -393,51 +457,52 @@ export const BookPurchaseModal: React.FC<BookPurchaseModalProps> = ({
               </div>
 
               {/* Price Breakdown */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 space-y-1.5 text-xs">
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>Base Price ({format === 'hardcopy' ? 'Hard Copy Book' : 'Digital PDF'}):</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">₹{basePrice}</span>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-[#E3E7EE] dark:border-slate-800 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Base Price ({format === 'HARDCOPY' ? 'Printed Edition' : 'Digital PDF'})</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">₹{basePrice.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>GST (18%):</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">₹{gstAmount}</span>
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>GST ({gstPercent}%)</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">₹{gstAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-slate-900 dark:text-white font-extrabold text-sm pt-1.5 border-t border-slate-200 dark:border-slate-800">
-                  <span>Total Payable:</span>
-                  <span className="text-[#2B2FB8] dark:text-indigo-400">₹{totalAmount}</span>
+                <div className="pt-2 border-t border-[#E3E7EE] dark:border-slate-800 flex justify-between items-center text-sm font-bold text-slate-900 dark:text-white">
+                  <span>Total Amount Payable</span>
+                  <span className="text-base text-[#2B2FB8] dark:text-indigo-400 font-extrabold">
+                    ₹{totalAmount.toFixed(2)}
+                  </span>
                 </div>
               </div>
 
               {errorMessage && (
-                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-2">
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMessage}</span>
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full h-12 rounded-xl bg-[#2B2FB8] hover:bg-[#202494] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Processing Razorpay Checkout…</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Proceed to Pay ₹{totalAmount} via Razorpay</span>
-                    </>
-                  )}
-                </button>
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 mt-2.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>100% Secure Checkout powered by Razorpay Payments</span>
-                </div>
+              {/* Pay Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#2B2FB8] hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Initializing Razorpay Secure Checkout...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    Pay ₹{totalAmount.toFixed(2)} via Razorpay
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>100% Secure Payment • Official Receipt via Email • UPI / Cards / Netbanking</span>
               </div>
             </form>
           )}

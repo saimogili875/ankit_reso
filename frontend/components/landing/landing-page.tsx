@@ -91,6 +91,9 @@ export const LandingPage: React.FC = () => {
                 <a href="#batches">Batches</a>
               </li>
               <li>
+                <Link href="/books">Books</Link>
+              </li>
+              <li>
                 <a href="#teacher">Faculty</a>
               </li>
               <li>
@@ -179,6 +182,9 @@ export const LandingPage: React.FC = () => {
           <a href="#batches" className="mobile-link" onClick={closeMobileMenu}>
             JEE Batches
           </a>
+          <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
+            Books &amp; Publications
+          </Link>
           <a href="#teacher" className="mobile-link" onClick={closeMobileMenu}>
             IIT Faculty
           </a>
@@ -788,6 +794,9 @@ export const LandingPage: React.FC = () => {
             <div className="footer-col">
               <h4>Direct Access</h4>
               <ul className="footer-links">
+                <li>
+                  <Link href="/books">Official Books &amp; Publications</Link>
+                </li>
                 <li>
                   <Link href="/sign-in">Student Portal Login</Link>
                 </li>

@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BookOpen, Truck, Download, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, Truck, Download, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 import { BookItem, BookPurchaseModal } from './BookPurchaseModal';
+import { buildApiUrl } from '@/lib/api-client';
 
 const BOOKS: BookItem[] = [
   {
@@ -45,12 +47,14 @@ export const BookCatalogSection: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<'digital' | 'hardcopy'>('digital');
 
   React.useEffect(() => {
-    fetch('/api/payments/books/')
+    fetch(buildApiUrl('/api/books/'))
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped: BookItem[] = data.map((b, idx) => ({
+        const items = Array.isArray(data) ? data : (data?.results || []);
+        if (Array.isArray(items) && items.length > 0) {
+          const mapped: BookItem[] = items.map((b, idx) => ({
             id: b.id,
+            slug: b.slug,
             title: b.title,
             subtitle: b.subtitle || '',
             badge: b.badge || 'Official Book',
@@ -61,6 +65,7 @@ export const BookCatalogSection: React.FC = () => {
               ? b.highlights
               : (BOOKS[idx % BOOKS.length]?.highlights || []),
             coverColor: idx === 0 ? 'from-indigo-600 to-blue-700' : 'from-amber-600 to-orange-700',
+            cover_image: b.cover_image,
           }));
           setBooksList(mapped);
         }
@@ -88,6 +93,13 @@ export const BookCatalogSection: React.FC = () => {
             Authored by Ankit Sir (B.Tech, IIT Kharagpur). Choose instant <strong>Digital PDF access</strong> or get a physical <strong>Hard Copy delivered</strong> to your address via courier.
           </p>
         </div>
+        <Link
+          href="/books"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#2B2FB8] text-white hover:bg-indigo-700 shadow-sm transition-colors shrink-0"
+        >
+          <span>All Publications</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       {/* Book Cards Grid */}
@@ -115,7 +127,7 @@ export const BookCatalogSection: React.FC = () => {
               {/* Highlights & Features */}
               <div className="p-6 space-y-4">
                 <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                  {book.highlights.map((item, idx) => (
+                  {(book.highlights || []).map((item, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                       <span>{item}</span>
