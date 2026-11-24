@@ -119,7 +119,10 @@ const OFFICIAL_BOOKS: BookItem[] = [
 
 export default function BooksPage() {
   const [books, setBooks] = useState<BookItem[]>(OFFICIAL_BOOKS);
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'class10' | 'jee'>('all');
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedFormat, setSelectedFormat] = useState<'all' | 'DIGITAL' | 'HARDCOPY'>('all');
+  const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high' | 'discount'>('featured');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalBook, setActiveModalBook] = useState<BookItem | null>(null);
   const [modalFormat, setModalFormat] = useState<'DIGITAL' | 'HARDCOPY'>('DIGITAL');
@@ -152,28 +155,61 @@ export default function BooksPage() {
   }, []);
 
   const filteredBooks = useMemo(() => {
-    return books.filter((b) => {
-      const label = (b as { class_label?: string }).class_label || '';
-      const titleAndSub = `${b.title} ${b.subtitle || ''} ${label}`.toLowerCase();
-      
-      // Category filter
-      if (selectedCategory === 'class10') {
-        const isClass10 = titleAndSub.includes('10th') || titleAndSub.includes('class x') || titleAndSub.includes('cbse') || label.toLowerCase().includes('class 10') || label.toLowerCase().includes('class x');
-        if (!isClass10) return false;
-      } else if (selectedCategory === 'jee') {
-        const isJee = titleAndSub.includes('jee') || titleAndSub.includes('olympiad') || titleAndSub.includes('advanced problem');
-        if (!isJee) return false;
-      }
+    return books
+      .filter((b) => {
+        const label = (b as { class_label?: string }).class_label || '';
+        const titleAndSub = `${b.title} ${b.subtitle || ''} ${label}`.toLowerCase();
+        const slug = (b.slug || '').toLowerCase();
+        
+        // Class filter
+        if (selectedClass !== 'all') {
+          if (selectedClass === 'class10') {
+            const isClass10 = titleAndSub.includes('10th') || titleAndSub.includes('class x') || titleAndSub.includes('cbse');
+            if (!isClass10) return false;
+          } else if (selectedClass === 'jee') {
+            const isJee = titleAndSub.includes('jee') || titleAndSub.includes('olympiad') || slug.includes('adv-prob');
+            if (!isJee) return false;
+          }
+        }
 
-      // Search filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        return titleAndSub.includes(q);
-      }
+        // Type filter
+        if (selectedType !== 'all') {
+          if (selectedType === 'pyq' && !slug.includes('pyq') && !titleAndSub.includes('pyq') && !titleAndSub.includes('previous years')) {
+            return false;
+          }
+          if (selectedType === 'textbook' && !slug.includes('complete') && !titleAndSub.includes('textbook') && !titleAndSub.includes('complete syllabus')) {
+            return false;
+          }
+          if (selectedType === 'reasoning' && !slug.includes('reasoning') && !slug.includes('mental-ability') && !titleAndSub.includes('reasoning')) {
+            return false;
+          }
+          if (selectedType === 'question-bank' && !slug.includes('question-bank') && !slug.includes('adv-prob') && !titleAndSub.includes('question bank')) {
+            return false;
+          }
+        }
 
-      return true;
-    });
-  }, [books, selectedCategory, searchQuery]);
+        // Search filter
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          return titleAndSub.includes(q);
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const priceA = Number(a.digital_price ?? a.digitalPrice ?? 299);
+        const priceB = Number(b.digital_price ?? b.digitalPrice ?? 299);
+        const origA = Number(a.original_price ?? a.originalPrice ?? 499);
+        const origB = Number(b.original_price ?? b.originalPrice ?? 499);
+        const discA = origA - priceA;
+        const discB = origB - priceB;
+
+        if (sortBy === 'price-low') return priceA - priceB;
+        if (sortBy === 'price-high') return priceB - priceA;
+        if (sortBy === 'discount') return discB - discA;
+        return 0; // featured default
+      });
+  }, [books, selectedClass, selectedType, sortBy, searchQuery]);
 
   const handleOpenModal = (book: BookItem, format: 'DIGITAL' | 'HARDCOPY') => {
     setActiveModalBook(book);
@@ -241,56 +277,100 @@ export default function BooksPage() {
           </div>
 
           {/* Filter Tabs & Search Controls */}
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto pt-6 border-t border-slate-800/80">
-            {/* Filter Pills */}
-            <div className="inline-flex items-center p-1 rounded-2xl bg-slate-900/90 border border-slate-800 w-full sm:w-auto overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  selectedCategory === 'all'
-                    ? 'bg-[#2B2FB8] text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                All Books ({books.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('class10')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                  selectedCategory === 'class10'
-                    ? 'bg-[#2B2FB8] text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <GraduationCap className="w-3.5 h-3.5" />
-                <span>CBSE Class X Only</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('jee')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                  selectedCategory === 'jee'
-                    ? 'bg-[#2B2FB8] text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>JEE Advanced &amp; Olympiad</span>
-              </button>
+          <div className="mt-10 space-y-4 max-w-5xl mx-auto pt-6 border-t border-slate-800/80">
+            {/* Row 1: Class Pills & Search */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Filter Pills */}
+              <div className="inline-flex items-center p-1 rounded-2xl bg-slate-900/90 border border-slate-800 w-full sm:w-auto overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedClass('all')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    selectedClass === 'all'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  All Classes ({books.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClass('class10')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedClass === 'class10'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>CBSE Class X</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClass('jee')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedClass === 'jee'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>JEE &amp; Olympiad</span>
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by title, chapter..."
+                  className="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-slate-900/80 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                />
+              </div>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title, subject..."
-                className="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-slate-900/80 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-              />
+            {/* Row 2: Book Type Filter & Sort by Dropdown */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto py-1">
+                <span className="text-slate-500 font-semibold mr-1 text-[11px] shrink-0">Type:</span>
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'pyq', label: 'Past Solved PYQ' },
+                  { id: 'textbook', label: 'Textbook' },
+                  { id: 'question-bank', label: 'Question Bank' },
+                  { id: 'reasoning', label: 'Mental Ability' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedType(t.id)}
+                    className={`px-3 py-1 rounded-lg font-semibold transition-colors shrink-0 ${
+                      selectedType === t.id
+                        ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
+                        : 'bg-slate-900/50 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                <span className="text-slate-500 text-[11px]">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-amber-400"
+                >
+                  <option value="featured">Featured First</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                  <option value="discount">Biggest Discount</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -348,8 +428,11 @@ export default function BooksPage() {
                       </div>
                     )}
 
-                    {/* Authentic 3D Book Cover View */}
-                    <div className="relative aspect-[3/4] w-full max-w-[210px] rounded-xl overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:-translate-y-1 bg-slate-950">
+                    {/* Authentic 3D Book Cover View with Link to Details */}
+                    <Link
+                      href={`/books/${book.slug || book.id}`}
+                      className="relative aspect-[3/4] w-full max-w-[210px] rounded-xl overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:-translate-y-1 bg-slate-950 block"
+                    >
                       <Image
                         src={coverUrl}
                         alt={book.title}
@@ -357,15 +440,17 @@ export default function BooksPage() {
                         className="object-cover object-top"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       />
-                    </div>
+                    </Link>
                   </div>
 
                   {/* Body Content */}
                   <div className="p-5 space-y-3">
-                    {/* Title */}
-                    <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors leading-snug line-clamp-2">
-                      {book.title}
-                    </h3>
+                    {/* Title with Link */}
+                    <Link href={`/books/${book.slug || book.id}`} className="block">
+                      <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-2">
+                        {book.title}
+                      </h3>
+                    </Link>
 
                     {/* Author Credit */}
                     <div className="text-xs text-slate-400 flex items-center gap-1">
@@ -412,7 +497,7 @@ export default function BooksPage() {
                     </div>
                   </div>
 
-                  {/* Dual Action Buttons */}
+                  {/* Dual Action Buttons + Details Link */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -424,11 +509,17 @@ export default function BooksPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenModal(book, 'HARDCOPY')}
-                      className="py-2 px-2.5 rounded-xl font-bold text-xs bg-[#2B2FB8] hover:bg-indigo-700 text-white shadow-md shadow-indigo-900/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      className="py-2 px-2.5 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Truck className="w-3.5 h-3.5" /> Hard Copy
                     </button>
                   </div>
+                  <Link
+                    href={`/books/${book.slug || book.id}`}
+                    className="block text-center text-[11px] font-semibold text-slate-400 hover:text-amber-400 transition-colors pt-1"
+                  >
+                    View Table of Contents &amp; Previews →
+                  </Link>
                 </div>
               </div>
             );
