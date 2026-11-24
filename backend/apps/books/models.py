@@ -4,6 +4,22 @@ from django.conf import settings
 from apps.core.models import TimeStampedModel
 
 
+class InvoiceSequence(models.Model):
+    """
+    Daily sequential invoice counter for book orders: INV-BK-YYYYMMDD-XXXX
+    Guarantees monotonic sequence per calendar date using row-level select_for_update locking.
+    """
+    date_str = models.CharField(max_length=8, unique=True, db_index=True)
+    last_seq = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Invoice Sequence'
+        verbose_name_plural = 'Invoice Sequences'
+
+    def __str__(self):
+        return f"{self.date_str}: {self.last_seq}"
+
+
 class BookProduct(TimeStampedModel):
     """
     Official study book, problem bank, or publication published by the institute.
@@ -100,7 +116,7 @@ class BookOrder(TimeStampedModel):
     download_expires_at = models.DateTimeField(null=True, blank=True)
     download_count = models.IntegerField(default=0)
     max_downloads = models.IntegerField(default=5)
-    invoice_number = models.CharField(max_length=50, blank=True)
+    invoice_number = models.CharField(max_length=60, unique=True, null=True, blank=True, db_index=True)
 
     # Security & Audit metadata
     ip_address = models.GenericIPAddressField(null=True, blank=True)
