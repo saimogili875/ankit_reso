@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
-import { GraduationCap, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
+import { GraduationCap, Star, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
 import { BatchesSection } from './batches-section';
 import { BooksSection } from './books-section';
@@ -447,6 +447,14 @@ export const LandingPage: React.FC = () => {
                 <div className="seal-text-group">
                   <span className="seal-title">IIT Kharagpur</span>
                   <span className="seal-sub">B.Tech Engineering Alumnus (2019)</span>
+                </div>
+              </div>
+
+              <div className="iit-seal-badge" id="teacher-feedback-badge">
+                <Star className="seal-icon" width={22} height={22} />
+                <div className="seal-text-group">
+                  <span className="seal-title">96% Positive Feedback</span>
+                  <span className="seal-sub">Student ratings, 2025–26</span>
                 </div>
               </div>
 
