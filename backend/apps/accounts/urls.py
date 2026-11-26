@@ -19,6 +19,8 @@ from .views import (
     VerifyProfileChangePhoneOtpView,
     ClerkWebhookView,
     StudentOnboardingView,
+    AccountDataExportView,
+    AccountDeleteView,
 )
 
 urlpatterns = [
@@ -27,6 +29,8 @@ urlpatterns = [
 
     # Profile & Session
     re_path(r'^me/?$', CurrentUserView.as_view(), name='current-user'),
+    re_path(r'^me/export-data/?$', AccountDataExportView.as_view(), name='account-export-data'),
+    re_path(r'^me/delete-account/?$', AccountDeleteView.as_view(), name='account-delete'),
     re_path(r'^me/change-email/send-otp/?$', SendProfileChangeEmailOtpView.as_view(), name='profile-change-email-send-otp'),
     re_path(r'^me/change-email/verify-otp/?$', VerifyProfileChangeEmailOtpView.as_view(), name='profile-change-email-verify-otp'),
     re_path(r'^me/change-phone/send-otp/?$', SendProfileChangePhoneOtpView.as_view(), name='profile-change-phone-send-otp'),

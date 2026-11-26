@@ -445,6 +445,10 @@ class BatchPaymentSecurityTests(TestCase):
             is_addon=True,
         )
 
+    def _generate_signature(self, order_id, payment_id, secret=TEST_RAZORPAY_KEY_SECRET):
+        msg = f"{order_id}|{payment_id}".encode('utf-8')
+        return hmac.new(secret.encode('utf-8'), msg, hashlib.sha256).hexdigest()
+
     @patch('apps.payments.views.get_razorpay_client')
     def test_create_order_uses_db_price_ignoring_client_price(self, mock_get_client):
         """
@@ -559,5 +563,150 @@ class BatchPaymentSecurityTests(TestCase):
         """
         res = self.client.post('/api/enrollment/enroll/', {'course_id': str(self.course.id)})
         self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    def test_bad_signature_on_already_paid_payment_keeps_paid_status(self):
+        """
+        Phase 0 Fix 2: on a bad signature, never change status if the payment is already PAID.
+        """
+        order_id = 'order_already_paid_123'
+        payment_id = 'pay_already_paid_123'
+        payment = Payment.objects.create(
+            user=self.student,
+            batch=self.batch,
+            course=self.course,
+            amount_paise=550000,
+            currency='INR',
+            razorpay_order_id=order_id,
+            razorpay_payment_id=payment_id,
+            status=Payment.Status.PAID,
+            paid_at=timezone.now(),
+        )
+
+        res = self.client.post('/api/payments/verify/', {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': 'invalid_forged_signature',
+        })
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.PAID)
+
+    def test_batch_without_linked_course_blocks_checkout(self):
+        """
+        Phase 0 Fix 3: Block checkout in CreateOrderView if a batch has no linked course.
+        """
+        orphan_batch = Batch.objects.create(
+            card=self.card,
+            name='Orphan Batch No Course',
+            slug='orphan-batch-no-course',
+            course=None,
+            price=Decimal('1999.00'),
+            is_published=True,
+        )
+        res = self.client.post('/api/payments/create-order/', {
+            'batch_id': str(orphan_batch.id)
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no active course is linked', res.json().get('error', ''))
+
+    def test_invalid_addon_item_id_returns_400_not_500(self):
+        """
+        Phase 0 Fix 5: Validate addon_item_ids as UUIDs (400, not 500).
+        """
+        res = self.client.post('/api/payments/create-order/', {
+            'batch_id': str(self.batch.id),
+            'addon_item_ids': ['invalid-not-a-uuid-string'],
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Must be a valid UUID', res.json().get('error', ''))
+
+    @patch('apps.payments.views.get_razorpay_client')
+    def test_payment_fulfillment_creates_addon_entitlements(self, mock_client_getter):
+        """
+        Phase 0 Fix 3: Grant add-on entitlements on PAID via fulfill_payment.
+        """
+        from apps.payments.models import Entitlement
+        mock_client = MagicMock()
+        mock_client.order.create.return_value = {
+            'id': 'order_with_addon_123',
+            'amount': 579900,
+            'currency': 'INR',
+            'receipt': 'rcpt_addon',
+        }
+        mock_client_getter.return_value = mock_client
+
+        # Create order with add-on
+        res = self.client.post('/api/payments/create-order/', {
+            'batch_id': str(self.batch.id),
+            'addon_item_ids': [str(self.addon_book.id)],
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        order_id = res.json()['order_id']
+
+        # Verify payment
+        payment_id = 'pay_addon_123'
+        valid_sig = self._generate_signature(order_id, payment_id)
+
+        mock_client.utility.verify_payment_signature.return_value = True
+        mock_client.payment.fetch.return_value = {
+            'id': payment_id,
+            'amount': 579900,
+            'currency': 'INR',
+            'status': 'captured',
+        }
+
+        verify_res = self.client.post('/api/payments/verify/', {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': valid_sig,
+        })
+        self.assertEqual(verify_res.status_code, status.HTTP_200_OK)
+
+        # Assert Entitlement created
+        entitlement = Entitlement.objects.filter(
+            user=self.student,
+            batch=self.batch,
+            batch_item=self.addon_book
+        ).first()
+        self.assertIsNotNone(entitlement)
+        self.assertTrue(entitlement.is_active)
+        self.assertEqual(entitlement.title, self.addon_book.title)
+
+    @patch('apps.payments.views.get_razorpay_client')
+    def test_amount_mismatch_blocks_fulfillment(self, mock_client_getter):
+        """
+        Phase 0 Fix 4: Check paid amount and currency against payment.amount_paise.
+        On mismatch: no fulfillment.
+        """
+        mock_client = MagicMock()
+        mock_client_getter.return_value = mock_client
+        mock_client.utility.verify_payment_signature.return_value = True
+        # Razorpay says amount was only 100 paise (tampered) instead of 550000
+        mock_client.payment.fetch.return_value = {
+            'id': 'pay_tampered_123',
+            'amount': 100,
+            'currency': 'INR',
+            'status': 'captured',
+        }
+
+        order_id = 'order_tamper_amt_123'
+        Payment.objects.create(
+            user=self.student,
+            batch=self.batch,
+            course=self.course,
+            amount_paise=550000,
+            currency='INR',
+            razorpay_order_id=order_id,
+            status=Payment.Status.CREATED,
+        )
+
+        res = self.client.post('/api/payments/verify/', {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': 'pay_tampered_123',
+            'razorpay_signature': self._generate_signature(order_id, 'pay_tampered_123'),
+        })
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('does not match order record', res.json().get('error', ''))
         self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
 

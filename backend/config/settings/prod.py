@@ -15,6 +15,11 @@ if not VIDEO_STREAMING_SECRET:
 if VIDEO_STREAMING_SECRET == SECRET_KEY:
     raise ImproperlyConfigured("VIDEO_STREAMING_SECRET must not be identical to SECRET_KEY to prevent key reuse.")
 
+# Razorpay Webhook Secret: Enforce in production
+RAZORPAY_WEBHOOK_SECRET = config('RAZORPAY_WEBHOOK_SECRET', default='').strip()
+if not RAZORPAY_WEBHOOK_SECRET:
+    raise ImproperlyConfigured("RAZORPAY_WEBHOOK_SECRET must be configured in production to secure payment webhooks.")
+
 # Redis Configuration for Production:
 # Enforce REDIS_URL to avoid silent LocMemCache fallback which leads to split-brain
 # cache state across multi-process Gunicorn workers and Celery services.
@@ -51,7 +56,7 @@ def _normalize_origin(url: str) -> str:
         return f"https://{url}"
     return url.rstrip('/')
 
-DEFAULT_PROD_CORS_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+DEFAULT_PROD_CORS_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com'
 raw_cors = config('CORS_ALLOWED_ORIGINS', default=DEFAULT_PROD_CORS_ORIGINS)
 cors_origins = [_normalize_origin(o) for o in raw_cors.split(',') if _normalize_origin(o)]
 
@@ -65,8 +70,6 @@ for _origin in [
     'https://www.adepteduverse.com',
     'https://app.adepteduverse.com',
     'https://ankit-reso.onrender.com',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
 ]:
     if _origin not in cors_origins:
         cors_origins.append(_origin)
@@ -74,7 +77,7 @@ for _origin in [
 CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
-DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com,http://localhost:3000,http://127.0.0.1:3000'
+DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse.com,https://app.adepteduverse.com,https://ankit-reso.onrender.com'
 raw_csrf = config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_PROD_CSRF_ORIGINS)
 csrf_origins = [_normalize_origin(o) for o in raw_csrf.split(',') if _normalize_origin(o)]
 
@@ -88,8 +91,6 @@ for _origin in [
     'https://www.adepteduverse.com',
     'https://app.adepteduverse.com',
     'https://ankit-reso.onrender.com',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
 ]:
     if _origin not in csrf_origins:
         csrf_origins.append(_origin)
@@ -120,6 +121,12 @@ SECURE_REDIRECT_EXEMPT = [
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# HSTS & Referrer Policy Security Headers
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
+SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
+SECURE_REFERRER_POLICY = config('SECURE_REFERRER_POLICY', default='strict-origin-when-cross-origin')
 
 # Sentry Production Monitoring
 SENTRY_DSN = config('SENTRY_DSN', default=None)

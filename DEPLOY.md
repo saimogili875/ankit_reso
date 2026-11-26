@@ -194,3 +194,23 @@ The platform includes "Swecha", an academic admissions and student assistant.
 - In local development (`DEBUG=True`), uploaded banner images are automatically served from `/media/landing/`.
 - In production, media files can be served via standard storage backends (e.g. S3/Cloudflare R2 or persistent volumes).
 
+---
+
+## 8. Razorpay Payment Gateway & Webhook Setup
+
+### 8.1 Registering the Webhook in Razorpay Dashboard
+1. Log in to the [Razorpay Dashboard](https://dashboard.razorpay.com/).
+2. Navigate to **Settings** → **Webhooks** → **Add New Webhook**.
+3. **Webhook URL**: Enter `https://ankit-reso.onrender.com/api/payments/webhook/` (or your production domain e.g. `https://adepteduverse.com/api/payments/webhook/`).
+4. **Secret**: Enter a strong, random secret string (e.g. 32-character hexadecimal). Set this exact same value as `RAZORPAY_WEBHOOK_SECRET` in Render / deployment environment variables.
+5. **Active Events**: Select the following events:
+   - `payment.captured`
+   - `order.paid`
+   - `payment.failed`
+6. **Alert Email**: Enter institutional admin email for delivery failure notifications.
+7. Click **Create Webhook**.
+
+> [!IMPORTANT]
+> In production (`DJANGO_SETTINGS_MODULE=config.settings.prod`), backend startup will strictly fail (`ImproperlyConfigured`) if `RAZORPAY_WEBHOOK_SECRET` is empty or missing.
+
+

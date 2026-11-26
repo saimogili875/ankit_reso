@@ -62,3 +62,47 @@ class Payment(TimeStampedModel):
     def __str__(self):
         course_title = self.course.title if self.course else 'Direct Payment'
         return f"{self.user.email} - {course_title} - {self.amount_paise} paise ({self.status})"
+
+
+class Entitlement(TimeStampedModel):
+    """
+    Grants access to purchased curriculum add-ons and specialized batch components.
+    Created automatically when a Payment is transitioned to PAID.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='entitlements'
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.CASCADE,
+        related_name='entitlements'
+    )
+    batch = models.ForeignKey(
+        'academics.Batch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entitlements'
+    )
+    batch_item = models.ForeignKey(
+        'academics.BatchItem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entitlements'
+    )
+    item_type = models.CharField(max_length=50, blank=True)
+    title = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['payment']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - Entitlement: {self.title} ({self.item_type})"

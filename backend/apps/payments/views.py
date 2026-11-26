@@ -18,8 +18,10 @@ import razorpay
 
 from apps.accounts.permissions import IsStudent, IsAdminRole
 from apps.academics.models import Course, Enrollment, Batch, BatchItem
-from .models import Payment
+from .models import Payment, Entitlement
 from .serializers import PaymentSerializer
+from .services import fulfill_payment
+from .throttles import CheckoutRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,7 @@ class CreateOrderView(APIView):
     Price is calculated strictly on the server from the database. Client prices are completely ignored.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [CheckoutRateThrottle]
 
     def post(self, request):
         course_id = request.data.get('course_id')
@@ -57,6 +60,24 @@ class CreateOrderView(APIView):
                 {'error': 'Either course_id or batch_id is required.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Validate addon_item_ids strictly as UUIDs (400, not 500)
+        if addon_item_ids:
+            if not isinstance(addon_item_ids, list):
+                return Response(
+                    {'error': 'addon_item_ids must be a list of item IDs.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            cleaned_addon_ids = []
+            for item_id in addon_item_ids:
+                try:
+                    cleaned_addon_ids.append(str(uuid.UUID(str(item_id))))
+                except (ValueError, TypeError, AttributeError):
+                    return Response(
+                        {'error': f'Invalid addon item ID: {item_id}. Must be a valid UUID.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            addon_item_ids = cleaned_addon_ids
 
         course = None
         batch = None
@@ -79,6 +100,13 @@ class CreateOrderView(APIView):
                 return Response(
                     {'error': 'Batch not found or is not published.'},
                     status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Block checkout if batch has no linked course to prevent paid-but-not-delivered state
+            if not batch.course:
+                return Response(
+                    {'error': 'This batch cannot be purchased because no active course is linked to it.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             # Check if user already purchased this batch or enrolled in its course
@@ -115,7 +143,7 @@ class CreateOrderView(APIView):
             })
 
             # Process add-ons
-            if addon_item_ids and isinstance(addon_item_ids, list):
+            if addon_item_ids:
                 valid_addons = BatchItem.objects.filter(
                     batch=batch,
                     id__in=addon_item_ids,
@@ -176,9 +204,9 @@ class CreateOrderView(APIView):
             })
 
         # -------------------------------------------------------------
-        # 3. CONVERT TO PAISE & CREATE RAZORPAY ORDER
+        # 3. CONVERT TO PAISE (EXACT DECIMAL MATH) & CREATE RAZORPAY ORDER
         # -------------------------------------------------------------
-        amount_paise = int(round(float(total_amount_rupees) * 100))
+        amount_paise = int(total_amount_rupees * Decimal('100'))
         if amount_paise < 100:
             return Response(
                 {'error': 'Minimum order amount is ₹1.00.'},
@@ -250,7 +278,7 @@ class CreateOrderView(APIView):
             'amount': amount_paise,
             'currency': 'INR',
             'key_id': key_id,
-            'total_amount': float(total_amount_rupees),
+            'total_amount': str(total_amount_rupees),
             'items_count': len(items_snapshot),
         }, status=status.HTTP_201_CREATED)
 
@@ -313,40 +341,35 @@ class VerifyPaymentView(APIView):
 
         if not is_valid:
             logger.warning("Signature mismatch for order=%s, payment=%s", razorpay_order_id, razorpay_payment_id)
-            payment.status = Payment.Status.FAILED
-            payment.save(update_fields=['status'])
+            if payment.status != Payment.Status.PAID:
+                payment.status = Payment.Status.FAILED
+                payment.save(update_fields=['status'])
             return Response(
                 {'error': 'Payment signature verification failed.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Atomic idempotent enrollment
-        with transaction.atomic():
-            locked_payment = Payment.objects.select_for_update().get(id=payment.id)
-            if locked_payment.status == Payment.Status.PAID:
-                return Response({
-                    'success': True,
-                    'message': 'Payment already verified.',
-                    'order_id': locked_payment.razorpay_order_id,
-                    'payment_id': locked_payment.razorpay_payment_id,
-                    'enrolled': True,
-                }, status=status.HTTP_200_OK)
+        # Check paid amount and currency against payment.amount_paise via Razorpay API
+        try:
+            client = get_razorpay_client()
+            payment_info = client.payment.fetch(razorpay_payment_id)
+            if isinstance(payment_info, dict):
+                paid_amount = payment_info.get('amount')
+                paid_currency = payment_info.get('currency', 'INR')
+                if paid_amount is not None and (paid_amount != payment.amount_paise or paid_currency != payment.currency):
+                    logger.critical(
+                        "SECURITY ALERT: Payment amount/currency mismatch! Order %s, Payment %s: expected %s %s, got %s %s",
+                        payment.razorpay_order_id, razorpay_payment_id, payment.amount_paise, payment.currency, paid_amount, paid_currency
+                    )
+                    return Response(
+                        {'error': 'Paid amount or currency does not match order record. Fulfillment blocked.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+        except Exception as exc:
+            logger.warning("Razorpay API fetch check encountered: %s", exc)
 
-            locked_payment.status = Payment.Status.PAID
-            locked_payment.razorpay_payment_id = razorpay_payment_id
-            locked_payment.paid_at = timezone.now()
-            locked_payment.save(update_fields=['status', 'razorpay_payment_id', 'paid_at'])
-
-            target_course = locked_payment.course or (locked_payment.batch.course if locked_payment.batch else None)
-            if target_course:
-                enrollment, _ = Enrollment.objects.get_or_create(
-                    user=request.user,
-                    course=target_course,
-                    defaults={'status': 'ACTIVE'}
-                )
-                if enrollment.status != 'ACTIVE':
-                    enrollment.status = 'ACTIVE'
-                    enrollment.save(update_fields=['status'])
+        # Atomic idempotent fulfillment
+        locked_payment, is_enrolled = fulfill_payment(payment, razorpay_payment_id)
 
         return Response({
             'success': True,
@@ -354,7 +377,7 @@ class VerifyPaymentView(APIView):
             'order_id': locked_payment.razorpay_order_id,
             'payment_id': locked_payment.razorpay_payment_id,
             'batch_id': str(locked_payment.batch_id) if locked_payment.batch_id else None,
-            'enrolled': bool(target_course),
+            'enrolled': is_enrolled,
         }, status=status.HTTP_200_OK)
 
 
@@ -406,25 +429,16 @@ class WebhookView(APIView):
             if order_id:
                 payment = Payment.objects.filter(razorpay_order_id=order_id).select_related('course', 'batch', 'batch__course').first()
                 if payment:
-                    with transaction.atomic():
-                        locked = Payment.objects.select_for_update().get(id=payment.id)
-                        if locked.status != Payment.Status.PAID:
-                            locked.status = Payment.Status.PAID
-                            if payment_id:
-                                locked.razorpay_payment_id = payment_id
-                            locked.paid_at = timezone.now()
-                            locked.save(update_fields=['status', 'razorpay_payment_id', 'paid_at'])
+                    paid_amount = payment_entity.get('amount')
+                    paid_currency = payment_entity.get('currency', 'INR')
+                    if paid_amount is not None and (paid_amount != payment.amount_paise or paid_currency != payment.currency):
+                        logger.critical(
+                            "SECURITY ALERT: Webhook payment amount/currency mismatch for order %s: expected %s %s, got %s %s",
+                            order_id, payment.amount_paise, payment.currency, paid_amount, paid_currency
+                        )
+                        return Response({'error': 'Amount or currency mismatch. Fulfillment blocked.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                            target_course = locked.course or (locked.batch.course if locked.batch else None)
-                            if target_course:
-                                enrollment, _ = Enrollment.objects.get_or_create(
-                                    user=locked.user,
-                                    course=target_course,
-                                    defaults={'status': 'ACTIVE'}
-                                )
-                                if enrollment.status != 'ACTIVE':
-                                    enrollment.status = 'ACTIVE'
-                                    enrollment.save(update_fields=['status'])
+                    fulfill_payment(payment, payment_id)
                 else:
                     # Look up BookOrder by razorpay_order_id when no Course Payment matches
                     try:

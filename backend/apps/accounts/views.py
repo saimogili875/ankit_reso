@@ -1,6 +1,9 @@
 import logging
 import hashlib
+import uuid
 from django.conf import settings
+from django.utils import timezone
+from django.db import transaction
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -684,5 +687,132 @@ class StudentOnboardingView(APIView):
                 'preferred_language': profile.preferred_language,
                 'contact_phone': profile.contact_phone,
             }
+        }, status=status.HTTP_200_OK)
+
+
+class AccountDataExportView(APIView):
+    """
+    GET /api/auth/me/export-data/
+    Data Portability under DPDP: Returns all stored personal, academic, test, and purchase records
+    belonging to the authenticated user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        profile = getattr(user, 'student_profile', None)
+
+        profile_data = {
+            'username': user.username,
+            'email': user.email,
+            'phone': getattr(user, 'phone', None) or getattr(user, 'phone_number', None) or '',
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'full_name': getattr(user, 'full_name', '') or f"{user.first_name} {user.last_name}".strip(),
+            'role': user.role,
+            'date_joined': user.date_joined.isoformat() if getattr(user, 'date_joined', None) else None,
+            'is_verified': getattr(user, 'is_verified', False),
+            'academic_class': profile.academic_class if profile else None,
+            'target_exam': profile.target_exam if profile else None,
+            'target_year': profile.target_year if profile else None,
+            'bio': profile.bio if profile else '',
+        }
+
+        from apps.academics.models import Enrollment
+        enrollments = [
+            {
+                'course_id': str(e.course_id),
+                'course_title': e.course.title if e.course else '',
+                'enrolled_at': e.enrolled_at.isoformat() if e.enrolled_at else None,
+                'status': e.status,
+            }
+            for e in Enrollment.objects.filter(user=user).select_related('course')
+        ]
+
+        from apps.tests.models import TestAttempt
+        test_attempts = [
+            {
+                'test_id': str(a.test_id),
+                'test_title': a.test.title if a.test else '',
+                'score': a.score,
+                'total_marks': a.total_marks,
+                'percentage': a.percentage,
+                'accuracy': a.accuracy,
+                'status': a.status,
+                'completed_at': a.completed_at.isoformat() if a.completed_at else None,
+            }
+            for a in TestAttempt.objects.filter(user=user).select_related('test')
+        ]
+
+        from apps.payments.models import Payment
+        payments = [
+            {
+                'order_id': p.razorpay_order_id,
+                'payment_id': p.razorpay_payment_id,
+                'amount_paise': p.amount_paise,
+                'currency': p.currency,
+                'status': p.status,
+                'created_at': p.created_at.isoformat() if p.created_at else None,
+                'paid_at': p.paid_at.isoformat() if p.paid_at else None,
+                'items_snapshot': p.items_snapshot,
+            }
+            for p in Payment.objects.filter(user=user)
+        ]
+
+        return Response({
+            'export_timestamp': timezone.now().isoformat(),
+            'compliance': 'Digital Personal Data Protection Act (DPDP)',
+            'profile': profile_data,
+            'enrollments': enrollments,
+            'test_attempts': test_attempts,
+            'payments': payments,
+        }, status=status.HTTP_200_OK)
+
+
+class AccountDeleteView(APIView):
+    """
+    POST /api/auth/me/delete-account/
+    Right to Erasure under DPDP:
+    Anonymizes all user PII, disables active authentication, and preserves statutory financial logs.
+    Payload: { "confirmation": "DELETE" }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        confirmation = request.data.get('confirmation')
+        if confirmation != 'DELETE':
+            return Response(
+                {'error': 'To permanently delete your account, confirmation must equal "DELETE".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        with transaction.atomic():
+            user_id = user.id
+            user.is_active = False
+            user.first_name = "Deleted"
+            user.last_name = "User"
+            user.username = f"deleted_{uuid.uuid4().hex[:10]}"
+            user.email = f"deleted_{uuid.uuid4().hex[:10]}@anonymized.invalid"
+            if hasattr(user, 'phone'):
+                user.phone = None
+            if hasattr(user, 'phone_number'):
+                user.phone_number = None
+            if hasattr(user, 'full_name'):
+                user.full_name = "Deleted User"
+            user.set_unusable_password()
+            user.save()
+
+            profile = getattr(user, 'student_profile', None)
+            if profile:
+                profile.bio = ''
+                profile.city = ''
+                profile.state = ''
+                profile.contact_phone = ''
+                profile.save()
+
+        logger.info("Account deleted and anonymized under DPDP: user_id=%s", user_id)
+        return Response({
+            'message': 'Your account has been deleted and personal data permanently anonymized.',
         }, status=status.HTTP_200_OK)
 
