@@ -85,7 +85,17 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.next();
   }
 
-  // Protected student routes: Enforce Clerk login
+  // Protected student routes: Enforce Django session OR Clerk login
+  const sessionCookie = request.cookies.get('sessionid')?.value;
+  const authSessionCookie = request.cookies.get('auth_session')?.value;
+  const userRoleCookie = request.cookies.get('user_role')?.value;
+  const isDjangoAuth = Boolean(sessionCookie || authSessionCookie);
+
+  // If authenticated via Django session as student or admin, allow through
+  if (isDjangoAuth && (userRoleCookie === 'STUDENT' || userRoleCookie === 'ADMIN' || !userRoleCookie)) {
+    return NextResponse.next();
+  }
+
   const session = await auth();
   if (!session.userId) {
     const signInUrl = new URL('/sign-in', request.url);

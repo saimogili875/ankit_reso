@@ -253,15 +253,17 @@ class LoginSerializer(serializers.Serializer):
 
         user = None
         # Detect identifier type:
-        # 1. Contains '@' -> Email
+        # 1. If identifier contains '@', try email lookup first
         if '@' in identifier:
             user = User.objects.select_related('student_profile').filter(email__iexact=identifier).first()
-        # 2. Starts with '+' or is all digits -> Phone
-        elif identifier.startswith('+') or identifier.replace('-', '').replace(' ', '').isdigit():
+        
+        # 2. If looks like phone number, try phone lookup
+        if not user and (identifier.startswith('+') or identifier.replace('-', '').replace(' ', '').isdigit()):
             norm_phone = normalize_phone(identifier)
             user = User.objects.select_related('student_profile').filter(phone=norm_phone).first() or User.objects.select_related('student_profile').filter(phone_number=norm_phone).first()
-        # 3. Otherwise -> Username
-        else:
+        
+        # 3. Fallback to username (even if identifier contains '@', e.g. username='SriNri@2026')
+        if not user:
             user = User.objects.select_related('student_profile').filter(username__iexact=identifier).first()
 
         if not user or not user.check_password(password):

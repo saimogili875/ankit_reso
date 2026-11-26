@@ -93,9 +93,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (clerkLoaded) {
       if (!clerkUser) {
-        setUser(null);
-        clearAuthCookies();
-        setIsLoading(false);
+        const hasDjangoSession =
+          typeof document !== 'undefined' &&
+          document.cookie.split(';').some((c) => {
+            const trimmed = c.trim();
+            return trimmed.startsWith('auth_session=') || trimmed.startsWith('sessionid=');
+          });
+
+        if (!hasDjangoSession) {
+          setUser(null);
+          clearAuthCookies();
+          setIsLoading(false);
+        } else {
+          fetchUser();
+        }
       } else {
         fetchUser();
       }
