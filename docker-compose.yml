@@ -44,6 +44,7 @@ services:
       - DEBUG=True
       - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key}
       - ALLOWED_HOSTS=*
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_pass}@postgres:5432/${POSTGRES_DB:-adepteduverse}
       - POSTGRES_DB=${POSTGRES_DB:-adepteduverse}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_pass}
@@ -78,10 +79,11 @@ services:
       dockerfile: Dockerfile
     container_name: adepteduverse_celery
     restart: always
-    command: celery -A config worker --loglevel=info
+    command: celery -A config worker --loglevel=info -Q celery,video
     environment:
       - DEBUG=True
       - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_pass}@postgres:5432/${POSTGRES_DB:-adepteduverse}
       - POSTGRES_DB=${POSTGRES_DB:-adepteduverse}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_pass}
@@ -100,8 +102,34 @@ services:
       - TEXTBEE_API_KEY=${TEXTBEE_API_KEY}
       - TEXTBEE_DEVICE_ID=${TEXTBEE_DEVICE_ID}
     depends_on:
-      backend:
-        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: adepteduverse_celery_beat
+    restart: always
+    command: celery -A config beat --loglevel=info
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_pass}@postgres:5432/${POSTGRES_DB:-adepteduverse}
+      - POSTGRES_DB=${POSTGRES_DB:-adepteduverse}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_pass}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -115,6 +143,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - BACKEND_ORIGIN=http://backend:8000
     depends_on:
       - backend
 

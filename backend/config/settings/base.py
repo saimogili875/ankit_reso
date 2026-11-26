@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 from decouple import config
@@ -100,14 +101,31 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Configuration
 DATABASE_URL = config('DATABASE_URL', default=None)
-CONN_MAX_AGE = config('CONN_MAX_AGE', default=60, cast=int)
-POSTGRES_HOST = config('POSTGRES_HOST', default='localhost')
+MIGRATION_DATABASE_URL = config('MIGRATION_DATABASE_URL', default=None)
+DATABASE_SSL_REQUIRE = config('DATABASE_SSL_REQUIRE', default=None)
+
+POSTGRES_DB = config('POSTGRES_DB', default=None)
+POSTGRES_USER = config('POSTGRES_USER', default=None)
+POSTGRES_PASSWORD = config('POSTGRES_PASSWORD', default=None)
+POSTGRES_HOST = config('POSTGRES_HOST', default=None)
 POSTGRES_PORT = config('POSTGRES_PORT', default='5432')
 
-# Detect if using Supabase or PgBouncer transaction pooler (port 6543)
+# Direct migration connection routing (bypasses transaction poolers like PgBouncer)
+is_migrating = any(cmd in sys.argv for cmd in ['migrate', 'makemigrations'])
+active_db_url = DATABASE_URL
+if is_migrating and MIGRATION_DATABASE_URL:
+    active_db_url = MIGRATION_DATABASE_URL
+
+# Detect if using Supabase or PgBouncer transaction pooler (port 6543 or 'pooler' in host)
 is_pooler = False
-if DATABASE_URL:
-    is_pooler = ':6543' in DATABASE_URL or 'pooler' in DATABASE_URL.lower()
+if active_db_url:
+    is_pooler = ':6543' in active_db_url or 'pooler' in active_db_url.lower()
+
+# With a transaction pooler, CONN_MAX_AGE must be 0 to avoid pooler session starvation
+default_conn_max_age = 0 if is_pooler else 60
+CONN_MAX_AGE = config('CONN_MAX_AGE', default=default_conn_max_age, cast=int)
+if is_pooler:
+    CONN_MAX_AGE = 0
 
 DISABLE_SERVER_SIDE_CURSORS = config('DISABLE_SERVER_SIDE_CURSORS', default=is_pooler, cast=bool)
 
@@ -118,42 +136,86 @@ if 'test' in sys.argv:
             'NAME': ':memory:',
         }
     }
-elif DATABASE_URL:
+    db_engine = 'django.db.backends.sqlite3'
+    db_host = ':memory:'
+elif active_db_url:
+    url_lower = active_db_url.lower()
+    is_postgres_url = url_lower.startswith('postgres://') or url_lower.startswith('postgresql://')
+    is_sqlite_url = url_lower.startswith('sqlite://')
+
+    # SSL is only valid for PostgreSQL. Allow disabling via DATABASE_SSL_REQUIRE=false.
+    if DATABASE_SSL_REQUIRE is not None:
+        ssl_enabled = config('DATABASE_SSL_REQUIRE', default=True, cast=bool)
+    else:
+        # Auto-detect: require SSL for remote postgres (not localhost / 127.0.0.1 / postgres host)
+        is_local_host = any(h in url_lower for h in ['localhost', '127.0.0.1', '@postgres:', '@postgres/'])
+        ssl_enabled = is_postgres_url and not is_local_host
+
     try:
         import dj_database_url
-        DATABASES = {
-            'default': dj_database_url.parse(
-                DATABASE_URL,
-                conn_max_age=CONN_MAX_AGE,
-                conn_health_checks=True,
-                ssl_require=True,
-            )
-        }
-        if DISABLE_SERVER_SIDE_CURSORS or is_pooler:
-            DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+        parsed_db = dj_database_url.parse(
+            active_db_url,
+            conn_max_age=CONN_MAX_AGE,
+            conn_health_checks=True,
+            ssl_require=ssl_enabled if is_postgres_url else False,
+        )
+        if not is_postgres_url and 'OPTIONS' in parsed_db and 'sslmode' in parsed_db['OPTIONS']:
+            del parsed_db['OPTIONS']['sslmode']
+        if not ssl_enabled and 'OPTIONS' in parsed_db and 'sslmode' in parsed_db['OPTIONS']:
+            del parsed_db['OPTIONS']['sslmode']
+        if is_pooler or DISABLE_SERVER_SIDE_CURSORS:
+            parsed_db['DISABLE_SERVER_SIDE_CURSORS'] = True
+        DATABASES = {'default': parsed_db}
+        db_engine = parsed_db.get('ENGINE', '')
+        db_host = parsed_db.get('HOST', '')
     except ImportError:
-        parsed_db = urlparse(DATABASE_URL)
+        parsed_url = urlparse(active_db_url)
+        db_engine = 'django.db.backends.postgresql' if is_postgres_url else 'django.db.backends.sqlite3'
+        db_host = parsed_url.hostname or ''
         DATABASES = {
             'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': parsed_db.path.lstrip('/'),
-                'USER': unquote(parsed_db.username) if parsed_db.username else '',
-                'PASSWORD': unquote(parsed_db.password) if parsed_db.password else '',
-                'HOST': parsed_db.hostname or '',
-                'PORT': str(parsed_db.port) if parsed_db.port else '5432',
+                'ENGINE': db_engine,
+                'NAME': parsed_url.path.lstrip('/') if is_postgres_url else (BASE_DIR / 'db.sqlite3'),
+                'USER': unquote(parsed_url.username) if parsed_url.username else '',
+                'PASSWORD': unquote(parsed_url.password) if parsed_url.password else '',
+                'HOST': db_host,
+                'PORT': str(parsed_url.port) if parsed_url.port else '5432',
                 'CONN_MAX_AGE': CONN_MAX_AGE,
                 'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS or is_pooler,
-                'OPTIONS': {'sslmode': 'require'},
             }
         }
-else:
-    # Safe local fallback to SQLite when DATABASE_URL is not set
+        if is_postgres_url and ssl_enabled:
+            DATABASES['default']['OPTIONS'] = {'sslmode': 'require'}
+elif POSTGRES_DB and (POSTGRES_USER or POSTGRES_HOST):
+    # Branch 2: POSTGRES_* environment variables (e.g. Docker Compose)
+    db_engine = 'django.db.backends.postgresql'
+    db_host = POSTGRES_HOST or 'localhost'
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
+            'ENGINE': db_engine,
+            'NAME': POSTGRES_DB,
+            'USER': POSTGRES_USER or 'postgres',
+            'PASSWORD': POSTGRES_PASSWORD or '',
+            'HOST': db_host,
+            'PORT': str(POSTGRES_PORT or '5432'),
+            'CONN_MAX_AGE': CONN_MAX_AGE,
+            'DISABLE_SERVER_SIDE_CURSORS': DISABLE_SERVER_SIDE_CURSORS,
+        }
+    }
+else:
+    # Branch 3: Safe local fallback to SQLite when neither DATABASE_URL nor POSTGRES_* is set
+    db_engine = 'django.db.backends.sqlite3'
+    db_host = 'local-file'
+    DATABASES = {
+        'default': {
+            'ENGINE': db_engine,
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# Startup database logging (safe: engine and host only, never password)
+logger = logging.getLogger(__name__)
+logger.info("Database configured: ENGINE=%s, HOST=%s", db_engine, db_host or 'localhost')
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -235,18 +297,25 @@ REDIS_PORT = config('REDIS_PORT', default='6379')
 DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 DJANGO_REDIS_LOGGER = 'django_redis'
 
+redis_cache_options = {
+    'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+    'IGNORE_EXCEPTIONS': True,
+    'SOCKET_CONNECT_TIMEOUT': 2,
+    'SOCKET_TIMEOUT': 2,
+}
+# Render / Upstash TLS support for Redis
+if REDIS_URL and REDIS_URL.startswith('rediss://'):
+    redis_cache_options['CONNECTION_POOL_KWARGS'] = {
+        'ssl_cert_reqs': None,
+    }
+
 if REDIS_URL:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
             'LOCATION': REDIS_URL,
             'TIMEOUT': 300,
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                'IGNORE_EXCEPTIONS': True,
-                'SOCKET_CONNECT_TIMEOUT': 2,
-                'SOCKET_TIMEOUT': 2,
-            }
+            'OPTIONS': redis_cache_options,
         }
     }
 else:
@@ -262,6 +331,18 @@ SESSION_CACHE_ALIAS = 'default'
 
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL or 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL or 'redis://localhost:6379/0')
+
+# TLS Support for Celery Broker & Result Backend (e.g. Render Managed Redis rediss://)
+if CELERY_BROKER_URL.startswith('rediss://'):
+    import ssl
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE,
+    }
+if CELERY_RESULT_BACKEND.startswith('rediss://'):
+    import ssl
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE,
+    }
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:connections": "python3 ../scripts/check_connections.py"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.7",

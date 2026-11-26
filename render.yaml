@@ -33,6 +33,10 @@ services:
       # Individual POSTGRES_* parameters are only a fallback if DATABASE_URL is unset. Prefer DATABASE_URL.
       - key: DATABASE_URL
         sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: PREVIEW_ORIGINS_ENABLED
+        value: "false"
       - key: CONN_MAX_AGE
         value: "600"
       - key: DISABLE_SERVER_SIDE_CURSORS

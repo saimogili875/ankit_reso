@@ -197,3 +197,19 @@ class R2StorageClient:
         except (BotoCoreError, ClientError) as e:
             logger.error(f"Failed to delete prefix {prefix} from R2: {e}")
             return 0
+
+    def check_connection(self) -> tuple[bool, str]:
+        """
+        Tests connectivity to Cloudflare R2 bucket.
+        Returns (is_connected: bool, status_message: str).
+        """
+        if not (self.access_key_id and self.secret_access_key and self.endpoint_url):
+            return False, "R2 credentials or endpoint not configured in environment"
+        client = self._get_client()
+        if not client:
+            return False, "Failed to initialize boto3 S3 client"
+        try:
+            client.head_bucket(Bucket=self.bucket_name)
+            return True, f"Connected to bucket '{self.bucket_name}'"
+        except (BotoCoreError, ClientError) as e:
+            return False, f"R2 bucket connection error: {e}"

@@ -29,9 +29,9 @@ if not REDIS_URL:
     raise ImproperlyConfigured("REDIS_URL must be configured in production to prevent in-memory cache split-brain across workers.")
 
 # Host Configuration: Read from ALLOWED_HOSTS env var
-DEFAULT_PROD_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,localhost,127.0.0.1,testserver'
+DEFAULT_PROD_ALLOWED_HOSTS = 'adepteduverse.com,www.adepteduverse.com,ankit-reso.onrender.com,.onrender.com,testserver'
 ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default=DEFAULT_PROD_ALLOWED_HOSTS).split(',') if h.strip()]
-for _h in ['adepteduverse.com', 'www.adepteduverse.com', 'ankit-reso.onrender.com', '.onrender.com', 'localhost', '127.0.0.1', 'testserver']:
+for _h in ['adepteduverse.com', 'www.adepteduverse.com', 'ankit-reso.onrender.com', '.onrender.com', 'testserver']:
     if _h not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_h)
 
@@ -47,6 +47,7 @@ STORAGES = {
 
 # Frontend URL support for split deployment (e.g. Vercel)
 FRONTEND_URL = config('FRONTEND_URL', default='').strip()
+PREVIEW_ORIGINS_ENABLED = config('PREVIEW_ORIGINS_ENABLED', default=False, cast=bool)
 
 def _normalize_origin(url: str) -> str:
     url = url.strip()
@@ -60,9 +61,12 @@ DEFAULT_PROD_CORS_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse
 raw_cors = config('CORS_ALLOWED_ORIGINS', default=DEFAULT_PROD_CORS_ORIGINS)
 cors_origins = [_normalize_origin(o) for o in raw_cors.split(',') if _normalize_origin(o)]
 
+# Strictly exclude localhost/127.0.0.1 from production CORS
+cors_origins = [o for o in cors_origins if not ('localhost' in o or '127.0.0.1' in o)]
+
 if FRONTEND_URL:
     norm_frontend = _normalize_origin(FRONTEND_URL)
-    if norm_frontend and norm_frontend not in cors_origins:
+    if norm_frontend and not ('localhost' in norm_frontend or '127.0.0.1' in norm_frontend) and norm_frontend not in cors_origins:
         cors_origins.append(norm_frontend)
 
 for _origin in [
@@ -81,9 +85,12 @@ DEFAULT_PROD_CSRF_ORIGINS = 'https://adepteduverse.com,https://www.adepteduverse
 raw_csrf = config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_PROD_CSRF_ORIGINS)
 csrf_origins = [_normalize_origin(o) for o in raw_csrf.split(',') if _normalize_origin(o)]
 
+# Strictly exclude localhost/127.0.0.1 from production CSRF
+csrf_origins = [o for o in csrf_origins if not ('localhost' in o or '127.0.0.1' in o)]
+
 if FRONTEND_URL:
     norm_frontend = _normalize_origin(FRONTEND_URL)
-    if norm_frontend and norm_frontend not in csrf_origins:
+    if norm_frontend and not ('localhost' in norm_frontend or '127.0.0.1' in norm_frontend) and norm_frontend not in csrf_origins:
         csrf_origins.append(norm_frontend)
 
 for _origin in [
@@ -94,6 +101,18 @@ for _origin in [
 ]:
     if _origin not in csrf_origins:
         csrf_origins.append(_origin)
+
+# Regex origins for apex domain, subdomains, and onrender.com
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://([a-zA-Z0-9-]+\.)*adepteduverse\.com$",
+    r"^https://([a-zA-Z0-9-]+\.)*onrender\.com$",
+]
+
+# Dynamic Vercel preview environments support (toggled via PREVIEW_ORIGINS_ENABLED=true)
+if PREVIEW_ORIGINS_ENABLED:
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r"^https://[a-zA-Z0-9-]+\.vercel\.app$")
+    if 'https://*.vercel.app' not in csrf_origins:
+        csrf_origins.append('https://*.vercel.app')
 
 CSRF_TRUSTED_ORIGINS = csrf_origins
 
