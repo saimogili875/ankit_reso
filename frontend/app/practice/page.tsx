@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useEnrollment } from '@/hooks/use-enrollment';
+import { useActiveCourse } from '@/hooks/use-active-course';
+import { CourseSwitcher } from '@/components/courses/CourseSwitcher';
 import { apiClient } from '@/lib/api-client';
 import { asList } from '@/lib/api-utils';
 import {
@@ -84,10 +86,26 @@ interface SubmitResult {
 
 export default function PracticePage() {
   const { isEnrolled } = useEnrollment();
-  const enrolled = isEnrolled();
+  const {
+    enrolledCourses,
+    allCourses,
+    activeCourse,
+    setActiveCourse,
+    isEnrolledInAny,
+    enrolledCount,
+  } = useActiveCourse();
+
+  const enrolled = isEnrolledInAny || isEnrolled();
 
   // Navigation step states
   const [selectedCourse, setSelectedCourse] = useState<boolean>(false);
+
+  // Auto-enter course if enrolled in 1+ courses
+  useEffect(() => {
+    if (activeCourse && enrolledCount > 0) {
+      setSelectedCourse(true);
+    }
+  }, [activeCourse, enrolledCount]);
   const [selectedClass, setSelectedClass] = useState<ClassChoice | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<ApiSubject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<ApiChapter | null>(null);
@@ -341,28 +359,73 @@ export default function PracticePage() {
         )}
       </div>
 
+      {/* Course Switcher */}
+      <CourseSwitcher
+        activeCourse={activeCourse}
+        courses={enrolledCount > 0 ? enrolledCourses : allCourses}
+        onSelectCourse={(c) => {
+          setActiveCourse(c);
+          setSelectedCourse(true);
+          setSelectedClass(null);
+          setSelectedSubject(null);
+          setSelectedChapter(null);
+          setActiveDPP(null);
+        }}
+        isEnrolledInAny={isEnrolledInAny}
+        enrolledCount={enrolledCount}
+      />
+
       {/* VIEW 1: NOT ENROLLED */}
       {!enrolled ? (
-        <Card className="p-8 sm:p-12 text-center space-y-5 max-w-2xl mx-auto border-blue-900/40 bg-slate-900/90 shadow-2xl">
-          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto shadow-inner">
-            <Lock className="w-8 h-8" />
+        <div className="space-y-6">
+          <Card className="p-8 text-center space-y-4 max-w-2xl mx-auto border-purple-900/40 bg-slate-900/90 shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-2">
+              <Badge variant="blue">Practice Catalog</Badge>
+              <h2 className="text-2xl font-extrabold text-white">Select a Course to Unlock Practice Sets</h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                You are previewing courses. Enroll in a course to unlock DPPs, CBT chapter practice sets, and solutions.
+              </p>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+            {allCourses.map((c) => (
+              <Card key={c.id} className="p-5 space-y-4 bg-slate-900/90 border-slate-800 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="blue">{c.exam_type || 'JEE'}</Badge>
+                    <span className="font-bold text-amber-400 text-sm">
+                      {c.is_free ? 'Free' : `₹${c.price}`}
+                    </span>
+                  </div>
+                  <h3 className="font-extrabold text-lg text-slate-100">{c.title}</h3>
+                  <p className="text-xs text-slate-400 line-clamp-2">{c.description || 'Structured JEE practice drills and tests'}</p>
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActiveCourse(c);
+                      setSelectedCourse(true);
+                    }}
+                    className="text-xs border-slate-700 text-slate-300 hover:text-white"
+                  >
+                    View Previews
+                  </Button>
+                  <Link href={`/courses`}>
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs">
+                      Enroll / Buy
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            ))}
           </div>
-          <div className="space-y-2">
-            <Badge variant="blue">Single Course Access</Badge>
-            <h2 className="text-2xl font-extrabold text-white">No Enrolled Courses Found</h2>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-              Enroll in the <strong>JEE Main + Advanced Complete Course</strong> on the Home page for Free to unlock all video lectures and practice problems.
-            </p>
-          </div>
-          <div className="pt-2">
-            <Link href="/">
-              <Button variant="primary" className="gap-2 px-6 py-3 font-bold shadow-lg shadow-blue-600/30">
-                <BookOpen className="w-4 h-4" />
-                <span>Explore & Enroll Free on Home</span>
-              </Button>
-            </Link>
-          </div>
-        </Card>
+        </div>
       ) : isLoadingQuestions ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
@@ -769,28 +832,33 @@ export default function PracticePage() {
             <p className="text-xs text-slate-400">Courses unlocked via your registration</p>
           </div>
 
-          <div className="max-w-2xl">
-            <Card className="p-6 space-y-5 bg-slate-900 border-slate-800 hover:border-emerald-500/40 transition-colors">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <Badge variant="blue">JEE Main & Advanced</Badge>
-                  <h3 className="font-extrabold text-lg text-slate-100">JEE Main + Advanced Complete Course</h3>
-                  <p className="text-xs text-slate-400">Class 11 + Class 12 • Physics • Chemistry • Mathematics</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+            {enrolledCourses.map((c) => (
+              <Card key={c.id} className="p-6 space-y-5 bg-slate-900 border-slate-800 hover:border-emerald-500/40 transition-colors flex flex-col justify-between">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <Badge variant="blue">{c.exam_type || 'JEE'}</Badge>
+                    <h3 className="font-extrabold text-lg text-slate-100">{c.title}</h3>
+                    <p className="text-xs text-slate-400 line-clamp-2">{c.description || 'Structured JEE practice drills and tests'}</p>
+                  </div>
+                  <Badge variant="emerald" className="px-3 py-1 shrink-0">✓ Enrolled</Badge>
                 </div>
-                <Badge variant="emerald" className="px-3 py-1 shrink-0">✓ Enrolled</Badge>
-              </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end">
-                <Button
-                  variant="primary"
-                  onClick={() => setSelectedCourse(true)}
-                  className="gap-2 px-5 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
-                >
-                  <span>Open Practice Sets</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </Card>
+                <div className="pt-3 border-t border-slate-800 flex justify-end">
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setActiveCourse(c);
+                      setSelectedCourse(true);
+                    }}
+                    className="gap-2 px-5 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
+                  >
+                    <span>Open Practice Sets</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
       )}

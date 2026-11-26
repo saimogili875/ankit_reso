@@ -400,12 +400,36 @@ class CurrentUserView(APIView):
             profile.target_year = data['target_year']
         if 'bio' in data:
             profile.bio = data['bio']
+        if 'last_selected_course_id' in request.data:
+            profile.last_selected_course_id = str(request.data['last_selected_course_id'])[:100]
         profile.save()
 
         user_data = UserSerializer(user).data
         return Response({
             'message': 'Profile updated successfully.',
             'user': user_data
+        }, status=status.HTTP_200_OK)
+
+
+class SelectCourseView(APIView):
+    """
+    POST /api/auth/select-course/
+    Persists student's active course selection to server profile.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        course_id = request.data.get('course_id') or request.data.get('course')
+        if not course_id:
+            return Response({'error': 'course_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+        profile.last_selected_course_id = str(course_id).strip()
+        profile.save(update_fields=['last_selected_course_id'])
+
+        return Response({
+            'success': True,
+            'last_selected_course_id': profile.last_selected_course_id
         }, status=status.HTTP_200_OK)
 
 

@@ -31,6 +31,7 @@ export interface HlsPlayerProps {
   initialPositionSeconds?: number;
   durationSeconds?: number;
   isFreePreview?: boolean;
+  watermarkText?: string;
   onEnded?: () => void;
   onProgressUpdate?: (watchedSeconds: number, lastPosition: number, percent: number) => void;
 }
@@ -62,12 +63,25 @@ export function HlsVideoPlayer({
   vttUrl,
   initialPositionSeconds = 0,
   durationSeconds = 0,
+  watermarkText,
   onEnded,
   onProgressUpdate,
 }: HlsPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+
+  // Anti-leak dynamic moving watermark state
+  const [watermarkPos, setWatermarkPos] = useState({ top: 15, left: 15 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const top = Math.floor(Math.random() * 65) + 10;
+      const left = Math.floor(Math.random() * 60) + 10;
+      setWatermarkPos({ top, left });
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -616,7 +630,10 @@ export function HlsVideoPlayer({
   if (youtubeVideoId) {
     const ytId = youtubeVideoId.replace(/.*(v=|youtu\.be\/)/, '').split('&')[0];
     return (
-      <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl">
+      <div
+        onContextMenu={(e) => e.preventDefault()}
+        className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl select-none"
+      >
         <iframe
           src={`https://www.youtube.com/embed/${ytId}?autoplay=1&modestbranding=1&rel=0`}
           title={title}
@@ -624,6 +641,20 @@ export function HlsVideoPlayer({
           allowFullScreen
           className="w-full h-full border-0"
         />
+        {/* Anti-leak watermark overlay over YouTube embed */}
+        {watermarkText && (
+          <div
+            style={{
+              top: `${watermarkPos.top}%`,
+              left: `${watermarkPos.left}%`,
+            }}
+            className="absolute pointer-events-none transition-all duration-1000 z-10 select-none"
+          >
+            <div className="bg-black/50 backdrop-blur-xs border border-white/10 px-2.5 py-1 rounded-md text-[10px] sm:text-xs text-white/50 font-mono tracking-wider shadow-sm">
+              {watermarkText}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -634,6 +665,7 @@ export function HlsVideoPlayer({
       onMouseMove={handleMouseMove}
       onTouchStart={handleTouchContainer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      onContextMenu={(e) => e.preventDefault()}
       className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl select-none group font-sans"
     >
       {/* Video Element */}
@@ -644,6 +676,21 @@ export function HlsVideoPlayer({
         onClick={togglePlay}
         className="w-full h-full object-contain cursor-pointer"
       />
+
+      {/* Anti-leak moving watermark overlay */}
+      {watermarkText && (
+        <div
+          style={{
+            top: `${watermarkPos.top}%`,
+            left: `${watermarkPos.left}%`,
+          }}
+          className="absolute pointer-events-none transition-all duration-1000 z-10 select-none"
+        >
+          <div className="bg-black/40 backdrop-blur-xs border border-white/10 px-2.5 py-1 rounded-md text-[10px] sm:text-xs text-white/60 font-mono tracking-wider shadow-sm">
+            {watermarkText}
+          </div>
+        </div>
+      )}
 
       {/* Buffering Spinner */}
       {isBuffering && (

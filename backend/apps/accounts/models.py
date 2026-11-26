@@ -102,6 +102,8 @@ class StudentProfile(TimeStampedModel):
     is_onboarded = models.BooleanField(default=False)
     avatar_url = models.URLField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
+    last_selected_course_id = models.CharField(max_length=100, blank=True, default='')
+    is_flagged_bulk_viewing = models.BooleanField(default=False, help_text="Flagged for downloading/scraping excessive pages in short interval")
 
     # Step 1 – Student details
     date_of_birth = models.DateField(null=True, blank=True)

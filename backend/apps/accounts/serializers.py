@@ -12,7 +12,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'academic_class', 'target_exam', 'target_year',
             'city', 'state', 'school_or_coaching',
             'preferred_language', 'contact_phone', 'is_onboarded',
-            'avatar_url', 'bio'
+            'avatar_url', 'bio', 'last_selected_course_id',
         ]
 
 class UserSerializer(serializers.ModelSerializer):

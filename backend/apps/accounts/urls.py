@@ -21,6 +21,7 @@ from .views import (
     StudentOnboardingView,
     AccountDataExportView,
     AccountDeleteView,
+    SelectCourseView,
 )
 
 urlpatterns = [
@@ -29,6 +30,7 @@ urlpatterns = [
 
     # Profile & Session
     re_path(r'^me/?$', CurrentUserView.as_view(), name='current-user'),
+    re_path(r'^select-course/?$', SelectCourseView.as_view(), name='select-course'),
     re_path(r'^me/export-data/?$', AccountDataExportView.as_view(), name='account-export-data'),
     re_path(r'^me/delete-account/?$', AccountDeleteView.as_view(), name='account-delete'),
     re_path(r'^me/change-email/send-otp/?$', SendProfileChangeEmailOtpView.as_view(), name='profile-change-email-send-otp'),

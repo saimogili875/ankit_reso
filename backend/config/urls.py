@@ -78,6 +78,7 @@ urlpatterns = [
     path('api/admin-panel/payments/', AdminPaymentListView.as_view(), name='adminpanel-payments-list'),
     path('api/banners/', include('apps.banners.urls')),
     path('api/books/', include('apps.books.urls')),
+    path('api/course-content/', include('apps.coursecontent.urls')),
     path('api/admin/books/', include('apps.books.admin_urls')),
     path('api/admin-panel/books/', include('apps.books.admin_urls')),
 

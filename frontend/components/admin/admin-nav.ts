@@ -19,6 +19,7 @@ import {
   Layers,
   BookOpen,
   Package,
+  PlusCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     title: 'Academics',
     items: [
       { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses and course modules' },
+      { label: 'Course Content', href: '/admin/course-content', icon: FolderTree, hint: 'Manage sections & items: modules, practice, notes, test series' },
       { label: 'Batches & Pricing', href: '/admin/batches', icon: Layers, hint: 'Manage batches, prices, items and images' },
       { label: 'Pricing Cards', href: '/admin/pricing-cards', icon: Tag, hint: 'Manage landing pricing category cards' },
       { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree, hint: 'Subjects, chapters, lectures and DPPs' },
@@ -62,6 +64,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle, hint: 'Single, multi and numerical questions' },
       { label: 'Study Materials', href: '/admin/materials', icon: FileText, hint: 'PDFs, notes and handouts' },
       { label: 'CBT Mock Tests', href: '/admin/tests', icon: Clock, hint: 'Build and publish timed tests' },
+      { label: 'Add Exam', href: '/admin/tests?create=true', icon: PlusCircle, hint: 'Create an exam (title, duration, marks, questions)' },
     ],
   },
   {

@@ -74,6 +74,12 @@ export default function AdminTestsPage() {
 
   useEffect(() => {
     fetchTests();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('create') === 'true' || params.get('action') === 'create') {
+        handleOpenCreate();
+      }
+    }
   }, []);
 
   const handleOpenCreate = () => {

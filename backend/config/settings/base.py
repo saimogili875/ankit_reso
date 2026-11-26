@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'apps.banners',
     'apps.payments',
     'apps.books',
+    'apps.coursecontent',
 ]
 
 MIDDLEWARE = [
