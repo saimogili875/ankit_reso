@@ -48,22 +48,30 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ children }) => {
   const isLanding = pathname === '/landing' || (pathname === '/' && isAuthenticated !== true);
 
   if (isAuthPage || isAdminPage || isLanding) {
-    return <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 font-sans">{children}</div>;
+    return (
+      <div className="min-h-[100dvh] bg-background text-foreground font-sans transition-colors duration-150">
+        {children}
+      </div>
+    );
   }
 
   if (isCBTAttemptPage) {
-    return <div className="min-h-[100dvh] bg-slate-950 text-slate-100 font-sans">{children}</div>;
+    return (
+      <div className="min-h-[100dvh] bg-[#0B0B0E] text-[#F5F5F7] font-sans">
+        <main role="main" className="min-h-[100dvh]">{children}</main>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 flex flex-col font-sans">
+    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col font-sans transition-colors duration-150">
       {/* Desktop Fixed Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
       <div className="lg:pl-64 flex-1 flex flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <Header />
-        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main role="main" className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

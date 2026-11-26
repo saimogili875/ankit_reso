@@ -213,7 +213,7 @@ class LoginView(APIView):
             # Reset failure count for this identifier upon successful login
             LoginFailedIdentifierRateThrottle.clear_login_failures(request)
 
-            user_data = UserSerializer(user).data
+            user_data = UserSerializer(user, context={'request': request}).data
             return Response({
                 'message': 'Login successful',
                 'user': user_data
@@ -362,7 +362,7 @@ class CurrentUserView(APIView):
     def get(self, request):
         if not request.user.is_authenticated:
             return Response({'authenticated': False, 'user': None}, status=status.HTTP_200_OK)
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={'request': request})
         return Response({'authenticated': True, 'user': serializer.data}, status=status.HTTP_200_OK)
 
     def patch(self, request):
@@ -372,6 +372,10 @@ class CurrentUserView(APIView):
 
         user = request.user
         data = serializer.validated_data
+
+        if 'theme' in data and hasattr(request, 'session'):
+            request.session['theme'] = data['theme']
+            request.session.modified = True
 
         if 'full_name' in data:
             user.full_name = data['full_name']
@@ -404,7 +408,7 @@ class CurrentUserView(APIView):
             profile.last_selected_course_id = str(request.data['last_selected_course_id'])[:100]
         profile.save()
 
-        user_data = UserSerializer(user).data
+        user_data = UserSerializer(user, context={'request': request}).data
         return Response({
             'message': 'Profile updated successfully.',
             'user': user_data
@@ -534,7 +538,7 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             login(request, user)
-            user_data = UserSerializer(user).data
+            user_data = UserSerializer(user, context={'request': request}).data
             return Response({'message': 'Registration successful', 'user': user_data}, status=status.HTTP_201_CREATED)
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 

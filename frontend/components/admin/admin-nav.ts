@@ -20,6 +20,7 @@ import {
   BookOpen,
   Package,
   PlusCircle,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -89,6 +90,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     title: 'System',
     items: [
       { label: 'Roles & RBAC', href: '/admin/roles', icon: ShieldCheck, hint: 'Assign Admin, Teacher, or Student roles' },
+      { label: 'Settings', href: '/settings', icon: Settings, hint: 'Appearance, devices and privacy preferences' },
     ],
   },
 ];

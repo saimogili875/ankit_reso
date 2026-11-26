@@ -29,6 +29,7 @@ export const navItems = [
   { label: 'Analysis', href: '/analysis', icon: BarChart3 },
   { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare },
   { label: 'Profile', href: '/profile', icon: User },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC = () => {

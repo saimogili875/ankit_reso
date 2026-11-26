@@ -25,7 +25,7 @@ export const BottomNav: React.FC = () => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   // Check if More is active (when current route is one of the More subpages)
-  const isMoreRoute = ['/schedule', '/analysis', '/doubt-solver', '/materials', '/profile'].some((r) =>
+  const isMoreRoute = ['/schedule', '/analysis', '/doubt-solver', '/materials', '/profile', '/settings'].some((r) =>
     pathname.startsWith(r)
   );
 

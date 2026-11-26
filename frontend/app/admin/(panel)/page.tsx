@@ -123,12 +123,12 @@ export default function AdminOverviewPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* Heading */}
-      <div className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-border">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-heading">
             Welcome back, {firstName}
           </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted mt-1">
             Real-time platform totals, daily growth trends, and management shortcuts.
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function AdminOverviewPage() {
           type="button"
           onClick={fetchOverview}
           disabled={isLoading}
-          className="flex items-center gap-2 h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm"
+          className="flex items-center gap-2 h-9 px-3.5 rounded-xl border border-border bg-surface text-sm font-medium text-foreground hover:bg-muted/10 disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Refresh</span>

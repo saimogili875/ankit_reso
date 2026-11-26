@@ -18,18 +18,25 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     student_profile = StudentProfileSerializer(read_only=True)
     is_admin = serializers.SerializerMethodField()
+    theme = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'clerk_id', 'email', 'username', 'full_name', 'first_name', 'last_name',
             'role', 'phone', 'phone_number', 'is_verified', 'is_email_verified',
-            'is_phone_verified', 'is_admin', 'student_profile'
+            'is_phone_verified', 'is_admin', 'student_profile', 'theme'
         ]
-        read_only_fields = ['id', 'clerk_id', 'is_verified', 'is_email_verified', 'is_phone_verified', 'is_admin']
+        read_only_fields = ['id', 'clerk_id', 'is_verified', 'is_email_verified', 'is_phone_verified', 'is_admin', 'theme']
 
     def get_is_admin(self, obj):
         return bool(str(obj.role).upper() == User.Role.ADMIN or obj.is_superuser or obj.is_staff)
+
+    def get_theme(self, obj):
+        request = self.context.get('request')
+        if request and hasattr(request, 'session'):
+            return request.session.get('theme', 'system')
+        return 'system'
 
 
 class StudentOnboardingSerializer(serializers.Serializer):
@@ -331,6 +338,7 @@ class UpdateProfileSerializer(serializers.Serializer):
     target_exam = serializers.CharField(required=False)
     target_year = serializers.IntegerField(required=False)
     bio = serializers.CharField(required=False, allow_blank=True)
+    theme = serializers.ChoiceField(choices=['light', 'dark', 'system'], required=False)
 
     def validate_username(self, value):
         user = self.context['request'].user

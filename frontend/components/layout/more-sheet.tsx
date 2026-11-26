@@ -40,6 +40,7 @@ export const MoreSheet: React.FC<MoreSheetProps> = ({ isOpen, onClose }) => {
     { label: 'Study Materials', href: '/materials', icon: FileText, desc: 'Formula sheets & revision handouts' },
     { label: 'Wrong-Answer Notebook', href: '/analysis/notebook', icon: Bookmark, desc: 'Bookmarks & error analysis' },
     { label: 'Student Profile', href: '/profile', icon: User, desc: 'Target exam, phone & personal settings' },
+    { label: 'Settings & Appearance', href: '/settings', icon: Settings, desc: 'Theme, active course, devices & data privacy' },
     { label: 'Administrator Portal', href: '/admin/login', icon: Settings, desc: 'Admin login & management console' },
   ];
 

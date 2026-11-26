@@ -1,33 +1,89 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #F4F6F8;
+  --surface: #FFFFFF;
+  --card: rgba(255, 255, 255, 0.90);
   --foreground: #101828;
+  --muted: #64748B;
+  --border: rgba(0, 0, 0, 0.08);
+  --primary: #2B2FB8;
+  --primary-hover: #1E2299;
+  --accent: #D97706;
+  --accent-light: #FEF3C7;
+
+  /* Backward compatibility aliases */
   --primary-indigo: #2B2FB8;
   --accent-amber: #F5B63D;
   --muted-slate: #5B6475;
   --border-card: #E3E7EE;
+
+  /* Chart Colors - Light */
+  --chart-1: #2B2FB8;
+  --chart-2: #0284C7;
+  --chart-3: #10B981;
+  --chart-4: #F59E0B;
+  --chart-5: #EF4444;
+  --chart-grid: rgba(0, 0, 0, 0.06);
+  --chart-tooltip-bg: rgba(255, 255, 255, 0.95);
+  --chart-tooltip-border: rgba(0, 0, 0, 0.1);
+}
+
+.dark {
+  --background: #0B0B0E;
+  --surface: #121216;
+  --card: rgba(22, 22, 28, 0.75);
+  --foreground: #F5F5F7;
+  --muted: #86868B;
+  --border: rgba(255, 255, 255, 0.08);
+  --primary: #818CF8; /* Lighter indigo with >= 4.5:1 contrast against #0B0B0E */
+  --primary-hover: #6366F1;
+  --accent: #FBBF24;
+  --accent-light: rgba(251, 191, 36, 0.15);
+
+  /* Backward compatibility aliases */
+  --primary-indigo: #818CF8;
+  --accent-amber: #FBBF24;
+  --muted-slate: #86868B;
+  --border-card: rgba(255, 255, 255, 0.08);
+
+  /* Chart Colors - Dark */
+  --chart-1: #818CF8;
+  --chart-2: #38BDF8;
+  --chart-3: #34D399;
+  --chart-4: #FBBF24;
+  --chart-5: #F87171;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-tooltip-bg: rgba(18, 18, 22, 0.95);
+  --chart-tooltip-border: rgba(255, 255, 255, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --font-sans: var(--font-inter), var(--font-figtree), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-inter), var(--font-bricolage), system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #020617;
-    --foreground: #f8fafc;
-  }
-}
-
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-figtree), system-ui, sans-serif;
   min-height: 100dvh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .font-heading {
@@ -36,4 +92,17 @@ body {
 
 .font-body {
   font-family: var(--font-figtree), system-ui, sans-serif;
+}
+
+/* Glass cards and Naresh-style subtle borders */
+.glass-card {
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
 }

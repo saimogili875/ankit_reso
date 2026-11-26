@@ -5,6 +5,7 @@ import './globals.css';
 import './landing.css';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { AuthProvider } from '@/hooks/use-auth';
+import { ThemeProvider } from '@/providers/theme-provider';
 
 const inter = localFont({
   src: [
@@ -45,8 +46,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
-      <body className="antialiased bg-[#F4F6F8] dark:bg-slate-950 text-[#101828] dark:text-slate-100 font-sans min-h-[100dvh]">
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var stored = localStorage.getItem('theme');
+                  var theme = stored || 'system';
+                  var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className="antialiased bg-background text-foreground font-sans min-h-[100dvh] transition-colors duration-150">
         <ClerkProvider
           afterSignOutUrl="/"
           appearance={{
@@ -57,7 +78,9 @@ export default function RootLayout({
           }}
         >
           <AuthProvider>
-            <DashboardShell>{children}</DashboardShell>
+            <ThemeProvider>
+              <DashboardShell>{children}</DashboardShell>
+            </ThemeProvider>
           </AuthProvider>
         </ClerkProvider>
       </body>

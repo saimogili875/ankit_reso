@@ -26,6 +26,7 @@ import {
 import { apiClient, clearAuthCookies } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
 import type { User, OtpSendResponse, OtpVerifyResponse } from '@/types';
+import { KpiCard, LineTrend, BarCompare } from '@/components/charts';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -246,7 +247,17 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-4 text-center space-y-4">
+        <h1 className="text-2xl font-bold text-foreground font-heading">Student Dashboard</h1>
+        <p className="text-xs text-muted">Please sign in to access your personal dashboard and progress metrics.</p>
+        <Link href="/login" className="inline-block px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white">
+          Sign In
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 px-4 sm:px-6">
@@ -669,6 +680,98 @@ export default function DashboardPage() {
           </form>
         </Card>
       )}
+
+      {/* Progress & Study Analytics */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-foreground font-heading">
+              Learning Progress & Performance
+            </h3>
+            <p className="text-xs text-muted">Weekly study pacing, test completions, and chapter mastery</p>
+          </div>
+          <Link
+            href="/analysis"
+            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+          >
+            <span>Full Analytics</span>
+            <span>&rarr;</span>
+          </Link>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <KpiCard
+            title="Weekly Study Hours"
+            value="18.5 hrs"
+            change={12}
+            changeLabel="vs last week"
+            sparklineData={[12, 14, 13, 16, 15, 17, 18.5]}
+            subtitle="Video lessons & practice"
+          />
+          <KpiCard
+            title="Mock Tests Done"
+            value="6 Tests"
+            change={20}
+            changeLabel="on schedule"
+            icon={Clock}
+            subtitle="76% average score"
+          />
+          <KpiCard
+            title="DPP Problems Solved"
+            value="142 Questions"
+            change={8}
+            changeLabel="accuracy 84%"
+            icon={BookOpen}
+            subtitle="Daily practice problems"
+          />
+          <KpiCard
+            title="Syllabus Progress"
+            value="68%"
+            badgeText="On Track"
+            icon={GraduationCap}
+            subtitle="JEE 2025 roadmap"
+          />
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <LineTrend
+            title="Daily Study Minutes (Last 7 Days)"
+            description="Time spent on video streaming and CBT test simulations"
+            data={[
+              { day: 'Mon', minutes: 120 },
+              { day: 'Tue', minutes: 165 },
+              { day: 'Wed', minutes: 140 },
+              { day: 'Thu', minutes: 190 },
+              { day: 'Fri', minutes: 155 },
+              { day: 'Sat', minutes: 210 },
+              { day: 'Sun', minutes: 180 },
+            ]}
+            xKey="day"
+            series={[{ key: 'minutes', name: 'Study Minutes', color: 'var(--chart-1)' }]}
+            height={220}
+            valueFormatter={(val) => `${val}m`}
+          />
+
+          <BarCompare
+            title="Subject Practice Accuracy (%)"
+            description="Overall accuracy across Mathematics, Physics, and Chemistry DPPs"
+            data={[
+              { subject: 'Math', accuracy: 88, target: 90 },
+              { subject: 'Physics', accuracy: 74, target: 80 },
+              { subject: 'Chemistry', accuracy: 82, target: 85 },
+            ]}
+            xKey="subject"
+            series={[
+              { key: 'accuracy', name: 'Current Accuracy', color: 'var(--chart-2)' },
+              { key: 'target', name: 'Target Accuracy', color: 'var(--chart-3)' },
+            ]}
+            height={220}
+            valueFormatter={(val) => `${val}%`}
+          />
+        </div>
+      </div>
 
       {/* Quick Access Study Hub */}
       <div className="space-y-3 pt-2">

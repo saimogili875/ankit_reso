@@ -9,6 +9,7 @@ export interface StudentProfile {
   target_year: number;
   avatar_url?: string;
   bio?: string;
+  last_selected_course_id?: string;
 }
 
 export interface User {
@@ -26,6 +27,7 @@ export interface User {
   is_phone_verified?: boolean;
   is_admin?: boolean;
   student_profile?: StudentProfile;
+  theme?: 'light' | 'dark' | 'system';
 }
 
 export interface OtpSendResponse {

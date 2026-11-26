@@ -4,9 +4,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, ChevronDown, GraduationCap, CheckCircle, AlertTriangle, Info, ExternalLink, User, LogOut } from 'lucide-react';
+import { Search, Bell, ChevronDown, GraduationCap, CheckCircle, AlertTriangle, Info, ExternalLink, User, LogOut, Settings } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
+import { ThemeToggle } from '@/providers/theme-provider';
 
 interface Announcement {
   id: string;
@@ -165,6 +166,10 @@ export const Header: React.FC = () => {
 
       {/* Right Controls: Exam Selector, Bell, User Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Light / Dark / System Theme Toggle */}
+        <ThemeToggle variant="segmented" className="hidden xl:inline-flex" />
+        <ThemeToggle variant="icon" className="xl:hidden" />
+
         {/* Exam Selector Pill */}
         <Link
           href="/profile"
@@ -378,6 +383,15 @@ export const Header: React.FC = () => {
               >
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 View & Edit Profile
+              </Link>
+
+              <Link
+                href="/settings"
+                onClick={() => setIsProfileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5 text-slate-400" />
+                Settings & Preferences
               </Link>
 
               {currentUser?.is_admin && (

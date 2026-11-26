@@ -4,15 +4,15 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   BarChart2,
-  TrendingUp,
-  Target,
-  AlertCircle,
   Bookmark,
   Flame,
+  CheckCircle2,
+  BookOpen,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { KpiCard, LineTrend, BarCompare, Donut } from '@/components/charts';
 
 interface TrendItem {
   attempt_id: string;
@@ -127,19 +127,19 @@ export default function OverallAnalysisPage() {
   if (!hasAnyAttempts) {
     return (
       <div className="max-w-4xl mx-auto py-16 px-4 text-center space-y-5">
-        <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 text-blue-400 mx-auto flex items-center justify-center">
+        <div className="w-16 h-16 rounded-2xl bg-surface border border-border text-primary mx-auto flex items-center justify-center">
           <BarChart2 className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-100">No Analytics Data Yet</h1>
-        <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+        <h1 className="text-2xl font-extrabold text-foreground font-heading">No Analytics Data Yet</h1>
+        <p className="text-sm text-muted max-w-md mx-auto leading-relaxed">
           Take a CBT mock test or solve daily practice problems (DPPs). Your accuracy, strength map,
           and rank predictions will automatically generate based on your real performance.
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
-          <Link href="/tests" className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white">
+          <Link href="/tests" className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-all shadow-sm">
             Attempt Mock Test
           </Link>
-          <Link href="/practice" className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-200">
+          <Link href="/practice" className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:bg-muted/10 transition-colors">
             Solve DPPs
           </Link>
         </div>
@@ -147,233 +147,224 @@ export default function OverallAnalysisPage() {
     );
   }
 
+  // Prepare trend data for LineTrend
+  const progressionData = overview.trends.map((t) => ({
+    label: t.test_title.length > 14 ? `${t.test_title.slice(0, 12)}…` : t.test_title,
+    fullTitle: t.test_title,
+    date: t.date,
+    percentage: t.percentage,
+    accuracy: t.accuracy,
+    rank: t.rank || 0,
+    timePerQuestion: Math.round((t.time_taken_seconds || 1800) / Math.max(t.max_marks / 4, 1)),
+  }));
+
+  // Prepare difficulty data for BarCompare
+  const difficultyData = ['EASY', 'MEDIUM', 'HARD'].map((diff) => {
+    const d = overview.difficulty_accuracy[diff] || { total: 0, correct: 0, accuracy: 0.0 };
+    return {
+      difficulty: diff,
+      accuracy: Math.round(d.accuracy),
+      correct: d.correct,
+      incorrect: Math.max(d.total - d.correct, 0),
+    };
+  });
+
+  // Prepare error reasons data for Donut
+  const errorData = Object.entries(overview.error_reasons).map(([reason, count]) => ({
+    name: reason.replace(/_/g, ' '),
+    value: count,
+  }));
+
+  // Sparkline data for Accuracy KPI
+  const accuracySpark = overview.trends.map((t) => t.accuracy);
+
   return (
     <div className="max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6 space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-blue-950/60 border border-blue-900/60 text-blue-400">
+            <span className="p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary">
               <BarChart2 className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight font-heading">
               Comprehensive Performance Analytics
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-muted">
             Multi-dimensional insights from your tests, practice sessions, and watch history.
           </p>
         </div>
 
         <Link
           href="/analysis/notebook"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-purple-950/60 hover:bg-purple-900/60 text-purple-300 border border-purple-800 transition-colors shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 transition-colors shrink-0"
         >
-          <Bookmark className="w-4 h-4 text-purple-400" />
+          <Bookmark className="w-4 h-4" />
           <span>Error Notebook & Bookmarks</span>
         </Link>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1">
-          <span className="text-xs text-slate-400 font-semibold uppercase block">Overall Accuracy</span>
-          <span className="text-2xl font-extrabold text-blue-400">{overview.overall_accuracy}%</span>
-          <span className="text-[11px] text-slate-500 block">{overview.total_correct} of {overview.total_questions_answered} correct</span>
-        </div>
+      {/* Naresh-Style Glass KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <KpiCard
+          title="Overall Accuracy"
+          value={`${overview.overall_accuracy}%`}
+          change={overview.overall_accuracy >= 70 ? 5 : -2}
+          changeLabel="vs target"
+          sparklineData={accuracySpark}
+          subtitle={`${overview.total_correct} of ${overview.total_questions_answered} correct`}
+        />
 
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1">
-          <span className="text-xs text-slate-400 font-semibold uppercase block">Study Streak</span>
-          <div className="flex items-center justify-center gap-1.5 text-2xl font-extrabold text-amber-400">
-            <Flame className="w-6 h-6 fill-current" />
-            <span>{overview.active_streak_days} Days</span>
-          </div>
-          <span className="text-[11px] text-slate-500 block">Consecutive learning activity</span>
-        </div>
+        <KpiCard
+          title="Study Streak"
+          value={`${overview.active_streak_days} Days`}
+          icon={Flame}
+          subtitle="Consecutive learning days"
+          badgeText="Active"
+        />
 
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1">
-          <span className="text-xs text-slate-400 font-semibold uppercase block">Tests / DPPs Done</span>
-          <span className="text-2xl font-extrabold text-purple-400">
-            {overview.total_tests_attempted} <span className="text-sm font-normal text-slate-500">tests</span> • {overview.total_dpps_attempted} <span className="text-sm font-normal text-slate-500">dpps</span>
-          </span>
-          <span className="text-[11px] text-slate-500 block">Exam simulation volume</span>
-        </div>
+        <KpiCard
+          title="Tests & DPPs Done"
+          value={`${overview.total_tests_attempted + overview.total_dpps_attempted}`}
+          icon={CheckCircle2}
+          subtitle={`${overview.total_tests_attempted} tests • ${overview.total_dpps_attempted} DPPs`}
+        />
 
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1">
-          <span className="text-xs text-slate-400 font-semibold uppercase block">Syllabus Covered</span>
-          <span className="text-2xl font-extrabold text-emerald-400">{overview.syllabus_coverage_percentage}%</span>
-          <span className="text-[11px] text-slate-500 block">Verified lecture watch progress</span>
-        </div>
+        <KpiCard
+          title="Syllabus Covered"
+          value={`${overview.syllabus_coverage_percentage}%`}
+          icon={BookOpen}
+          subtitle="Lecture & chapter progress"
+        />
       </div>
 
-      {/* RANK PREDICTOR WIDGET (Rendered only if Admin table is configured) */}
+      {/* OFFICIAL RANK PREDICTOR WIDGET */}
       {predictor?.has_predictor && predictor.has_attempts && (
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-900 to-slate-900 border border-purple-500/40 space-y-3 shadow-xl">
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/15 via-surface to-surface border border-primary/40 space-y-3 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-primary/20 text-primary border border-primary/40">
                 Official {predictor.exam_type} Rank Predictor
               </span>
-              <h3 className="text-lg font-extrabold text-white">
+              <h3 className="text-lg font-extrabold text-foreground font-heading">
                 Forecasted All India Rank:{' '}
-                <span className="text-purple-400 font-mono">
+                <span className="text-primary font-mono font-black">
                   {predictor.predicted_rank_min?.toLocaleString()} – {predictor.predicted_rank_max?.toLocaleString()}
                 </span>
               </h3>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-muted">
                 Calibrated based on your latest mock test score of{' '}
-                <strong className="text-white">{predictor.latest_score} marks</strong> (Average: {predictor.average_score} marks).
+                <strong className="text-foreground">{predictor.latest_score} marks</strong> (Average: {predictor.average_score} marks).
               </p>
             </div>
 
             {predictor.percentile_min && (
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-900 text-center shrink-0">
-                <span className="text-[10px] text-slate-400 block uppercase font-bold">Estimated Percentile</span>
-                <span className="text-base font-extrabold text-emerald-400">
+              <div className="p-3.5 rounded-xl bg-surface border border-border text-center shrink-0 shadow-sm">
+                <span className="text-[10px] text-muted block uppercase font-bold">Estimated Percentile</span>
+                <span className="text-lg font-extrabold text-emerald-500 font-mono">
                   {predictor.percentile_min}% – {predictor.percentile_max}%
                 </span>
               </div>
             )}
           </div>
           {predictor.notes && (
-            <p className="text-[11px] text-slate-400 border-t border-purple-950 pt-2">
+            <p className="text-[11px] text-muted border-t border-border pt-2 font-mono">
               Advisor note: {predictor.notes}
             </p>
           )}
         </div>
       )}
 
-      {/* TEST CHRONOLOGICAL PROGRESSION */}
-      {overview.trends.length > 0 && (
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-blue-400" />
-                Mock Test Progression
-              </h3>
-              <p className="text-xs text-slate-400">Score & accuracy trajectory across completed papers</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {overview.trends.map((t) => (
-              <div
-                key={t.attempt_id}
-                className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-              >
-                <div className="space-y-0.5">
-                  <span className="font-bold text-slate-200 block">{t.test_title}</span>
-                  <span className="text-[11px] text-slate-500 font-mono">{t.date}</span>
-                </div>
-
-                <div className="flex items-center gap-6 font-mono text-slate-300">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Score</span>
-                    <strong className="text-blue-400 font-bold">{t.score} / {t.max_marks}</strong> ({t.percentage}%)
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Accuracy</span>
-                    <strong className="text-amber-400 font-bold">{t.accuracy}%</strong>
-                  </div>
-                  {t.rank && (
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">Rank</span>
-                      <strong className="text-purple-400 font-bold">#{t.rank}</strong>
-                    </div>
-                  )}
-                  <Link
-                    href={`/tests/${t.attempt_id}/result`}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-800 text-[11px] font-semibold transition-colors"
-                  >
-                    Analysis →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* 1. MOCK TEST SCORE & ACCURACY LINE TREND */}
+      {progressionData.length > 0 && (
+        <LineTrend
+          title="Score & Accuracy Progression"
+          description="Chronological performance across completed CBT papers and chapter tests"
+          data={progressionData as unknown as Array<Record<string, unknown>>}
+          xKey="label"
+          series={[
+            { key: 'percentage', name: 'Score %', color: 'var(--chart-1)' },
+            { key: 'accuracy', name: 'Accuracy %', color: 'var(--chart-3)' },
+          ]}
+          height={280}
+          valueFormatter={(val) => `${val}%`}
+        />
       )}
 
-      {/* DIFFICULTY ACCURACY & ERROR REASONS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Difficulty Breakdown */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Target className="w-4 h-4 text-emerald-400" />
-            Accuracy by Question Difficulty
-          </h3>
-          <div className="space-y-3">
-            {['EASY', 'MEDIUM', 'HARD'].map((diff) => {
-              const dData = overview.difficulty_accuracy[diff] || { total: 0, correct: 0, accuracy: 0.0 };
-              const barColor = diff === 'EASY' ? 'bg-emerald-500' : diff === 'MEDIUM' ? 'bg-amber-500' : 'bg-rose-500';
+      {/* 2. DIFFICULTY COMPARISON & ERROR DONUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* BarCompare: Accuracy by Difficulty */}
+        <BarCompare
+          title="Accuracy by Question Difficulty"
+          description="Performance across Easy, Medium, and Hard exam simulation items"
+          data={difficultyData as unknown as Array<Record<string, unknown>>}
+          xKey="difficulty"
+          series={[
+            { key: 'accuracy', name: 'Accuracy %', color: 'var(--chart-2)' },
+          ]}
+          height={260}
+          valueFormatter={(val) => `${val}%`}
+        />
 
-              return (
-                <div key={diff} className="space-y-1 text-xs">
-                  <div className="flex justify-between font-semibold">
-                    <span className="text-slate-300">{diff}</span>
-                    <span className="text-slate-200">{dData.accuracy}% ({dData.correct}/{dData.total})</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div style={{ width: `${dData.accuracy}%` }} className={`h-full ${barColor} rounded-full`} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Error Reasons Breakdown */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400" />
-            Error Reasons (From Your Question Tags)
-          </h3>
-          {Object.keys(overview.error_reasons).length === 0 ? (
-            <p className="text-xs text-slate-500 py-4">
-              Tag your incorrect questions on test result pages to visualize your primary mistake patterns.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {Object.entries(overview.error_reasons).map(([reason, cnt]) => (
-                <div key={reason} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-medium">{reason.replace('_', ' ')}</span>
-                  <span className="font-bold text-rose-400 font-mono">{cnt} mistakes</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Donut: Error Reasons Distribution */}
+        <Donut
+          title="Mistake Pattern Breakdown"
+          description="Self-tagged question errors and review notebook tags"
+          data={errorData}
+          centerValue={`${overview.total_incorrect}`}
+          centerLabel="Missed"
+          height={260}
+          valueFormatter={(val) => `${val} errors`}
+          emptyMessage="No question mistake tags recorded yet."
+        />
       </div>
 
-      {/* WEAK CHAPTERS ACTIONABLE LIST */}
+      {/* 3. TIME PER QUESTION TREND */}
+      {progressionData.length > 0 && (
+        <LineTrend
+          title="Pacing: Average Time per Question"
+          description="Speed and time management trajectory (seconds per question)"
+          data={progressionData as unknown as Array<Record<string, unknown>>}
+          xKey="label"
+          series={[
+            { key: 'timePerQuestion', name: 'Avg Seconds / Question', color: 'var(--chart-4)' },
+          ]}
+          height={220}
+          valueFormatter={(val) => `${val}s`}
+        />
+      )}
+
+      {/* 4. CHAPTER PERFORMANCE COMPARISON TABLE */}
       {chapters && chapters.weak_chapters.length > 0 && (
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="glass-card rounded-2xl p-6 border border-border space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-slate-100">Top Weak Chapters Needing Attention</h3>
-              <p className="text-xs text-slate-400">Chapters where your accuracy is below 40%</p>
+              <h3 className="text-sm font-bold text-foreground font-heading">
+                Top Weak Chapters Needing Focus
+              </h3>
+              <p className="text-xs text-muted">Chapters where your problem-solving accuracy is below 40%</p>
             </div>
-            <Link href="/practice" className="text-xs font-semibold text-blue-400 hover:underline">
-              Solve DPPs →
+            <Link href="/practice" className="text-xs font-semibold text-primary hover:underline">
+              Solve DPPs &rarr;
             </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {chapters.weak_chapters.slice(0, 6).map((wc) => (
-              <div key={wc.chapter_id} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+              <div key={wc.chapter_id} className="p-3.5 rounded-xl bg-surface border border-border space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-100 line-clamp-1">{wc.chapter_name}</h4>
-                    <span className="text-[11px] text-blue-400">{wc.subject_name}</span>
+                    <h4 className="text-xs font-bold text-foreground line-clamp-1">{wc.chapter_name}</h4>
+                    <span className="text-[11px] text-primary">{wc.subject_name}</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-900">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 font-mono">
                     {wc.accuracy}%
                   </span>
                 </div>
-                <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
+                <div className="flex items-center justify-between pt-1 border-t border-border/60 text-[11px] text-muted">
                   <span>{wc.incorrect} missed questions</span>
-                  <Link href="/learn" className="text-blue-400 hover:underline">Revise →</Link>
+                  <Link href="/learn" className="text-primary hover:underline font-medium">Revise &rarr;</Link>
                 </div>
               </div>
             ))}
