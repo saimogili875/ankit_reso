@@ -227,8 +227,9 @@ export default function AdminCoursesPage() {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to save course.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save course.';
+      setFeedback({ type: 'error', message });
     } finally {
       setIsSaving(false);
     }
@@ -240,8 +241,9 @@ export default function AdminCoursesPage() {
       await apiClient.delete(`/admin-panel/courses/${id}/`);
       setFeedback({ type: 'success', message: 'Course deleted successfully.' });
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to delete course.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete course.';
+      setFeedback({ type: 'error', message });
     }
   };
 
@@ -253,8 +255,9 @@ export default function AdminCoursesPage() {
         is_published: nextStatus === 'PUBLISHED',
       });
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to update course status.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update course status.';
+      setFeedback({ type: 'error', message });
     }
   };
 

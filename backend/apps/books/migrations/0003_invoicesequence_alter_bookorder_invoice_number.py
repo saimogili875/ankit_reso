@@ -47,10 +47,18 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Invoice Sequences',
             },
         ),
+        # Step 1: Make invoice_number nullable in the database first, so clean_existing_orders can set None
+        migrations.AlterField(
+            model_name='bookorder',
+            name='invoice_number',
+            field=models.CharField(blank=True, db_index=True, max_length=60, null=True),
+        ),
+        # Step 2: Clean existing records (convert blanks to None and dedupe)
         migrations.RunPython(
             clean_existing_orders_and_hash_tokens,
             reverse_code=migrations.RunPython.noop,
         ),
+        # Step 3: Add unique constraint now that duplicates and empty strings are resolved
         migrations.AlterField(
             model_name='bookorder',
             name='invoice_number',

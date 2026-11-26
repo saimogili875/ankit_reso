@@ -62,12 +62,9 @@ class NormalizeSlashMiddleware:
         if any(last_segment.lower().endswith(ext) for ext in STATIC_FILE_EXTENSIONS) or '.' in last_segment:
             return self.get_response(request)
 
-        # Never redirect or mutate unsafe HTTP methods (POST, PUT, PATCH, DELETE)
-        # to preserve request payload integrity.
-        if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
-            return self.get_response(request)
-
-        # For safe methods (GET, HEAD, OPTIONS) on API endpoints, normalize internally
+        # Internally append trailing slash to path_info and path.
+        # This allows all HTTP methods (GET, POST, PUT, PATCH, DELETE) to match
+        # Django's trailing-slash routes without CommonMiddleware raising RuntimeError!
         request.path_info = path + '/'
         request.path = request.path_info
         return self.get_response(request)

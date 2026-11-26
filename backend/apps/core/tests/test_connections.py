@@ -21,8 +21,7 @@ class ConnectionConfigUnitTests(TestCase):
         - Static file extensions are NOT mutated.
         - Explicit slashless endpoints are NOT mutated.
         - Webhook endpoints are NOT mutated.
-        - Unsafe methods (POST, PUT, PATCH, DELETE) are NOT redirected or mutated.
-        - Standard GET on /api/ endpoints without slash are normalized with a trailing slash.
+        - Internal slash normalization appends trailing slash on /api/ endpoints for all methods (including DELETE, PUT, POST) without redirects, avoiding CommonMiddleware RuntimeError.
         """
         def dummy_response(req):
             return req.path_info
@@ -45,10 +44,11 @@ class ConnectionConfigUnitTests(TestCase):
             ('POST', '/api/create-order', '/api/create-order'),
             ('POST', '/api/verify-payment', '/api/verify-payment'),
             ('POST', '/api/students/onboarding', '/api/students/onboarding'),
-            ('POST', '/api/courses', '/api/courses'),
+            ('POST', '/api/courses', '/api/courses/'),
             ('POST', '/api/payments/razorpay/webhook', '/api/payments/razorpay/webhook'),
-            ('PUT', '/api/courses/update', '/api/courses/update'),
-            ('DELETE', '/api/courses/1', '/api/courses/1'),
+            ('PUT', '/api/courses/update', '/api/courses/update/'),
+            ('DELETE', '/api/courses/1', '/api/courses/1/'),
+            ('DELETE', '/api/admin-panel/courses/123', '/api/admin-panel/courses/123/'),
         ]
 
         for method, path, expected in test_cases:
