@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
 import { GraduationCap, Star, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
-import { CoursesSection } from './courses-section';
+import { BatchesSection } from './batches-section';
 import { BooksSection } from './books-section';
 import { StudentResultsSection } from './student-results-section';
 
