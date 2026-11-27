@@ -72,6 +72,7 @@ urlpatterns = [
     path('api/progress/', include('apps.progress.urls')),
     path('api/materials/', include('apps.materials.urls')),
     path('api/analytics/', include('apps.analytics.urls')),
+    path('api/admin/', include('apps.adminpanel.urls')),
     path('api/admin-panel/', include('apps.adminpanel.urls')),
     path('api/admin/payments/', AdminPaymentListView.as_view(), name='admin-payments-list'),
     path('api/admin/payments/grant-enrollment/', AdminGrantEnrollmentView.as_view(), name='admin-payments-grant-enrollment'),

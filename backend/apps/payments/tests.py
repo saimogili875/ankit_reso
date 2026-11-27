@@ -57,7 +57,7 @@ class RazorpayPaymentsTestCase(TestCase):
 
         # Paid Course (Price = ₹4999.00 -> 499900 paise)
         self.course = Course.objects.create(
-            title='JEE Advanced Complete Batch',
+            title='JEE Advanced Complete Course',
             slug='jee-adv-complete',
             price=Decimal('4999.00'),
             is_free=False,
@@ -390,8 +390,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from apps.academics.models import PricingCard, Batch, BatchItem, Course, Enrollment
-from apps.payments.models import Payment
+from apps.academics.models import CourseCategory, Course, CourseAddon, Enrollment
+from apps.payments.models import Payment, Entitlement
 
 User = get_user_model()
 
@@ -405,7 +405,7 @@ TEST_WEBHOOK_SECRET = "test_webhook_secret_789"
     RAZORPAY_KEY_SECRET=TEST_RAZORPAY_KEY_SECRET,
     RAZORPAY_WEBHOOK_SECRET=TEST_WEBHOOK_SECRET,
 )
-class BatchPaymentSecurityTests(TestCase):
+class CoursePaymentSecurityTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.student = User.objects.create_user(
@@ -416,33 +416,26 @@ class BatchPaymentSecurityTests(TestCase):
         )
         self.client.force_authenticate(user=self.student)
 
-        self.card = PricingCard.objects.create(
-            key='senior',
-            title='Class XI & XII',
+        self.category = CourseCategory.objects.create(
+            slug='senior',
+            name='Class XI & XII',
             is_published=True,
             order=1
         )
         self.course = Course.objects.create(
+            category=self.category,
             title='JEE Comprehensive Class 11',
             slug='jee-comp-11',
             price=Decimal('5500.00'),
             is_free=False,
             is_published=True,
         )
-        self.batch = Batch.objects.create(
-            card=self.card,
-            name='JEE Foundation Batch',
-            slug='jee-foundation-class-11',
+        self.addon_book = CourseAddon.objects.create(
             course=self.course,
-            price=Decimal('5500.00'),
-            is_published=True,
-        )
-        self.addon_book = BatchItem.objects.create(
-            batch=self.batch,
-            item_type=BatchItem.ItemType.ADVANCED_BOOK_DIGITAL,
+            addon_type=CourseAddon.AddonType.ADVANCED_BOOK_DIGITAL,
             title='Digital Advanced Book',
             price=Decimal('299.00'),
-            is_addon=True,
+            is_published=True,
         )
 
     def _generate_signature(self, order_id, payment_id, secret=TEST_RAZORPAY_KEY_SECRET):
@@ -453,7 +446,7 @@ class BatchPaymentSecurityTests(TestCase):
     def test_create_order_uses_db_price_ignoring_client_price(self, mock_get_client):
         """
         Verify that even if an attacker passes a fake client price (e.g. ₹1.00),
-        the server strictly queries the database price: batch.price (5500) + addon.price (299) = 5799.00.
+        the server strictly queries the database price: course.price (5500) + addon.price (299) = 5799.00.
         """
         fake_client = mock_get_client.return_value
         fake_client.order.create.return_value = {
@@ -463,7 +456,7 @@ class BatchPaymentSecurityTests(TestCase):
         }
 
         tampered_payload = {
-            'batch_id': str(self.batch.id),
+            'course_id': str(self.course.id),
             'addon_item_ids': [str(self.addon_book.id)],
             'amount': 100,  # Attacker tries paying ₹1 instead of ₹5799
             'price': 1.00,
@@ -479,7 +472,7 @@ class BatchPaymentSecurityTests(TestCase):
         payment = Payment.objects.get(razorpay_order_id='order_rzp_mock123')
         self.assertEqual(payment.amount_paise, 579900)
         self.assertEqual(payment.user, self.student)
-        self.assertEqual(payment.batch, self.batch)
+        self.assertEqual(payment.course, self.course)
 
     def test_bad_signature_rejected(self):
         """
@@ -487,7 +480,6 @@ class BatchPaymentSecurityTests(TestCase):
         """
         payment = Payment.objects.create(
             user=self.student,
-            batch=self.batch,
             course=self.course,
             amount_paise=550000,
             currency='INR',
@@ -518,7 +510,6 @@ class BatchPaymentSecurityTests(TestCase):
 
         payment = Payment.objects.create(
             user=self.student,
-            batch=self.batch,
             course=self.course,
             amount_paise=550000,
             currency='INR',
@@ -559,7 +550,7 @@ class BatchPaymentSecurityTests(TestCase):
     def test_paid_enroll_without_payment_returns_402(self):
         """
         Security check: Ensure students cannot bypass payment and directly self-enroll
-        in paid courses/batches via /api/enrollment/enroll/.
+        in paid courses via /api/enrollment/enroll/.
         """
         res = self.client.post('/api/enrollment/enroll/', {'course_id': str(self.course.id)})
         self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
@@ -567,13 +558,12 @@ class BatchPaymentSecurityTests(TestCase):
 
     def test_bad_signature_on_already_paid_payment_keeps_paid_status(self):
         """
-        Phase 0 Fix 2: on a bad signature, never change status if the payment is already PAID.
+        On a bad signature, never change status if the payment is already PAID.
         """
         order_id = 'order_already_paid_123'
         payment_id = 'pay_already_paid_123'
         payment = Payment.objects.create(
             user=self.student,
-            batch=self.batch,
             course=self.course,
             amount_paise=550000,
             currency='INR',
@@ -592,30 +582,12 @@ class BatchPaymentSecurityTests(TestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.Status.PAID)
 
-    def test_batch_without_linked_course_blocks_checkout(self):
-        """
-        Phase 0 Fix 3: Block checkout in CreateOrderView if a batch has no linked course.
-        """
-        orphan_batch = Batch.objects.create(
-            card=self.card,
-            name='Orphan Batch No Course',
-            slug='orphan-batch-no-course',
-            course=None,
-            price=Decimal('1999.00'),
-            is_published=True,
-        )
-        res = self.client.post('/api/payments/create-order/', {
-            'batch_id': str(orphan_batch.id)
-        }, format='json')
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('no active course is linked', res.json().get('error', ''))
-
     def test_invalid_addon_item_id_returns_400_not_500(self):
         """
-        Phase 0 Fix 5: Validate addon_item_ids as UUIDs (400, not 500).
+        Validate addon_item_ids as UUIDs (400, not 500).
         """
         res = self.client.post('/api/payments/create-order/', {
-            'batch_id': str(self.batch.id),
+            'course_id': str(self.course.id),
             'addon_item_ids': ['invalid-not-a-uuid-string'],
         }, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -624,9 +596,8 @@ class BatchPaymentSecurityTests(TestCase):
     @patch('apps.payments.views.get_razorpay_client')
     def test_payment_fulfillment_creates_addon_entitlements(self, mock_client_getter):
         """
-        Phase 0 Fix 3: Grant add-on entitlements on PAID via fulfill_payment.
+        Grant add-on entitlements on PAID via fulfill_payment.
         """
-        from apps.payments.models import Entitlement
         mock_client = MagicMock()
         mock_client.order.create.return_value = {
             'id': 'order_with_addon_123',
@@ -638,7 +609,7 @@ class BatchPaymentSecurityTests(TestCase):
 
         # Create order with add-on
         res = self.client.post('/api/payments/create-order/', {
-            'batch_id': str(self.batch.id),
+            'course_id': str(self.course.id),
             'addon_item_ids': [str(self.addon_book.id)],
         }, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -666,8 +637,8 @@ class BatchPaymentSecurityTests(TestCase):
         # Assert Entitlement created
         entitlement = Entitlement.objects.filter(
             user=self.student,
-            batch=self.batch,
-            batch_item=self.addon_book
+            course=self.course,
+            course_addon=self.addon_book
         ).first()
         self.assertIsNotNone(entitlement)
         self.assertTrue(entitlement.is_active)
@@ -676,7 +647,7 @@ class BatchPaymentSecurityTests(TestCase):
     @patch('apps.payments.views.get_razorpay_client')
     def test_amount_mismatch_blocks_fulfillment(self, mock_client_getter):
         """
-        Phase 0 Fix 4: Check paid amount and currency against payment.amount_paise.
+        Check paid amount and currency against payment.amount_paise.
         On mismatch: no fulfillment.
         """
         mock_client = MagicMock()
@@ -693,7 +664,6 @@ class BatchPaymentSecurityTests(TestCase):
         order_id = 'order_tamper_amt_123'
         Payment.objects.create(
             user=self.student,
-            batch=self.batch,
             course=self.course,
             amount_paise=550000,
             currency='INR',
@@ -709,4 +679,62 @@ class BatchPaymentSecurityTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('does not match order record', res.json().get('error', ''))
         self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    def test_admin_manual_grant_creates_audit_entry_and_enrollment(self):
+        """
+        Admin can enrol manually with a reason and an audit entry.
+        """
+        admin_user = User.objects.create_superuser(
+            username='admin_grant',
+            email='admin_grant@adepteduverse.com',
+            password='AdminPassword123!',
+            role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=admin_user)
+
+        res = self.client.post('/api/payments/admin/grant-enrollment/', {
+            'user_email': self.student.email,
+            'course_id': str(self.course.id),
+            'reason': 'Merit scholarship grant 2026',
+        }, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Enrollment.objects.filter(user=self.student, course=self.course, status='ACTIVE').exists())
+        
+        # Verify manual payment record with audit reason
+        payment = Payment.objects.get(id=res.json()['payment_id'])
+        self.assertEqual(payment.amount_paise, 0)
+        self.assertEqual(payment.status, Payment.Status.PAID)
+        self.assertEqual(payment.items_snapshot[0]['reason'], 'Merit scholarship grant 2026')
+        self.assertEqual(payment.items_snapshot[0]['by'], admin_user.email)
+
+    def test_guard_aborts_when_real_paid_batch_data_exists(self):
+        """
+        Verify safety guard aborts with clear error when paid payments from a batch exist.
+        """
+        import importlib
+        migration_mod = importlib.import_module('apps.academics.migrations.0007_coursecategory_course_fields_coursefeature_courseaddon')
+        migrate_batch_data_and_guard = migration_mod.migrate_batch_data_and_guard
+        from unittest.mock import MagicMock
+
+        mock_payment_model = MagicMock()
+        mock_payment_model.objects.count.return_value = 5
+        mock_payment_model.objects.filter.return_value.count.return_value = 2  # 2 paid batch payments
+
+        def mock_get_model(app_label, model_name):
+            if model_name == 'Payment':
+                return mock_payment_model
+            mock_model = MagicMock()
+            mock_model.objects.count.return_value = 0
+            mock_model.objects.all.return_value = []
+            return mock_model
+
+        mock_apps = MagicMock()
+        mock_apps.get_model.side_effect = mock_get_model
+
+        with self.assertRaises(RuntimeError) as ctx:
+            migrate_batch_data_and_guard(mock_apps, None)
+        self.assertIn("SAFETY GUARD ABORT", str(ctx.exception))
+        self.assertIn("Found 2 PAID Payment records", str(ctx.exception))
+
 

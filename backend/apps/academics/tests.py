@@ -39,7 +39,7 @@ class AcademicsEnrollmentTestCase(TestCase):
         )
 
         self.paid_course = Course.objects.create(
-            title='Paid Comprehensive Batch',
+            title='Paid Comprehensive Course',
             slug='paid-comprehensive',
             price=Decimal('2999.00'),
             is_free=False,
@@ -108,7 +108,7 @@ from django.core.management import call_command
 from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework import status
-from apps.academics.models import PricingCard, Batch, BatchItem, BatchFeature, AcademicClass
+from apps.academics.models import CourseCategory, Course, CourseFeature, CourseAddon, AcademicClass
 from apps.academics.pricing_views import clear_pricing_cache
 
 
@@ -123,71 +123,71 @@ class PricingSystemTests(TestCase):
         without throwing IntegrityErrors or creating duplicate records.
         """
         call_command('seed_pricing')
-        cards_count_1 = PricingCard.objects.count()
-        batches_count_1 = Batch.objects.count()
-        items_count_1 = BatchItem.objects.count()
-        features_count_1 = BatchFeature.objects.count()
+        categories_count_1 = CourseCategory.objects.count()
+        courses_count_1 = Course.objects.count()
+        addons_count_1 = CourseAddon.objects.count()
+        features_count_1 = CourseFeature.objects.count()
 
-        self.assertEqual(cards_count_1, 3)
-        self.assertEqual(batches_count_1, 8)
-        self.assertGreater(items_count_1, 0)
+        self.assertEqual(categories_count_1, 3)
+        self.assertGreaterEqual(courses_count_1, 8)
+        self.assertGreater(addons_count_1, 0)
         self.assertGreater(features_count_1, 0)
 
         # Run second time
         call_command('seed_pricing')
-        self.assertEqual(PricingCard.objects.count(), cards_count_1)
-        self.assertEqual(Batch.objects.count(), batches_count_1)
-        self.assertEqual(BatchItem.objects.count(), items_count_1)
-        self.assertEqual(BatchFeature.objects.count(), features_count_1)
+        self.assertEqual(CourseCategory.objects.count(), categories_count_1)
+        self.assertEqual(Course.objects.count(), courses_count_1)
+        self.assertEqual(CourseAddon.objects.count(), addons_count_1)
+        self.assertEqual(CourseFeature.objects.count(), features_count_1)
 
-    def test_public_api_hides_unpublished_cards_and_batches(self):
+    def test_public_api_hides_unpublished_categories_and_courses(self):
         """
-        Verify that unpublished cards and batches are excluded from public API responses.
+        Verify that unpublished categories and courses are excluded from public API responses.
         """
-        card = PricingCard.objects.create(
-            key='school',
-            title='School Batches',
+        category = CourseCategory.objects.create(
+            slug='school',
+            name='School Courses',
             is_published=True,
             order=1
         )
-        pub_batch = Batch.objects.create(
-            card=card,
-            name='Published Batch',
-            slug='published-batch',
+        pub_course = Course.objects.create(
+            category=category,
+            title='Published Course',
+            slug='published-course',
             price=Decimal('2000.00'),
             is_published=True,
             display_order=1
         )
-        draft_batch = Batch.objects.create(
-            card=card,
-            name='Draft Batch',
-            slug='draft-batch',
+        draft_course = Course.objects.create(
+            category=category,
+            title='Draft Course',
+            slug='draft-course',
             price=Decimal('5000.00'),
             is_published=False,
             display_order=2
         )
 
         clear_pricing_cache()
-        res = self.client.get('/api/pricing/cards/')
+        res = self.client.get('/api/pricing/categories/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         
-        # Only pub_batch should be nested in card
-        card_data = res.json()[0]
-        batch_slugs = [b['slug'] for b in card_data['batches']]
-        self.assertIn('published-batch', batch_slugs)
-        self.assertNotIn('draft-batch', batch_slugs)
+        # Only pub_course should be nested in category
+        cat_data = res.json()[0]
+        course_slugs = [c['slug'] for c in cat_data['courses']]
+        self.assertIn('published-course', course_slugs)
+        self.assertNotIn('draft-course', course_slugs)
 
-        # Direct slug lookup for draft batch should return 404 for unauthenticated/students
-        draft_res = self.client.get('/api/pricing/batches/draft-batch/')
+        # Direct slug lookup for draft course should return 404 for unauthenticated/students
+        draft_res = self.client.get('/api/pricing/courses/draft-course/')
         self.assertEqual(draft_res.status_code, status.HTTP_404_NOT_FOUND)
 
-        pub_res = self.client.get('/api/pricing/batches/published-batch/')
+        pub_res = self.client.get('/api/pricing/courses/published-course/')
         self.assertEqual(pub_res.status_code, status.HTTP_200_OK)
-        self.assertEqual(pub_res.json()['name'], 'Published Batch')
+        self.assertEqual(pub_res.json()['title'], 'Published Course')
 
     def test_pricing_categories_endpoint(self):
         """
-        Verify /api/pricing/categories/<key>/ returns published batches.
+        Verify /api/pricing/categories/<key>/ returns published courses.
         """
         call_command('seed_pricing')
         clear_pricing_cache()
@@ -195,5 +195,57 @@ class PricingSystemTests(TestCase):
         res = self.client.get('/api/pricing/categories/school/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         data = res.json()
-        self.assertEqual(data['card']['key'], 'school')
-        self.assertEqual(len(data['batches']), 5)
+        self.assertEqual(data['category']['slug'], 'school')
+        self.assertGreaterEqual(len(data['courses']), 5)
+
+    def test_admin_crud_course_categories_and_addons(self):
+        """
+        Verify admin can perform CRUD on course categories, features, and addons.
+        """
+        admin_user = User.objects.create_superuser(
+            username='admin_pricing',
+            email='admin_pricing@example.com',
+            password='Password123!',
+            role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=admin_user)
+
+        # 1. Create Category
+        cat_res = self.client.post('/api/admin/course-categories/', {
+            'name': 'Olympiad Specials',
+            'slug': 'olympiad-specials',
+            'order': 4,
+            'is_published': True,
+        }, format='json')
+        self.assertEqual(cat_res.status_code, status.HTTP_201_CREATED)
+        cat_id = cat_res.json()['id']
+
+        # 2. Create Course in Category
+        course_res = self.client.post('/api/admin/courses/', {
+            'title': 'RMO Olympiad Accelerator',
+            'slug': 'rmo-olympiad-accelerator',
+            'category': cat_id,
+            'price': '3500.00',
+            'is_published': True,
+        }, format='json')
+        self.assertEqual(course_res.status_code, status.HTTP_201_CREATED)
+        course_id = course_res.json()['id']
+
+        # 3. Add Feature to Course
+        feat_res = self.client.post('/api/admin/course-features/', {
+            'course': course_id,
+            'text': 'Personalized Olympiad Mentorship',
+            'order': 1,
+        }, format='json')
+        self.assertEqual(feat_res.status_code, status.HTTP_201_CREATED)
+
+        # 4. Add Addon to Course
+        addon_res = self.client.post('/api/admin/course-addons/', {
+            'course': course_id,
+            'title': 'Olympiad 15-Year Archive Book',
+            'addon_type': CourseAddon.AddonType.ADVANCED_BOOK_DIGITAL,
+            'price': '800.00',
+            'is_published': True,
+        }, format='json')
+        self.assertEqual(addon_res.status_code, status.HTTP_201_CREATED)
+

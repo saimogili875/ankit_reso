@@ -320,7 +320,7 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         now_time = timezone.now()
         res_create2 = self.client.post(reverse('admin-landing-banners-list'), {
             'title': 'Admissions Open 2025-26',
-            'caption': 'Class 11 & 12 Evening Batch',
+            'caption': 'Class 11 & 12 Evening Course',
             'image_url': 'https://example.com/active.jpg',
             'link_url': 'https://example.com/enroll',
             'show_from': (now_time - timedelta(days=1)).isoformat(),

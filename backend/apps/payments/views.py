@@ -17,7 +17,7 @@ from rest_framework.decorators import action
 import razorpay
 
 from apps.accounts.permissions import IsStudent, IsAdminRole
-from apps.academics.models import Course, Enrollment, Batch, BatchItem
+from apps.academics.models import Course, Enrollment, CourseAddon
 from .models import Payment, Entitlement
 from .serializers import PaymentSerializer
 from .services import fulfill_payment
@@ -43,21 +43,20 @@ def get_razorpay_client():
 class CreateOrderView(APIView):
     """
     POST /api/payments/create-order/
-    Creates a new Razorpay order for purchasing a paid Course or Batch.
-    Accepts {course_id} OR {batch_id, addon_item_ids: []}.
+    Creates a new Razorpay order for purchasing a paid Course with optional CourseAddons.
+    Accepts {course_id, addon_item_ids: []}.
     Price is calculated strictly on the server from the database. Client prices are completely ignored.
     """
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [CheckoutRateThrottle]
 
     def post(self, request):
-        course_id = request.data.get('course_id')
-        batch_id = request.data.get('batch_id') or request.data.get('batch_slug')
-        addon_item_ids = request.data.get('addon_item_ids') or request.data.get('addon_items') or []
+        course_id = request.data.get('course_id') or request.data.get('course_slug')
+        addon_item_ids = request.data.get('addon_item_ids') or request.data.get('addon_ids') or []
 
-        if not course_id and not batch_id:
+        if not course_id:
             return Response(
-                {'error': 'Either course_id or batch_id is required.'},
+                {'error': 'course_id is required.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -79,145 +78,65 @@ class CreateOrderView(APIView):
                     )
             addon_item_ids = cleaned_addon_ids
 
-        course = None
-        batch = None
-        total_amount_rupees = Decimal('0.00')
-        items_snapshot = []
+        try:
+            course = Course.objects.filter(
+                models.Q(id=course_id) | models.Q(slug=course_id),
+                is_published=True
+            ).first()
+        except (ValidationError, ValueError):
+            course = Course.objects.filter(slug=course_id, is_published=True).first()
 
-        # -------------------------------------------------------------
-        # 1. BATCH CHECKOUT FLOW
-        # -------------------------------------------------------------
-        if batch_id:
-            try:
-                batch = Batch.objects.filter(
-                    models.Q(id=batch_id) | models.Q(slug=batch_id),
-                    is_published=True
-                ).select_related('course').first()
-            except (ValidationError, ValueError):
-                batch = Batch.objects.filter(slug=batch_id, is_published=True).select_related('course').first()
+        if not course:
+            return Response(
+                {'error': 'Course not found or is not published.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-            if not batch:
-                return Response(
-                    {'error': 'Batch not found or is not published.'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+        if Enrollment.objects.filter(user=request.user, course=course, status='ACTIVE').exists():
+            return Response(
+                {'error': 'You are already enrolled in this course.'},
+                status=status.HTTP_409_CONFLICT
+            )
 
-            # Block checkout if batch has no linked course to prevent paid-but-not-delivered state
-            if not batch.course:
-                return Response(
-                    {'error': 'This batch cannot be purchased because no active course is linked to it.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Check if user already purchased this batch or enrolled in its course
-            has_paid_batch = Payment.objects.filter(
-                user=request.user,
-                batch=batch,
-                status=Payment.Status.PAID
-            ).exists()
-            if has_paid_batch:
-                return Response(
-                    {'error': 'You have already purchased this batch.'},
-                    status=status.HTTP_409_CONFLICT
-                )
-
-            if batch.course and Enrollment.objects.filter(user=request.user, course=batch.course, status='ACTIVE').exists():
-                return Response(
-                    {'error': 'You are already enrolled in the course linked to this batch.'},
-                    status=status.HTTP_409_CONFLICT
-                )
-
-            # Calculate server-side price
-            base_price = Decimal(str(batch.price or 0.00))
-            if base_price <= Decimal('0.00'):
-                return Response(
-                    {'error': 'This batch is free. Direct self-enrollment is available.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            total_amount_rupees = base_price
-            items_snapshot.append({
-                'type': 'base_batch',
-                'title': batch.name,
-                'price': str(base_price),
-            })
-
-            # Process add-ons
-            if addon_item_ids:
-                valid_addons = BatchItem.objects.filter(
-                    batch=batch,
-                    id__in=addon_item_ids,
-                    is_addon=True
-                )
-                for item in valid_addons:
-                    addon_price = Decimal(str(item.price or 0.00))
-                    total_amount_rupees += addon_price
-                    items_snapshot.append({
-                        'id': str(item.id),
-                        'item_type': item.item_type,
-                        'title': item.title,
-                        'price': str(addon_price),
-                        'is_addon': True,
-                    })
-
-            course = batch.course
-
-        # -------------------------------------------------------------
-        # 2. STANDALONE COURSE CHECKOUT FLOW
-        # -------------------------------------------------------------
-        else:
-            try:
-                course = Course.objects.filter(
-                    models.Q(id=course_id) | models.Q(slug=course_id),
-                    is_published=True
-                ).first()
-            except (ValidationError, ValueError):
-                course = Course.objects.filter(slug=course_id, is_published=True).first()
-
-            if not course:
-                return Response(
-                    {'error': 'Course not found or is not published.'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            if Enrollment.objects.filter(user=request.user, course=course, status='ACTIVE').exists():
-                return Response(
-                    {'error': 'You are already enrolled in this course.'},
-                    status=status.HTTP_409_CONFLICT
-                )
-
-            try:
-                total_amount_rupees = Decimal(str(course.price or 0.00))
-            except (ValueError, TypeError):
-                total_amount_rupees = Decimal('0.00')
-
-            if course.is_free or total_amount_rupees <= Decimal('0.00'):
-                return Response(
-                    {'error': 'This course is free. Please use standard course enrollment.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            items_snapshot.append({
+        base_price = Decimal(str(course.price or 0.00))
+        total_amount_rupees = base_price
+        items_snapshot = [
+            {
                 'type': 'course',
+                'id': str(course.id),
                 'title': course.title,
-                'price': str(total_amount_rupees),
-            })
+                'price': str(base_price),
+            }
+        ]
 
-        # -------------------------------------------------------------
-        # 3. CONVERT TO PAISE (EXACT DECIMAL MATH) & CREATE RAZORPAY ORDER
-        # -------------------------------------------------------------
+        if addon_item_ids:
+            valid_addons = CourseAddon.objects.filter(
+                course=course,
+                id__in=addon_item_ids,
+                is_published=True
+            )
+            for addon in valid_addons:
+                addon_price = Decimal(str(addon.price or 0.00))
+                total_amount_rupees += addon_price
+                items_snapshot.append({
+                    'id': str(addon.id),
+                    'item_type': addon.addon_type,
+                    'title': addon.title,
+                    'price': str(addon_price),
+                    'is_addon': True,
+                })
+
         amount_paise = int(total_amount_rupees * Decimal('100'))
         if amount_paise < 100:
             return Response(
-                {'error': 'Minimum order amount is ₹1.00.'},
+                {'error': 'Minimum order amount is ₹1.00. Free courses can be self-enrolled directly.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         receipt = f"rcpt_{uuid.uuid4().hex[:14]}"
         notes = {
             'user_id': str(request.user.id),
-            'course_id': str(course.id) if course else '',
-            'batch_id': str(batch.id) if batch else '',
+            'course_id': str(course.id),
         }
 
         try:
@@ -260,11 +179,9 @@ class CreateOrderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # 4. Save Payment record
         Payment.objects.create(
             user=request.user,
             course=course,
-            batch=batch,
             items_snapshot=items_snapshot,
             amount_paise=amount_paise,
             currency='INR',
@@ -305,7 +222,7 @@ class VerifyPaymentView(APIView):
         payment = Payment.objects.filter(
             razorpay_order_id=razorpay_order_id,
             user=request.user
-        ).select_related('course', 'batch', 'batch__course').first()
+        ).select_related('course').first()
 
         if not payment:
             return Response(
@@ -376,7 +293,8 @@ class VerifyPaymentView(APIView):
             'message': 'Payment verified successfully.',
             'order_id': locked_payment.razorpay_order_id,
             'payment_id': locked_payment.razorpay_payment_id,
-            'batch_id': str(locked_payment.batch_id) if locked_payment.batch_id else None,
+            'course_id': str(locked_payment.course_id) if locked_payment.course_id else None,
+            'course_slug': locked_payment.course.slug if locked_payment.course else None,
             'enrolled': is_enrolled,
         }, status=status.HTTP_200_OK)
 
@@ -427,7 +345,7 @@ class WebhookView(APIView):
 
         if event in ['payment.captured', 'order.paid']:
             if order_id:
-                payment = Payment.objects.filter(razorpay_order_id=order_id).select_related('course', 'batch', 'batch__course').first()
+                payment = Payment.objects.filter(razorpay_order_id=order_id).select_related('course').first()
                 if payment:
                     paid_amount = payment_entity.get('amount')
                     paid_currency = payment_entity.get('currency', 'INR')
@@ -473,19 +391,18 @@ class AdminPaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
 
     def get_queryset(self):
-        qs = Payment.objects.select_related('user', 'course', 'batch').all().order_by('-created_at')
+        qs = Payment.objects.select_related('user', 'course').all().order_by('-created_at')
         status_param = self.request.query_params.get('status')
         if status_param and status_param != 'all':
             qs = qs.filter(status=status_param.lower())
-        batch_param = self.request.query_params.get('batch')
-        if batch_param:
-            qs = qs.filter(models.Q(batch__id=batch_param) | models.Q(batch__slug=batch_param))
+        course_param = self.request.query_params.get('course')
+        if course_param:
+            qs = qs.filter(models.Q(course__id=course_param) | models.Q(course__slug=course_param))
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
                 models.Q(user__email__icontains=search) |
                 models.Q(course__title__icontains=search) |
-                models.Q(batch__name__icontains=search) |
                 models.Q(razorpay_order_id__icontains=search) |
                 models.Q(razorpay_payment_id__icontains=search)
             )
@@ -495,15 +412,15 @@ class AdminPaymentListView(generics.ListAPIView):
 class AdminGrantEnrollmentView(APIView):
     """
     POST /api/payments/admin/grant-enrollment/
-    Allows an administrator to manually grant an enrollment or mark payment as verified.
+    Allows an administrator to manually grant a course enrollment with an audit reason.
     """
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def post(self, request):
         user_id = request.data.get('user_id')
         user_email = request.data.get('user_email')
-        course_id = request.data.get('course_id')
-        batch_id = request.data.get('batch_id')
+        course_id = request.data.get('course_id') or request.data.get('course_slug')
+        reason = request.data.get('reason', 'Administrative grant')
 
         from apps.accounts.models import User
         user = None
@@ -515,24 +432,27 @@ class AdminGrantEnrollmentView(APIView):
         if not user:
             return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        course = None
-        batch = None
-        if course_id:
-            course = Course.objects.filter(models.Q(id=course_id) | models.Q(slug=course_id)).first()
-        if batch_id:
-            batch = Batch.objects.filter(models.Q(id=batch_id) | models.Q(slug=batch_id)).select_related('course').first()
-            if batch and batch.course:
-                course = batch.course
+        if not course_id:
+            return Response({'error': 'course_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not course and not batch:
-            return Response({'error': 'Either course_id or batch_id must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            course = Course.objects.filter(models.Q(id=course_id) | models.Q(slug=course_id)).first()
+        except (ValidationError, ValueError):
+            course = Course.objects.filter(slug=course_id).first()
+
+        if not course:
+            return Response({'error': 'Course not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         with transaction.atomic():
             manual_payment = Payment.objects.create(
                 user=user,
                 course=course,
-                batch=batch,
-                items_snapshot=[{'type': 'manual_grant', 'by': request.user.email}],
+                items_snapshot=[{
+                    'type': 'manual_grant',
+                    'by': request.user.email,
+                    'reason': reason,
+                    'granted_at': timezone.now().isoformat(),
+                }],
                 amount_paise=0,
                 currency='INR',
                 razorpay_order_id=f"manual_{uuid.uuid4().hex[:12]}",
@@ -540,20 +460,25 @@ class AdminGrantEnrollmentView(APIView):
                 status=Payment.Status.PAID,
                 paid_at=timezone.now(),
             )
-            if course:
-                enrollment, _ = Enrollment.objects.get_or_create(
-                    user=user,
-                    course=course,
-                    defaults={'status': 'ACTIVE'}
-                )
-                if enrollment.status != 'ACTIVE':
-                    enrollment.status = 'ACTIVE'
-                    enrollment.save(update_fields=['status'])
+            enrollment, _ = Enrollment.objects.get_or_create(
+                user=user,
+                course=course,
+                defaults={'status': 'ACTIVE'}
+            )
+            if enrollment.status != 'ACTIVE':
+                enrollment.status = 'ACTIVE'
+                enrollment.save(update_fields=['status'])
+
+            logger.info(
+                "AUDIT: Admin %s granted course %s to student %s. Reason: %s",
+                request.user.email, course.title, user.email, reason
+            )
 
         return Response({
             'success': True,
-            'message': f"Enrollment granted to {user.email}.",
+            'message': f"Enrollment in {course.title} granted to {user.email}.",
             'payment_id': str(manual_payment.id),
+            'course_id': str(course.id),
         }, status=status.HTTP_201_CREATED)
 
 

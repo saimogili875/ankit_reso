@@ -12,16 +12,16 @@ logger = logging.getLogger(__name__)
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_FORMATS = {'JPEG', 'PNG', 'WEBP'}
 
-def process_and_upload_batch_image(uploaded_file, filename_hint: str = "batch") -> tuple[str, str]:
+def process_and_upload_course_image(uploaded_file, filename_hint: str = "course") -> tuple[str, str]:
     """
-    Validates, compresses, and uploads a batch cover image to Cloudflare R2:
+    Validates, compresses, and uploads a course cover image to Cloudflare R2:
     1. Validates size <= 5 MB.
     2. Verifies real image integrity with Pillow.
     3. Verifies format is JPG, PNG, or WebP.
     4. Auto-resizes to max 1200px width with high-quality Lanczos resampling.
     5. Strips all EXIF metadata for privacy and size reduction.
     6. Converts to optimized WebP format (quality 85).
-    7. Uploads via StorageService to Cloudflare R2 under 'images/batches/<uuid>.webp'.
+    7. Uploads via StorageService to Cloudflare R2 under 'images/courses/<uuid>.webp'.
     
     Returns:
         tuple (image_url, object_key)
@@ -74,7 +74,7 @@ def process_and_upload_batch_image(uploaded_file, filename_hint: str = "batch") 
     webp_bytes = buffer.getvalue()
 
     unique_name = f"{uuid.uuid4().hex}.webp"
-    object_key = f"images/batches/{unique_name}"
+    object_key = f"images/courses/{unique_name}"
 
     with tempfile.NamedTemporaryFile(suffix=".webp", delete=True) as temp_dest:
         temp_dest.write(webp_bytes)
@@ -83,13 +83,13 @@ def process_and_upload_batch_image(uploaded_file, filename_hint: str = "batch") 
         uploaded = storage_service.upload_file_direct(temp_dest.name, object_key, content_type="image/webp")
         if not uploaded:
             import os
-            media_batches_dir = os.path.join(settings.MEDIA_ROOT, 'batches')
-            os.makedirs(media_batches_dir, exist_ok=True)
-            local_path = os.path.join(media_batches_dir, unique_name)
+            media_courses_dir = os.path.join(settings.MEDIA_ROOT, 'courses')
+            os.makedirs(media_courses_dir, exist_ok=True)
+            local_path = os.path.join(media_courses_dir, unique_name)
             with open(local_path, "wb") as f:
                 f.write(webp_bytes)
-            logger.info("Saved batch image locally as dev fallback: %s", local_path)
-            image_url = f"{settings.MEDIA_URL.rstrip('/')}/batches/{unique_name}"
+            logger.info("Saved course image locally as dev fallback: %s", local_path)
+            image_url = f"{settings.MEDIA_URL.rstrip('/')}/courses/{unique_name}"
             return image_url, object_key
 
     r2_public_url = getattr(settings, 'R2_PUBLIC_URL', '').rstrip('/')
@@ -100,3 +100,7 @@ def process_and_upload_batch_image(uploaded_file, filename_hint: str = "batch") 
         image_url = presigned or f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{object_key}"
 
     return image_url, object_key
+
+
+# Backward-compatibility alias
+process_and_upload_batch_image = process_and_upload_course_image

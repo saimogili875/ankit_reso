@@ -12,9 +12,9 @@ Adept Eduverse provides premier JEE Mains & Advanced Mathematics mentorship by A
 
 Key institutional knowledge:
 - Faculty: Ankit Kumar, B.Tech from IIT Kharagpur. Over a decade of experience mentoring top JEE rankers (including AIR 125).
-- Batches & Timings:
-  * Class 11 and Class 12 Live Evening Batch: Monday through Saturday, 6:30 PM to 8:30 PM.
-  * Droppers Immersion Batch (Morning Accelerated): Monday through Saturday, 9:00 AM to 12:00 Noon.
+- Courses & Timings:
+  * Class 11 and Class 12 Live Evening Schedule: Monday through Saturday, 6:30 PM to 8:30 PM.
+  * Droppers Immersion Schedule (Morning Accelerated): Monday through Saturday, 9:00 AM to 12:00 Noon.
   * Sunday Mornings: All-India computer-based mock tests (CBT) with percentile benchmarking and personalized error analysis.
 - Lectures & Recordings: High-definition video recordings are processed and uploaded to the student portal within 2 hours of every live session, accessible 24/7. Over 2,700 video lectures available.
 - Doubts & Mentorship: Direct audio and chat interaction with Ankit Sir during live classes, weekly live doubt sessions, and a dedicated WhatsApp Academic Desk (+91 93825 57693).
@@ -37,15 +37,15 @@ def get_keyword_faq_response(user_message: str) -> str:
 
     if any(k in msg for k in ['fee', 'fees', 'cost', 'price', 'pricing', 'discount', 'scholarship', 'payment', 'installment', 'pay']):
         return (
-            "For official batch fee structures, installment options, and scholarship discounts, "
+            "For official course fee structures, installment options, and scholarship discounts, "
             "please connect directly with our Admissions Desk on WhatsApp at +91 93825 57693. "
             "We offer transparent pricing with UPI, Net Banking, and card support."
         )
 
-    if any(k in msg for k in ['batch', 'timing', 'schedule', 'time', 'hours', 'dropper', 'evening', 'morning', 'class 11', 'class 12']):
+    if any(k in msg for k in ['course', 'timing', 'schedule', 'time', 'hours', 'dropper', 'evening', 'morning', 'class 11', 'class 12']):
         return (
-            "Our live batch schedules are:\n"
-            "• Class 11 & 12 Evening Batch: Mon–Sat, 6:30 PM – 8:30 PM\n"
+            "Our live class schedules are:\n"
+            "• Class 11 & 12 Evening Schedule: Mon–Sat, 6:30 PM – 8:30 PM\n"
             "• Droppers Accelerated Immersion: Mon–Sat, 9:00 AM – 12:00 Noon\n"
             "• Sunday: All-India CBT Mock Tests\n\n"
             "All sessions include 2-hour HD recording uploads to your student vault."
@@ -91,8 +91,8 @@ def get_keyword_faq_response(user_message: str) -> str:
         )
 
     return (
-        "Hello! I am Swecha, your Adept Eduverse assistant. I can assist you with batch timings, demo classes, "
-        "admissions, login issues, and study materials. For specific fee or batch enrollment assistance, connect "
+        "Hello! I am Swecha, your Adept Eduverse assistant. I can assist you with course timings, demo classes, "
+        "admissions, login issues, and study materials. For specific fee or course enrollment assistance, connect "
         "directly with Ankit Sir's team on WhatsApp at +91 93825 57693."
     )
 

@@ -19,8 +19,8 @@ class DPDPPrivacyTestCase(TestCase):
             last_name='Student',
         )
         self.course = Course.objects.create(
-            title='Physics Complete Batch',
-            slug='physics-complete-batch',
+            title='Physics Complete Course',
+            slug='physics-complete-course',
             price=0,
             is_free=True,
             is_published=True,
@@ -35,7 +35,7 @@ class DPDPPrivacyTestCase(TestCase):
         self.assertIn('compliance', data)
         self.assertEqual(data['profile']['email'], 'dpdp_student@example.com')
         self.assertEqual(len(data['enrollments']), 1)
-        self.assertEqual(data['enrollments'][0]['course_title'], 'Physics Complete Batch')
+        self.assertEqual(data['enrollments'][0]['course_title'], 'Physics Complete Course')
 
     def test_delete_account_without_proper_confirmation_fails(self):
         res = self.client.post('/api/auth/me/delete-account/', {'confirmation': 'wrong'})

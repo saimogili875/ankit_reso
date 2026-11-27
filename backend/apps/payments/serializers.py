@@ -5,7 +5,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_name = serializers.CharField(source='user.full_name', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
-    batch_name = serializers.CharField(source='batch.name', read_only=True)
+    course_slug = serializers.CharField(source='course.slug', read_only=True)
     amount_rupees = serializers.SerializerMethodField()
 
     class Meta:
@@ -17,8 +17,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'user_name',
             'course',
             'course_title',
-            'batch',
-            'batch_name',
+            'course_slug',
             'items_snapshot',
             'amount_paise',
             'amount_rupees',

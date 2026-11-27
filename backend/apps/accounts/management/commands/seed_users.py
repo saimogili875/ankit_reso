@@ -167,8 +167,8 @@ class Command(BaseCommand):
         adv_course, _ = Course.objects.update_or_create(
             slug='jee-advanced-super30',
             defaults={
-                'title': 'JEE Advanced Super 30 Elite Batch',
-                'subtitle': 'Intensive multi-concept problem solving batch for top 500 AIR aspirants',
+                'title': 'JEE Advanced Super 30 Elite Course',
+                'subtitle': 'Intensive multi-concept problem solving course for top 500 AIR aspirants',
                 'description': 'Rigorous problem solving, subjective Olympiad-level questions, and personalized faculty mentoring.',
                 'thumbnail_url': '/images/hero/slide-3.jpg',
                 'exam_type': Course.ExamType.JEE_ADVANCED,

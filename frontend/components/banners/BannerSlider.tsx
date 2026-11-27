@@ -168,7 +168,7 @@ export function BannerSlider({ placement, className = '', isCompact = false }: B
 
             <div className="pt-1 flex items-center gap-2">
               <a
-                href="#batches"
+                href="#courses"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-md transition-all"
               >
                 Explore Batches →

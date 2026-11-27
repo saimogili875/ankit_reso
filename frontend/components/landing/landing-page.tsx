@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
 import { GraduationCap, Star, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
-import { BatchesSection } from './batches-section';
+import { CoursesSection } from './courses-section';
 import { BooksSection } from './books-section';
 import { StudentResultsSection } from './student-results-section';
 
@@ -90,7 +90,7 @@ export const LandingPage: React.FC = () => {
           <nav className="landing-nav" aria-label="Main Navigation">
             <ul className="nav-links">
               <li>
-                <a href="#batches">Courses</a>
+                <a href="#courses">Courses</a>
               </li>
               <li>
                 <Link href="/books">Books</Link>
@@ -170,7 +170,7 @@ export const LandingPage: React.FC = () => {
             {/* Mobile Header Quick Actions */}
             <div className="flex items-center gap-1.5 lg:hidden mr-1">
               <a
-                href="#batches"
+                href="#courses"
                 className="px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold text-slate-200 bg-slate-800/90 border border-slate-700/80 hover:text-white"
               >
                 Courses
@@ -201,7 +201,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Mobile Dropdown Menu */}
         <div className={`mobile-menu ${mobileMenuOpen ? 'active' : ''}`} id="mobileMenu">
-          <a href="#batches" className="mobile-link" onClick={closeMobileMenu}>
+          <a href="#courses" className="mobile-link" onClick={closeMobileMenu}>
             Batches &amp; Curriculum
           </a>
           <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
@@ -288,7 +288,7 @@ export const LandingPage: React.FC = () => {
               </p>
 
               <div className="hero-actions">
-                <a className="landing-btn btn-primary" href="#batches">
+                <a className="landing-btn btn-primary" href="#courses">
                   <span>Explore Batches</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
@@ -714,13 +714,13 @@ export const LandingPage: React.FC = () => {
               <h4>Programs</h4>
               <ul className="footer-links">
                 <li>
-                  <a href="#batches">Class VI-X Foundation Batches</a>
+                  <a href="#courses">Class VI-X Foundation Batches</a>
                 </li>
                 <li>
-                  <a href="#batches">Class 11 &amp; 12 JEE + Board</a>
+                  <a href="#courses">Class 11 &amp; 12 JEE + Board</a>
                 </li>
                 <li>
-                  <a href="#batches">Dropper Immersion Batch</a>
+                  <a href="#courses">Dropper Immersion Batch</a>
                 </li>
                 <li>
                   <Link href="/books">Official Book Store</Link>
@@ -797,7 +797,7 @@ export const LandingPage: React.FC = () => {
           <Home className="w-5 h-5" />
           <span>Home</span>
         </a>
-        <a href="#batches" className="mobile-dock-tab" aria-label="Courses & Batches">
+        <a href="#courses" className="mobile-dock-tab" aria-label="Courses & Batches">
           <GraduationCap className="w-5 h-5 text-indigo-400" />
           <span>Courses</span>
         </a>

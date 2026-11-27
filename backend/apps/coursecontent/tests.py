@@ -67,7 +67,7 @@ class CourseContentGatingTestCase(TestCase):
         )
 
         self.course = Course.objects.create(
-            title='JEE Main & Advanced 2026 Complete Batch',
+            title='JEE Main & Advanced 2026 Complete Course',
             slug='jee-complete-2026',
             price=7999,
             is_free=False,

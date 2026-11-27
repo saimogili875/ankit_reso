@@ -96,7 +96,7 @@ class EnrollView(APIView):
         if is_paid and not is_admin_or_staff:
             from apps.payments.models import Payment
             has_paid = Payment.objects.filter(
-                models.Q(course=course) | models.Q(batch__course=course),
+                course=course,
                 user=request.user,
                 status=Payment.Status.PAID
             ).exists()

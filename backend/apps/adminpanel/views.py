@@ -14,8 +14,10 @@ from datetime import timedelta
 from apps.accounts.models import User
 from apps.accounts.permissions import IsAdminRole
 from apps.academics.models import (
-    Exam, AcademicClass, Subject, Category, Chapter, Topic, Lecture, Course, Enrollment
+    Exam, AcademicClass, Subject, Category, Chapter, Topic, Lecture, Course, Enrollment,
+    CourseCategory, CourseFeature, CourseAddon
 )
+from apps.academics.services import process_and_upload_course_image
 from apps.content.models import (
     Video, HeroSlide, QuickAccessItem, Announcement, Doubt,
     ScheduleEvent, Notification,
@@ -297,6 +299,58 @@ class CourseViewSet(viewsets.ModelViewSet):
         user_id = request.data.get('user_id')
         Enrollment.objects.filter(course=course, user_id=user_id).delete()
         return Response({'message': f"Student un-enrolled from {course.title} successfully."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-image')
+    def upload_image(self, request, pk=None):
+        course = self.get_object()
+        uploaded_file = request.FILES.get('image') or request.FILES.get('file')
+        if not uploaded_file:
+            return Response({'error': 'No image file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_url, _ = process_and_upload_course_image(uploaded_file, filename_hint=course.slug)
+        course.image = image_url
+        course.thumbnail_url = image_url
+        course.save(update_fields=['image', 'thumbnail_url'])
+        return Response({'success': True, 'image_url': image_url})
+
+    @action(detail=True, methods=['post'], url_path='sync-features')
+    def sync_features(self, request, pk=None):
+        course = self.get_object()
+        features_data = request.data.get('features', [])
+        if not isinstance(features_data, list):
+            return Response({'error': 'features must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            course.course_features.all().delete()
+            for idx, item in enumerate(features_data, start=1):
+                text = item if isinstance(item, str) else item.get('text', '')
+                order = idx if isinstance(item, str) else item.get('order', idx)
+                if text.strip():
+                    CourseFeature.objects.create(course=course, text=text.strip(), order=order)
+        from apps.academics.serializers import CourseSerializer
+        return Response(CourseSerializer(course).data)
+
+    @action(detail=True, methods=['post'], url_path='sync-addons')
+    def sync_addons(self, request, pk=None):
+        course = self.get_object()
+        addons_data = request.data.get('addons', [])
+        if not isinstance(addons_data, list):
+            return Response({'error': 'addons must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            course.addons.all().delete()
+            for idx, it in enumerate(addons_data, start=1):
+                CourseAddon.objects.create(
+                    course=course,
+                    title=it.get('title', 'Addon'),
+                    addon_type=it.get('addon_type', CourseAddon.AddonType.MODULE),
+                    price=it.get('price', 0),
+                    description=it.get('description', ''),
+                    order=it.get('order', idx),
+                    is_published=it.get('is_published', True),
+                )
+        from apps.academics.serializers import CourseSerializer
+        return Response(CourseSerializer(course).data)
 
 
 class AcademicClassViewSet(viewsets.ModelViewSet):

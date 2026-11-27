@@ -26,17 +26,10 @@ class Payment(TimeStampedModel):
         blank=True,
         related_name='payments'
     )
-    batch = models.ForeignKey(
-        'academics.Batch',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='payments'
-    )
     items_snapshot = models.JSONField(
         default=list,
         blank=True,
-        help_text="Snapshot of selected batch items and add-ons at purchase time"
+        help_text="Snapshot of selected course and add-ons at purchase time"
     )
     amount_paise = models.IntegerField(help_text="Amount in paise (e.g. 100 paise = ₹1.00)")
     currency = models.CharField(max_length=10, default='INR')
@@ -79,15 +72,15 @@ class Entitlement(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name='entitlements'
     )
-    batch = models.ForeignKey(
-        'academics.Batch',
+    course = models.ForeignKey(
+        'academics.Course',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='entitlements'
     )
-    batch_item = models.ForeignKey(
-        'academics.BatchItem',
+    course_addon = models.ForeignKey(
+        'academics.CourseAddon',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -1,7 +1,7 @@
 import logging
 from django.db import transaction
 from django.utils import timezone
-from apps.academics.models import Enrollment, BatchItem
+from apps.academics.models import Enrollment, CourseAddon
 from .models import Payment, Entitlement
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ def fulfill_payment(payment: Payment, razorpay_payment_id: str = None) -> tuple[
     with transaction.atomic():
         locked_payment = Payment.objects.select_for_update().get(id=payment.id)
         if locked_payment.status == Payment.Status.PAID:
-            target_course = locked_payment.course or (locked_payment.batch.course if locked_payment.batch else None)
+            target_course = locked_payment.course
             return locked_payment, bool(target_course)
 
         locked_payment.status = Payment.Status.PAID
@@ -27,7 +27,7 @@ def fulfill_payment(payment: Payment, razorpay_payment_id: str = None) -> tuple[
         locked_payment.save(update_fields=['status', 'razorpay_payment_id', 'paid_at'])
 
         # 1. Course Enrollment
-        target_course = locked_payment.course or (locked_payment.batch.course if locked_payment.batch else None)
+        target_course = locked_payment.course
         is_enrolled = False
         if target_course:
             enrollment, created = Enrollment.objects.get_or_create(
@@ -45,19 +45,19 @@ def fulfill_payment(payment: Payment, razorpay_payment_id: str = None) -> tuple[
             for item in locked_payment.items_snapshot:
                 if isinstance(item, dict) and item.get('is_addon'):
                     item_id = item.get('id')
-                    batch_item = None
+                    course_addon = None
                     if item_id:
-                        batch_item = BatchItem.objects.filter(id=item_id).first()
-                    title = item.get('title') or (batch_item.title if batch_item else 'Addon Item')
-                    item_type = item.get('item_type') or (batch_item.item_type if batch_item else '')
+                        course_addon = CourseAddon.objects.filter(id=item_id).first()
+                    title = item.get('title') or (course_addon.title if course_addon else 'Addon Item')
+                    item_type = item.get('item_type') or (course_addon.addon_type if course_addon else '')
 
                     Entitlement.objects.get_or_create(
                         user=locked_payment.user,
                         payment=locked_payment,
                         title=title,
                         defaults={
-                            'batch': locked_payment.batch,
-                            'batch_item': batch_item,
+                            'course': target_course,
+                            'course_addon': course_addon,
                             'item_type': item_type,
                             'is_active': True,
                         }

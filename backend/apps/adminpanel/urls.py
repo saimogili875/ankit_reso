@@ -29,17 +29,23 @@ from .views import (
     LandingBannerSettingsView,
 )
 from apps.academics.pricing_views import (
+    CourseCategoryAdminViewSet,
+    CourseFeatureAdminViewSet,
+    CourseAddonAdminViewSet,
     PricingCardAdminViewSet,
-    BatchAdminViewSet,
-    BatchItemAdminViewSet,
     BatchFeatureAdminViewSet,
+    BatchItemAdminViewSet,
 )
 
 router = DefaultRouter()
+router.register('course-categories', CourseCategoryAdminViewSet, basename='admin-course-categories')
+router.register('course-features', CourseFeatureAdminViewSet, basename='admin-course-features')
+router.register('course-addons', CourseAddonAdminViewSet, basename='admin-course-addons')
+
+# Legacy route aliases
 router.register('pricing-cards', PricingCardAdminViewSet, basename='admin-pricing-cards')
-router.register('batches', BatchAdminViewSet, basename='admin-batches')
-router.register('batch-items', BatchItemAdminViewSet, basename='admin-batch-items')
 router.register('batch-features', BatchFeatureAdminViewSet, basename='admin-batch-features')
+router.register('batch-items', BatchItemAdminViewSet, basename='admin-batch-items')
 router.register('landing-banners', LandingBannerViewSet, basename='admin-landing-banners')
 router.register('hero-slides', HeroSlideViewSet, basename='admin-hero-slides')
 router.register('quick-access', QuickAccessViewSet, basename='admin-quick-access')

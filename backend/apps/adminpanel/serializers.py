@@ -497,13 +497,19 @@ class AdminCourseSerializer(serializers.ModelSerializer):
     enrolled_count = serializers.SerializerMethodField()
     classes_names = serializers.SerializerMethodField()
     subjects_names = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True, default='')
+    category_slug = serializers.CharField(source='category.slug', read_only=True, default='')
+    academic_class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
 
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'slug', 'subtitle', 'description',
-            'thumbnail_url', 'exam_type', 'price', 'original_price',
-            'discount_badge', 'is_free', 'features', 'start_date', 'end_date',
+            'id', 'title', 'slug', 'subtitle', 'tagline', 'description',
+            'image', 'thumbnail_url', 'exam_type', 'price', 'original_price',
+            'discount_badge', 'is_free', 'features', 'has_live_classes', 'display_order',
+            'category', 'category_name', 'category_slug',
+            'academic_class', 'academic_class_name',
+            'start_date', 'end_date',
             'status', 'is_published', 'allow_self_enrollment',
             'classes', 'subjects', 'classes_names', 'subjects_names',
             'enrolled_count', 'created_at', 'updated_at'
