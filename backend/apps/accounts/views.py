@@ -33,7 +33,7 @@ from .serializers import (
     UpdateProfileSerializer,
     StudentOnboardingSerializer,
 )
-from .throttles import LoginFailedIdentifierRateThrottle, AdminLoginThrottle
+from .throttles import LoginFailedIdentifierRateThrottle, LoginFailedIPRateThrottle, AdminLoginThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,7 @@ class LoginView(APIView):
     throttle_classes = [
         ScopedRateThrottle,
         LoginFailedIdentifierRateThrottle,
+        LoginFailedIPRateThrottle,
         AdminLoginThrottle,
     ]
     throttle_scope = 'login'
@@ -210,8 +211,9 @@ class LoginView(APIView):
             else:
                 request.session.set_expiry(0)       # browser session
 
-            # Reset failure count for this identifier upon successful login
+            # Reset failure count for this identifier and IP upon successful login
             LoginFailedIdentifierRateThrottle.clear_login_failures(request)
+            LoginFailedIPRateThrottle.clear_login_failures(request)
 
             user_data = UserSerializer(user, context={'request': request}).data
             return Response({
@@ -219,8 +221,9 @@ class LoginView(APIView):
                 'user': user_data
             }, status=status.HTTP_200_OK)
 
-        # Login failed: record failure against identifier and log warning
+        # Login failed: record failure against identifier and IP, then log warning without sensitive data
         LoginFailedIdentifierRateThrottle.record_login_failure(request)
+        LoginFailedIPRateThrottle.record_login_failure(request)
 
         raw_identifier = (request.data.get('identifier') or request.data.get('email') or '').strip().lower()
         ident_hash = hashlib.sha256(raw_identifier.encode('utf-8')).hexdigest()[:16] if raw_identifier else 'anonymous'

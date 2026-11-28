@@ -264,6 +264,7 @@ REST_FRAMEWORK = {
         'chatbot': '10/minute',
         'login': '10/minute',
         'login_failed_identifier': '5/15min',
+        'login_failed_ip': '5/15min',
         'admin_login': '5/15min',
         'register': '10/minute',
         'signup': '10/minute',
@@ -281,6 +282,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
+
+FRONTEND_URL = config('FRONTEND_URL', default='https://adepteduverse.com').strip()
 
 # Swagger Documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {

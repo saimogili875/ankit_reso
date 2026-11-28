@@ -47,6 +47,7 @@ class LoginThrottleSecurityTests(TestCase):
                 'user': '120/minute',
                 'login': '10/minute',
                 'login_failed_identifier': '5/15min',
+                'login_failed_ip': '15/minute',
             },
             'NUM_PROXIES': 2,
         }
@@ -184,3 +185,64 @@ class LoginThrottleSecurityTests(TestCase):
         self.assertEqual(res_success.status_code, status.HTTP_200_OK)
         self.assertEqual(res_success.data.get('message'), 'Login successful')
         self.assertEqual(res_success.data['user']['email'], target_email)
+
+    def test_login_failed_ip_rate_throttle_across_different_accounts(self):
+        """
+        5 wrong logins from the same client IP across different accounts result in 429 lockout on the 6th attempt.
+        """
+        client_ip = '198.51.100.77'
+
+        for i in range(5):
+            res = self.client.post(
+                '/api/auth/login/',
+                {
+                    'identifier': f'random_account_{i}@example.com',
+                    'password': 'WrongPassword999!',
+                },
+                HTTP_X_FORWARDED_FOR=f'{client_ip}, 76.76.21.21',
+                REMOTE_ADDR='10.0.0.1',
+            )
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 6th attempt from the same IP (even for valid user) must be throttled with 429
+        res_6 = self.client.post(
+            '/api/auth/login/',
+            {
+                'identifier': self.user.email,
+                'password': 'ValidPassword123!',
+            },
+            HTTP_X_FORWARDED_FOR=f'{client_ip}, 76.76.21.21',
+            REMOTE_ADDR='10.0.0.1',
+        )
+        self.assertEqual(res_6.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+        # A different IP is NOT throttled
+        res_diff_ip = self.client.post(
+            '/api/auth/login/',
+            {
+                'identifier': self.user.email,
+                'password': 'ValidPassword123!',
+            },
+            HTTP_X_FORWARDED_FOR='198.51.100.88, 76.76.21.21',
+            REMOTE_ADDR='10.0.0.1',
+        )
+        self.assertEqual(res_diff_ip.status_code, status.HTTP_200_OK)
+
+    def test_failed_login_logged_without_sensitive_data(self):
+        """Failed login attempts are logged with identifier hash, without password or sensitive info."""
+        with self.assertLogs('apps.accounts.views', level='WARNING') as cm:
+            res = self.client.post(
+                '/api/auth/login/',
+                {
+                    'identifier': 'sensitive_user@secret.com',
+                    'password': 'SuperSecretPasswordXYZ!',
+                },
+                HTTP_X_FORWARDED_FOR='198.51.100.12, 76.76.21.21',
+                REMOTE_ADDR='10.0.0.1',
+            )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        log_output = "\n".join(cm.output)
+        self.assertIn("Failed login attempt", log_output)
+        self.assertIn("identifier_hash=", log_output)
+        self.assertNotIn("SuperSecretPasswordXYZ!", log_output)
+        self.assertNotIn("sensitive_user@secret.com", log_output)

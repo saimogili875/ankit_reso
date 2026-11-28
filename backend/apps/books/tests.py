@@ -634,6 +634,98 @@ class BookGuestCheckoutTests(TestCase):
         self.assertIsNotNone(data_with_tok['download_url'])
         self.assertIn(raw_token, data_with_tok['download_url'])
 
+    @patch('storage.service.storage_service.provider.generate_presigned_url')
+    def test_download_endpoint_returns_503_when_r2_not_configured(self, mock_presign):
+        """When R2 is unconfigured or returns None, download returns 503 and does not increment count."""
+        mock_presign.return_value = None
+
+        raw_token = 'token_r2_down_test_123'
+        token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+        order = BookOrder.objects.create(
+            product=self.book,
+            format=BookOrder.Format.DIGITAL,
+            buyer_name='R2 Test Buyer',
+            buyer_phone='+919876543210',
+            buyer_email='r2buyer@example.com',
+            base_amount=Decimal('299.00'),
+            gst_amount=Decimal('53.82'),
+            total_amount_paise=35282,
+            razorpay_order_id='order_r2_test_1',
+            status=BookOrder.Status.PAID,
+            download_token=token_hash,
+            download_expires_at=timezone.now() + timedelta(days=7),
+            download_count=0,
+            max_downloads=5,
+        )
+
+        with self.assertLogs('apps.books.views', level='ERROR') as cm:
+            res = self.client.get(f'/api/books/orders/{order.public_id}/download/?token={raw_token}')
+        self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(res.json(), {'error': 'Download temporarily unavailable, contact support.'})
+        order.refresh_from_db()
+        self.assertEqual(order.download_count, 0)
+        self.assertTrue(any("Book download failed" in msg for msg in cm.output))
+
+    def test_download_endpoint_returns_503_when_book_has_no_pdf_key(self):
+        """When BookProduct has no pdf_key, download returns 503 and logs ERROR."""
+        self.book.pdf_key = ''
+        self.book.save(update_fields=['pdf_key'])
+
+        raw_token = 'token_no_pdf_key_test'
+        token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+        order = BookOrder.objects.create(
+            product=self.book,
+            format=BookOrder.Format.DIGITAL,
+            buyer_name='No Key Buyer',
+            buyer_phone='+919876543210',
+            buyer_email='nokey@example.com',
+            base_amount=Decimal('299.00'),
+            gst_amount=Decimal('53.82'),
+            total_amount_paise=35282,
+            razorpay_order_id='order_no_key_test_2',
+            status=BookOrder.Status.PAID,
+            download_token=token_hash,
+            download_expires_at=timezone.now() + timedelta(days=7),
+            download_count=0,
+            max_downloads=5,
+        )
+
+        with self.assertLogs('apps.books.views', level='ERROR') as cm:
+            res = self.client.get(f'/api/books/orders/{order.public_id}/download/?token={raw_token}')
+        self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(res.json(), {'error': 'Download temporarily unavailable, contact support.'})
+        order.refresh_from_db()
+        self.assertEqual(order.download_count, 0)
+        self.assertTrue(any("Book download failed" in msg for msg in cm.output))
+
+    @override_settings(FRONTEND_URL='https://custom.adepteduverse.com')
+    def test_order_email_download_url_uses_frontend_url(self):
+        """Order confirmation email download URL must use FRONTEND_URL setting."""
+        from apps.books.services import send_order_confirmation_email
+        from django.core import mail
+
+        order = BookOrder.objects.create(
+            product=self.book,
+            format=BookOrder.Format.DIGITAL,
+            buyer_name='Email Test Buyer',
+            buyer_phone='+919876543210',
+            buyer_email='emailbuyer@example.com',
+            base_amount=Decimal('299.00'),
+            gst_amount=Decimal('53.82'),
+            total_amount_paise=35282,
+            razorpay_order_id='order_email_test_3',
+            status=BookOrder.Status.PAID,
+            invoice_number='INV-BK-20261128-0001',
+        )
+
+        raw_token = 'secret_raw_token_email_test'
+        success = send_order_confirmation_email(order, raw_download_token=raw_token)
+        self.assertTrue(success)
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        expected_url = f"https://custom.adepteduverse.com/books/order/{order.public_id}?token={raw_token}"
+        self.assertIn(expected_url, email.body)
+
     # --------------------------------------------------------------------------
     # 8. ADMIN SAFETY
     # --------------------------------------------------------------------------
