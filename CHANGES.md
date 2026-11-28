@@ -1,5 +1,45 @@
 # AdeptEduverse / ANKIT JEE — Full-Stack Platform Update
 
+## Admin-Driven Academic Hierarchy (Phase 1 - Phase 5)
+
+### Summary of Major Deliverables
+1. **Dynamic Academic Hierarchy Architecture**:
+   - Replaced fixed, global academic structures with an admin-driven tree:
+     `Exam -> AcademicClass -> Subject -> Chapter -> (Topic, Lecture->Video, DPP, Question)`
+   - Decoupled all components from hardcoded "Class 11", "Class 12", "JEE Main", or "JEE Advanced" assumptions.
+   - Enforced strict scoped ownership:
+     - `Exam`: unique `(name, slug)` globally.
+     - `AcademicClass`: scoped uniquely to `(exam, slug)`, `(exam, code)`, `(exam, Lower('name'))`.
+     - `Subject`: belongs to exactly one `AcademicClass`. Scoped uniquely to `(academic_class, slug)` and `(academic_class, Lower('name'))`. Subjects across classes (e.g. "Physics" in Class 11 and "Physics" in Class 12) are completely isolated database rows with no cross-talk.
+     - `Category`: optional grouping scoped to `(subject, slug)`.
+     - `Chapter`: scoped uniquely to `(subject, slug)` and `(subject, name)`.
+     - `DPP`: scoped uniquely to `(chapter, dpp_number)`.
+   - Data-preserving migrations (`academics/0010`, `0011`, `0012`, `questions/0004`) and idempotent backfill management command (`migrate_academic_hierarchy.py`).
+
+2. **Admin Panel Management API & Cascade Safeguards (Phase 2)**:
+   - Full CRUD endpoints for `Exam`, `AcademicClass`, `Subject`, `Category`, `Topic`, `Chapter`.
+   - Built downstream cascade analysis endpoint (`GET /api/admin-panel/<model>/<id>/cascade_info/`).
+   - Guarded destructive deletions: requires `?confirm=true` if downstream entities (classes, subjects, chapters, questions, DPPs) exist.
+   - Cascading options tree in `OptionsView` (`GET /api/admin-panel/options/`).
+
+3. **Admin Frontend Hierarchy Tools (Phase 3)**:
+   - Dedicated 3-column management console at `/admin/exams` for managing Exams, Classes, and Subjects.
+   - Reusable `<AcademicPicker />` component with cascading dropdowns (`Exam -> Class -> Subject -> Chapter`).
+   - Integrated cascading scope filter bar in `/admin/modules`.
+   - Dynamic exam/class/subject chip multi-selectors in `/admin/courses`.
+   - Clear contextual labels (`"Class 11 · Physics"`) in Questions, Materials, Videos, and Schedule.
+
+4. **Student Experience Decoupling (Phase 4)**:
+   - Dynamic class and subject discovery in `/learn` and `/practice` scoped to the student's enrolled course.
+   - Test results (`/tests/[id]/result`) and student analytics keyed and filtered by Subject ID instead of global string names.
+
+5. **Verification & Testing (Phase 5)**:
+   - Full test suite: 42 backend test cases across `academics` and `adminpanel` passing cleanly in 21s.
+   - Integration test suite (`AcademicHierarchyIntegrationTestCase`) covering cross-parent composite uniqueness, data isolation, student endpoints, and cascade deletion guards.
+   - Zero-error Next.js production build (`60/60 static pages generated`).
+
+---
+
 ## Phase 1 & Phase 2: Course Architecture, Test Series Bundles, Exams Section, Gated Rank Board & Multi-Course Scoping (Feature Release)
 
 ### Summary of Major Deliverables

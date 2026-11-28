@@ -118,6 +118,9 @@ adepteduverse/
    ```bash
    python manage.py check
    python manage.py migrate
+   # Backfill or initialize academic hierarchy (safe & idempotent):
+   python manage.py migrate_academic_hierarchy
+   ```
    ```
 5. Start development server:
    ```bash

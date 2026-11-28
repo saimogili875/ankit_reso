@@ -141,7 +141,6 @@ export default function AdminModulesPage() {
 
   // Lookup data
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [classes, setClasses] = useState<ClassOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [availableQuestions, setAvailableQuestions] = useState<QuestionLookupItem[]>([]);
 
@@ -208,7 +207,6 @@ export default function AdminModulesPage() {
       ]);
 
       setCategories(optRes.categories || []);
-      setClasses(optRes.classes || []);
       setSubjects(optRes.subjects || []);
       setChapters(asList<ChapterItem>(chRes));
       setLectures(asList<LectureItem>(lecRes));

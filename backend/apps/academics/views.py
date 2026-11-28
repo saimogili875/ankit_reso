@@ -30,6 +30,11 @@ class CourseClassesView(APIView):
         except Course.DoesNotExist:
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
 
+class AcademicClassListView(generics.ListAPIView):
+    serializer_class = AcademicClassSerializer
+    queryset = AcademicClass.objects.all().order_by('order', 'name')
+    pagination_class = None
+
 class SubjectListView(generics.ListAPIView):
     serializer_class = SubjectSerializer
     queryset = Subject.objects.all().order_by('name')
@@ -37,30 +42,40 @@ class SubjectListView(generics.ListAPIView):
 
 class ClassSubjectsView(APIView):
     def get(self, request, pk):
-        subjects = Subject.objects.all().order_by('name')
+        subjects = Subject.objects.filter(
+            models.Q(academic_class_id=pk) |
+            models.Q(academic_class__code=pk) |
+            models.Q(academic_class__slug=pk)
+        ).order_by('order', 'name')
         return Response(SubjectSerializer(subjects, many=True).data)
 
 class SubjectChaptersView(APIView):
     def get(self, request, pk):
+        class_param = request.query_params.get('class', None)
         subject = None
         try:
-            subject = Subject.objects.filter(models.Q(id=pk) | models.Q(slug=pk)).first()
+            subject = Subject.objects.filter(id=pk).first()
         except (ValidationError, ValueError):
-            subject = Subject.objects.filter(slug=pk).first()
+            pass
+
+        if not subject:
+            qs = Subject.objects.filter(slug=pk)
+            if class_param:
+                qs = qs.filter(
+                    models.Q(academic_class_id=class_param) |
+                    models.Q(academic_class__code=class_param) |
+                    models.Q(academic_class__slug=class_param)
+                )
+            subject = qs.first()
 
         if not subject:
             return Response({'error': 'Subject not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        chapters = Chapter.objects.filter(category__subject=subject)
+        chapters = Chapter.objects.filter(
+            models.Q(subject=subject) | models.Q(category__subject=subject)
+        ).distinct().order_by('order', 'id')
 
-        class_code = request.query_params.get('class', None)
-        if class_code:
-            chapters = chapters.filter(
-                models.Q(academic_class__code=class_code) |
-                models.Q(academic_class__id=class_code)
-            )
-
-        serializer = ChapterSerializer(chapters.order_by('order', 'id'), many=True)
+        serializer = ChapterSerializer(chapters, many=True)
         return Response(serializer.data)
 
 class ChapterLecturesView(generics.ListAPIView):

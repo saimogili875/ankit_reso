@@ -249,3 +249,151 @@ class PricingSystemTests(TestCase):
         }, format='json')
         self.assertEqual(addon_res.status_code, status.HTTP_201_CREATED)
 
+
+class AcademicHierarchyIntegrationTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        # Users
+        self.admin = User.objects.create_user(
+            username='admin_hierarchy',
+            email='admin_hierarchy@example.com',
+            password='AdminPassword123!',
+            role=User.Role.ADMIN,
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.student = User.objects.create_user(
+            username='student_hierarchy',
+            email='student_hierarchy@example.com',
+            password='StudentPassword123!',
+            role=User.Role.STUDENT,
+        )
+
+        from apps.academics.models import Exam, AcademicClass, Subject, Chapter
+        # Hierarchy Structure 1: JEE Main -> Class 11 -> Physics -> Kinematics
+        self.exam_jee = Exam.objects.create(name='JEE Main Integration', slug='jee-main-integration', order=1)
+        self.class_jee_11 = AcademicClass.objects.create(exam=self.exam_jee, name='Class 11', slug='class-11', code='11', order=1)
+        self.subj_jee_11_physics = Subject.objects.create(
+            academic_class=self.class_jee_11,
+            name='Physics',
+            slug='physics',
+            order=1
+        )
+        self.chap_kinematics = Chapter.objects.create(
+            subject=self.subj_jee_11_physics,
+            name='Kinematics',
+            slug='kinematics',
+            order=1
+        )
+
+        # Hierarchy Structure 2: JEE Main -> Class 12 -> Physics -> Electrostatics
+        self.class_jee_12 = AcademicClass.objects.create(exam=self.exam_jee, name='Class 12', slug='class-12', code='12', order=2)
+        self.subj_jee_12_physics = Subject.objects.create(
+            academic_class=self.class_jee_12,
+            name='Physics',
+            slug='physics',
+            order=1
+        )
+        self.chap_electrostatics = Chapter.objects.create(
+            subject=self.subj_jee_12_physics,
+            name='Electrostatics',
+            slug='electrostatics',
+            order=1
+        )
+
+        # Hierarchy Structure 3: NEET -> Class 11 -> Physics (same names under separate exam/class)
+        self.exam_neet = Exam.objects.create(name='NEET Integration', slug='neet-integration', order=2)
+        self.class_neet_11 = AcademicClass.objects.create(exam=self.exam_neet, name='Class 11', slug='class-11', code='11', order=1)
+        self.subj_neet_11_physics = Subject.objects.create(
+            academic_class=self.class_neet_11,
+            name='Physics',
+            slug='physics',
+            order=1
+        )
+
+    def test_composite_uniqueness_allows_same_names_across_parents(self):
+        """Classes under different exams and subjects under different classes can share names/slugs."""
+        self.assertEqual(self.class_jee_11.name, self.class_neet_11.name)
+        self.assertEqual(self.class_jee_11.slug, self.class_neet_11.slug)
+        self.assertNotEqual(self.class_jee_11.exam, self.class_neet_11.exam)
+
+        self.assertEqual(self.subj_jee_11_physics.name, self.subj_jee_12_physics.name)
+        self.assertEqual(self.subj_jee_11_physics.slug, self.subj_jee_12_physics.slug)
+        self.assertNotEqual(self.subj_jee_11_physics.academic_class, self.subj_jee_12_physics.academic_class)
+
+    def test_composite_uniqueness_blocks_duplicates_under_same_parent(self):
+        """Cannot create two classes with the same slug/name under the same Exam."""
+        from django.db import IntegrityError, transaction
+        from apps.academics.models import AcademicClass, Subject
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                AcademicClass.objects.create(
+                    exam=self.exam_jee,
+                    name='Class 11 Duplicate',
+                    slug='class-11',
+                    code='11-dup'
+                )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Subject.objects.create(
+                    academic_class=self.class_jee_11,
+                    name='Physics Duplicate',
+                    slug='physics'
+                )
+
+    def test_subjects_in_different_classes_are_completely_isolated(self):
+        """Chapters in Class 11 Physics never leak into Class 12 Physics."""
+        from apps.academics.models import Chapter
+        jee_11_chaps = Chapter.objects.filter(subject=self.subj_jee_11_physics)
+        jee_12_chaps = Chapter.objects.filter(subject=self.subj_jee_12_physics)
+
+        self.assertEqual(list(jee_11_chaps), [self.chap_kinematics])
+        self.assertEqual(list(jee_12_chaps), [self.chap_electrostatics])
+        self.assertFalse(jee_11_chaps.filter(name='Electrostatics').exists())
+        self.assertFalse(jee_12_chaps.filter(name='Kinematics').exists())
+
+    def test_student_class_subjects_endpoint(self):
+        """GET /api/academics/classes/<id>/subjects/ returns only subjects for that class."""
+        self.client.force_authenticate(user=self.student)
+        res = self.client.get(f'/api/academics/classes/{self.class_jee_11.id}/subjects/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        returned_ids = [str(s['id']) for s in res.data]
+        self.assertIn(str(self.subj_jee_11_physics.id), returned_ids)
+        self.assertNotIn(str(self.subj_jee_12_physics.id), returned_ids)
+        self.assertNotIn(str(self.subj_neet_11_physics.id), returned_ids)
+
+    def test_student_subject_chapters_endpoint_by_id(self):
+        """GET /api/academics/subjects/<id>/chapters/ returns only chapters belonging to that subject."""
+        self.client.force_authenticate(user=self.student)
+        res = self.client.get(f'/api/academics/subjects/{self.subj_jee_11_physics.id}/chapters/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        returned_names = [c['name'] for c in res.data]
+        self.assertEqual(returned_names, ['Kinematics'])
+        self.assertNotIn('Electrostatics', returned_names)
+
+    def test_admin_cascade_info_endpoint(self):
+        """GET /api/admin-panel/exams/<id>/cascade_info/ returns count of classes, subjects, chapters."""
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get(f'/api/admin-panel/exams/{self.exam_jee.id}/cascade_info/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['classes_count'], 2)
+        self.assertEqual(res.data['subjects_count'], 2)
+        self.assertEqual(res.data['chapters_count'], 2)
+
+    def test_admin_deletion_safeguard_requires_confirm_true(self):
+        """DELETE /api/admin-panel/exams/<id>/ without confirm=true returns 400."""
+        from apps.academics.models import Exam
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.delete(f'/api/admin-panel/exams/{self.exam_jee.id}/')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('confirm=true', res.data.get('error', ''))
+        self.assertTrue(Exam.objects.filter(id=self.exam_jee.id).exists())
+
+        # With confirm=true, deletion proceeds
+        res_confirmed = self.client.delete(f'/api/admin-panel/exams/{self.exam_jee.id}/?confirm=true')
+        self.assertIn(res_confirmed.status_code, [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT])
+        self.assertFalse(Exam.objects.filter(id=self.exam_jee.id).exists())
+
+
