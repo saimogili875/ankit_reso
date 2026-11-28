@@ -2,7 +2,10 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.accounts.models import User
-from apps.academics.models import Exam, Subject, Category, Chapter, Lecture, AcademicClass
+from apps.academics.models import (
+    Exam, Subject, Category, Chapter, Lecture, AcademicClass,
+    Course, CourseFeature, CourseAddon, Enrollment
+)
 from apps.content.models import Video, LandingBanner, LandingBannerSettings
 from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
 from django.utils import timezone
@@ -465,6 +468,50 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
 
         # Confirm course is gone
         self.assertFalse(Course.objects.filter(id=course.id).exists())
+
+    def test_course_creation_auto_generates_unique_slug_and_validates_title(self):
+        self.client.force_authenticate(user=self.admin)
+
+        # 1. Create course without slug
+        payload_1 = {
+            'title': 'Pinnacle JEE Batch 2026',
+            'description': 'Advanced training for top rankers',
+            'price': 4999,
+            'status': 'PUBLISHED'
+        }
+        res_1 = self.client.post('/api/admin-panel/courses/', payload_1)
+        self.assertEqual(res_1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_1.data['slug'], 'pinnacle-jee-batch-2026')
+
+        # 2. Duplicate title (case-insensitive with whitespace) should be blocked with 400
+        payload_dup = {
+            'title': '   pinnacle jee batch 2026   ',
+            'price': 4999
+        }
+        res_dup = self.client.post('/api/admin-panel/courses/', payload_dup)
+        self.assertEqual(res_dup.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('A course with this title already exists.', str(res_dup.data))
+
+        # 3. Create another course that would collide on slug if not handled
+        # Manually create another course with a different title but pre-occupy a colliding slug
+        Course.objects.create(title='Other Course', slug='pinnacle-jee-batch-2027', price=0)
+        payload_3 = {
+            'title': 'Pinnacle JEE Batch 2027',
+            'price': 5999
+        }
+        res_3 = self.client.post('/api/admin-panel/courses/', payload_3)
+        self.assertEqual(res_3.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_3.data['slug'], 'pinnacle-jee-batch-2027-2')
+
+        # 4. Updating the first course with the same title should succeed (excluding self)
+        course_1_id = res_1.data['id']
+        patch_res = self.client.patch(f'/api/admin-panel/courses/{course_1_id}/', {
+            'title': 'Pinnacle JEE Batch 2026',
+            'description': 'Updated description'
+        })
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_res.data['description'], 'Updated description')
+
 
 
 

@@ -514,6 +514,20 @@ class AdminCourseSerializer(serializers.ModelSerializer):
             'classes', 'subjects', 'classes_names', 'subjects_names',
             'enrolled_count', 'created_at', 'updated_at'
         ]
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True},
+        }
+
+    def validate_title(self, value):
+        trimmed = value.strip() if value else ''
+        if not trimmed:
+            raise serializers.ValidationError("Course title cannot be empty.")
+        qs = Course.objects.filter(title__iexact=trimmed)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("A course with this title already exists.")
+        return trimmed
 
     def get_enrolled_count(self, obj):
         return obj.enrollments.count()
@@ -526,7 +540,13 @@ class AdminCourseSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         if not validated_data.get('slug'):
-            validated_data['slug'] = slugify(validated_data['title'])
+            base_slug = slugify(validated_data.get('title', 'course')) or 'course'
+            slug = base_slug
+            counter = 2
+            while Course.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            validated_data['slug'] = slug
         if 'status' in validated_data:
             validated_data['is_published'] = (validated_data['status'] == 'PUBLISHED')
         return super().create(validated_data)

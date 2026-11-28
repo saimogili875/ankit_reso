@@ -228,7 +228,25 @@ export default function AdminCoursesPage() {
       setIsModalOpen(false);
       fetchData();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save course.';
+      let message = 'Failed to save course.';
+      if (err instanceof ApiError) {
+        if (err.data && typeof err.data === 'object') {
+          const fieldEntries = Object.entries(err.data as Record<string, unknown>).filter(
+            ([k]) => !['status_code', 'detail'].includes(k)
+          );
+          if (fieldEntries.length > 0) {
+            message = fieldEntries
+              .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)}: ${Array.isArray(v) ? v.join(' ') : String(v)}`)
+              .join(' | ');
+          } else {
+            message = err.message || `API Error (${err.status})`;
+          }
+        } else {
+          message = err.message || `API Error (${err.status})`;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setFeedback({ type: 'error', message });
     } finally {
       setIsSaving(false);
