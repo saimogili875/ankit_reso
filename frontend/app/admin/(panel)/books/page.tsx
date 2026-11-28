@@ -70,6 +70,24 @@ interface StorageStatus {
   message?: string;
 }
 
+function BookThumbnail({ src, title }: { src?: string; title: string }) {
+  const [hasError, setHasError] = useState(false);
+  if (!src || hasError) {
+    return <BookOpen className="w-5 h-5 text-slate-600" />;
+  }
+  return (
+    <Image
+      src={src}
+      alt={title}
+      fill
+      unoptimized
+      className="object-cover"
+      sizes="48px"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 export default function AdminBooksPage() {
   const { notice, success, error, clear } = useNotice();
   const [books, setBooks] = useState<BookProductAdmin[]>([]);
@@ -383,18 +401,7 @@ export default function AdminBooksPage() {
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <div className="relative w-12 h-16 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
-                          {book.cover_image ? (
-                            <Image
-                              src={book.cover_image}
-                              alt={book.title}
-                              fill
-                              unoptimized
-                              className="object-cover"
-                              sizes="48px"
-                            />
-                          ) : (
-                            <BookOpen className="w-5 h-5 text-slate-600" />
-                          )}
+                          <BookThumbnail src={book.cover_image} title={book.title} />
                         </div>
                         <div>
                           <div className="font-bold text-white flex items-center gap-1.5">
