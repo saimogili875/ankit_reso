@@ -6,6 +6,7 @@ services:
     region: oregon
     plan: standard
     buildCommand: "cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py ensure_admin"
+    preDeployCommand: "cd backend && python manage.py migrate --noinput"
     startCommand: "cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --threads 2 --timeout 120"
     healthCheckPath: /api/health/
     envVars:
