@@ -23,6 +23,19 @@ import {
   FileQuestion,
 } from 'lucide-react';
 
+import { AcademicPicker } from '@/components/admin/AcademicPicker';
+
+interface SubjectOption {
+  id: number;
+  name: string;
+  slug: string;
+  academic_class_id?: number;
+  class_name?: string;
+  subject_label?: string;
+  exam_id?: string;
+  exam_name?: string;
+}
+
 interface CategoryOption {
   id: number;
   name: string;
@@ -34,13 +47,17 @@ interface ClassOption {
   id: number;
   name: string;
   code: string;
+  exam_id?: string;
+  exam_name?: string;
 }
 
 interface ChapterItem {
   id: string;
-  category: number;
-  category_name?: string;
+  subject?: number;
   subject_name?: string;
+  subject_label?: string;
+  category?: number;
+  category_name?: string;
   academic_class?: number;
   academic_class_name?: string;
   name: string;
@@ -117,9 +134,15 @@ type TabType = 'chapters' | 'lectures' | 'dpps';
 export default function AdminModulesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('chapters');
 
+  // Scope filter state
+  const [scopeExam, setScopeExam] = useState<string>('');
+  const [scopeClass, setScopeClass] = useState<number | undefined>();
+  const [scopeSubject, setScopeSubject] = useState<number | undefined>();
+
   // Lookup data
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [availableQuestions, setAvailableQuestions] = useState<QuestionLookupItem[]>([]);
 
   // Entities
@@ -144,6 +167,7 @@ export default function AdminModulesPage() {
 
   // Chapter form state
   const [chapterEditId, setChapterEditId] = useState<string | null>(null);
+  const [chapterSubject, setChapterSubject] = useState<string>('');
   const [chapterCategory, setChapterCategory] = useState<string>('');
   const [chapterClass, setChapterClass] = useState<string>('');
   const [chapterName, setChapterName] = useState('');
@@ -176,7 +200,7 @@ export default function AdminModulesPage() {
     setIsLoading(true);
     try {
       const [optRes, chRes, lecRes, dppRes, qRes] = await Promise.all([
-        apiClient.get<{ categories: CategoryOption[]; classes: ClassOption[] }>('/admin-panel/options/'),
+        apiClient.get<{ categories: CategoryOption[]; classes: ClassOption[]; subjects?: SubjectOption[] }>('/admin-panel/options/'),
         apiClient.get<{ results?: ChapterItem[] } | ChapterItem[]>('/admin-panel/chapters/'),
         apiClient.get<{ results?: LectureItem[] } | LectureItem[]>('/admin-panel/lectures/'),
         apiClient.get<{ results?: DPPItem[] } | DPPItem[]>('/admin-panel/dpps/'),
@@ -185,6 +209,7 @@ export default function AdminModulesPage() {
 
       setCategories(optRes.categories || []);
       setClasses(optRes.classes || []);
+      setSubjects(optRes.subjects || []);
       setChapters(asList<ChapterItem>(chRes));
       setLectures(asList<LectureItem>(lecRes));
       setDpps(asList<DPPItem>(dppRes));
@@ -205,8 +230,9 @@ export default function AdminModulesPage() {
   // Chapter Handlers
   const openNewChapter = () => {
     setChapterEditId(null);
-    setChapterCategory(categories.length > 0 ? String(categories[0].id) : '');
-    setChapterClass('');
+    setChapterSubject(scopeSubject ? String(scopeSubject) : (subjects.length > 0 ? String(subjects[0].id) : ''));
+    setChapterCategory('');
+    setChapterClass(scopeClass ? String(scopeClass) : '');
     setChapterName('');
     setChapterOrder(chapters.length + 1);
     setChapterDescription('');
@@ -217,7 +243,8 @@ export default function AdminModulesPage() {
 
   const openEditChapter = (ch: ChapterItem) => {
     setChapterEditId(ch.id);
-    setChapterCategory(String(ch.category));
+    setChapterSubject(ch.subject ? String(ch.subject) : (ch.category ? String(categories.find(c => c.id === ch.category)?.subject_id || '') : ''));
+    setChapterCategory(ch.category ? String(ch.category) : '');
     setChapterClass(ch.academic_class ? String(ch.academic_class) : '');
     setChapterName(ch.name);
     setChapterOrder(ch.order);
@@ -229,8 +256,8 @@ export default function AdminModulesPage() {
 
   const handleSaveChapter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chapterName.trim() || !chapterCategory) {
-      setFormError('Category and Chapter Name are required.');
+    if (!chapterName.trim() || !chapterSubject) {
+      setFormError('Subject and Chapter Name are required.');
       return;
     }
 
@@ -240,7 +267,8 @@ export default function AdminModulesPage() {
 
     try {
       const payload: Record<string, unknown> = {
-        category: Number(chapterCategory),
+        subject: Number(chapterSubject),
+        category: chapterCategory ? Number(chapterCategory) : null,
         academic_class: chapterClass ? Number(chapterClass) : null,
         name: chapterName.trim(),
         order: Number(chapterOrder),
@@ -507,6 +535,40 @@ export default function AdminModulesPage() {
         </div>
       </div>
 
+      {/* Cascading Scope Bar */}
+      <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            Curriculum Scope Filter
+          </span>
+          {(scopeExam || scopeClass || scopeSubject) && (
+            <button
+              onClick={() => {
+                setScopeExam('');
+                setScopeClass(undefined);
+                setScopeSubject(undefined);
+              }}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+        <AcademicPicker
+          levels={['exam', 'class', 'subject']}
+          examId={scopeExam}
+          classId={scopeClass}
+          subjectId={scopeSubject}
+          onChange={({ examId, classId, subjectId }) => {
+            setScopeExam(examId || '');
+            setScopeClass(classId);
+            setScopeSubject(subjectId);
+          }}
+          size="sm"
+        />
+      </div>
+
       {/* Tabs */}
       <div className="border-b border-slate-800">
         <div className="flex items-center gap-4">
@@ -580,18 +642,18 @@ export default function AdminModulesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Subject Category <span className="text-red-400">*</span>
+                  Subject <span className="text-red-400">*</span>
                 </label>
                 <select
-                  value={chapterCategory}
-                  onChange={(e) => setChapterCategory(e.target.value)}
+                  value={chapterSubject}
+                  onChange={(e) => setChapterSubject(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 >
-                  <option value="">Select Category...</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      [{cat.subject_name}] {cat.name}
+                  <option value="">Select Subject...</option>
+                  {subjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.subject_label || (sub.class_name ? `${sub.class_name} · ${sub.name}` : sub.name)}
                     </option>
                   ))}
                 </select>
@@ -599,19 +661,21 @@ export default function AdminModulesPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Academic Class
+                  Optional Category
                 </label>
                 <select
-                  value={chapterClass}
-                  onChange={(e) => setChapterClass(e.target.value)}
+                  value={chapterCategory}
+                  onChange={(e) => setChapterCategory(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="">General / Both Classes</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))}
+                  <option value="">None / Direct Subject Chapter</option>
+                  {categories
+                    .filter((cat) => !chapterSubject || String(cat.subject_id) === String(chapterSubject))
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -1003,12 +1067,22 @@ export default function AdminModulesPage() {
           {/* TAB 1: CHAPTERS LIST */}
           {activeTab === 'chapters' && (
             <div className="space-y-3">
-              {chapters.length === 0 ? (
+              {chapters
+                .filter((ch) => {
+                  if (scopeSubject && ch.subject && Number(ch.subject) !== Number(scopeSubject)) return false;
+                  return true;
+                })
+                .length === 0 ? (
                 <Card className="p-8 text-center bg-slate-900/40 border-slate-800 text-slate-500 text-xs">
-                  No chapters defined. Click &quot;Add Chapter&quot; above to create your first curriculum module.
+                  No chapters found under current scope. Click &quot;Add Chapter&quot; above to create one.
                 </Card>
               ) : (
-                chapters.map((ch) => (
+                chapters
+                  .filter((ch) => {
+                    if (scopeSubject && ch.subject && Number(ch.subject) !== Number(scopeSubject)) return false;
+                    return true;
+                  })
+                  .map((ch) => (
                   <Card
                     key={ch.id}
                     className="p-4 sm:p-5 bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-all space-y-2.5"
@@ -1019,14 +1093,14 @@ export default function AdminModulesPage() {
                           {ch.order}
                         </span>
                         <h3 className="text-sm font-bold text-white">{ch.name}</h3>
-                        {ch.subject_name && (
+                        {(ch.subject_label || ch.subject_name) && (
                           <Badge variant="blue" className="border-blue-900 text-blue-300 text-[10px]">
-                            {ch.subject_name}
+                            {ch.subject_label || ch.subject_name}
                           </Badge>
                         )}
-                        {ch.academic_class_name && (
+                        {ch.category_name && (
                           <Badge variant="slate" className="border-slate-800 text-slate-400 text-[10px]">
-                            {ch.academic_class_name}
+                            {ch.category_name}
                           </Badge>
                         )}
                       </div>

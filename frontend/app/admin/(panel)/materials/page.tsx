@@ -26,6 +26,9 @@ interface MaterialItem {
   material_type: 'PDF' | 'NOTE' | 'FORMULA_SHEET' | 'MIND_MAP';
   subject: number;
   subject_name?: string;
+  subject_label?: string;
+  class_name?: string;
+  exam_name?: string;
   chapter?: string | null;
   chapter_name?: string | null;
   r2_object_key: string;
@@ -38,6 +41,8 @@ interface MaterialItem {
 interface SubjectOption {
   id: number;
   name: string;
+  subject_label?: string;
+  class_name?: string;
 }
 
 interface ChapterOption {
@@ -271,7 +276,7 @@ export default function AdminMaterialsPage() {
             <option value="ALL">All Subjects</option>
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name}
+                {s.subject_label || (s.class_name ? `${s.class_name} · ${s.name}` : s.name)}
               </option>
             ))}
           </select>
@@ -328,7 +333,7 @@ export default function AdminMaterialsPage() {
                       </Badge>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="text-xs text-slate-200 font-medium">{m.subject_name || 'General'}</div>
+                      <div className="text-xs text-slate-200 font-medium">{m.subject_label || m.subject_name || 'General'}</div>
                       {m.chapter_name && (
                         <div className="text-[11px] text-slate-400 mt-0.5">{m.chapter_name}</div>
                       )}
@@ -461,7 +466,7 @@ export default function AdminMaterialsPage() {
                     <option value="">Select Subject</option>
                     {subjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}
+                        {s.subject_label || (s.class_name ? `${s.class_name} · ${s.name}` : s.name)}
                       </option>
                     ))}
                   </select>

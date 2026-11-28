@@ -19,6 +19,7 @@ import {
   Package,
   PlusCircle,
   Settings,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     title: 'Academics',
     items: [
+      { label: 'Exams & Classes', href: '/admin/exams', icon: Layers, hint: 'Manage academic exams, classes and subjects hierarchy' },
       { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses, pricing, add-ons and modules' },
       { label: 'Course Content', href: '/admin/course-content', icon: FolderTree, hint: 'Manage sections & items: modules, practice, notes, test series' },
       { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree, hint: 'Subjects, chapters, lectures and DPPs' },

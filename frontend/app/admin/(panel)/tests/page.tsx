@@ -24,6 +24,7 @@ interface QuestionItem {
   question_type: string;
   difficulty: string;
   subject_name?: string;
+  subject_label?: string;
   chapter_name?: string;
 }
 
@@ -375,6 +376,12 @@ export default function AdminTestsPage() {
                               <span>{q.question_type}</span>
                               <span>•</span>
                               <span>{q.difficulty}</span>
+                              {(q.subject_label || q.subject_name) && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-indigo-400 font-sans">{q.subject_label || q.subject_name}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
