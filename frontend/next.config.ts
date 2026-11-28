@@ -6,7 +6,8 @@ const rawOrigin = (
   process.env.BACKEND_ORIGIN ||
   (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('http')
     ? process.env.NEXT_PUBLIC_API_URL
-    : '')
+    : '') ||
+  'https://ankit-reso.onrender.com'
 );
 
 if (isProduction) {

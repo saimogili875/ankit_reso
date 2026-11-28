@@ -10,7 +10,8 @@ function resolveApiBase(): string {
   const configuredBackend = (
     process.env.INTERNAL_API_URL ||
     process.env.BACKEND_ORIGIN ||
-    (envUrl && envUrl.startsWith('http') ? envUrl : '')
+    (envUrl && envUrl.startsWith('http') ? envUrl : '') ||
+    'https://ankit-reso.onrender.com'
   ).trim();
 
   if (isProduction) {
