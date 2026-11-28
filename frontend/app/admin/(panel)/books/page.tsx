@@ -388,6 +388,7 @@ export default function AdminBooksPage() {
                               src={book.cover_image}
                               alt={book.title}
                               fill
+                              unoptimized
                               className="object-cover"
                               sizes="48px"
                             />
