@@ -68,8 +68,34 @@ class AcademicClassListView(generics.ListAPIView):
 
 class SubjectListView(generics.ListAPIView):
     serializer_class = SubjectSerializer
-    queryset = Subject.objects.all().order_by('name')
     pagination_class = None
+
+    def get_queryset(self):
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            user = self.request.user
+            if not user or not user.is_authenticated:
+                from rest_framework.exceptions import NotAuthenticated
+                raise NotAuthenticated()
+
+            is_admin = getattr(user, 'role', '') == 'ADMIN' or user.is_staff or user.is_superuser
+            if not is_admin:
+                is_enrolled = Enrollment.objects.filter(
+                    user=user,
+                    course_id=course_id,
+                    status='ACTIVE'
+                ).exists()
+                if not is_enrolled:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("You are not actively enrolled in this course.")
+
+            try:
+                course = Course.objects.get(id=course_id)
+                return course.subjects.select_related('academic_class', 'academic_class__exam').order_by('order', 'name')
+            except (Course.DoesNotExist, ValueError):
+                return Subject.objects.none()
+
+        return Subject.objects.select_related('academic_class', 'academic_class__exam').all().order_by('order', 'name')
 
 class ClassSubjectsView(APIView):
     def get(self, request, pk):

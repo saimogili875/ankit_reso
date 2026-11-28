@@ -100,12 +100,13 @@ class ProgressOverviewView(APIView):
                 c_acc = round((c_correct / c_total) * 100, 1)
                 if c_acc < 60.0:
                     sub = chap.subject or (chap.category.subject if chap.category else None)
+                    sub_label = f"{sub.academic_class.name} · {sub.name}" if (sub and getattr(sub, 'academic_class', None)) else (sub.name if sub else '')
                     weak_chapters.append({
                         'id': str(chap.id),
                         'name': chap.name,
                         'subject_id': str(sub.id) if sub else '',
                         'subject_name': sub.name if sub else '',
-                        'subject_label': getattr(sub, 'subject_label', sub.name if sub else ''),
+                        'subject_label': sub_label,
                         'accuracy': c_acc,
                         'total_attempted': c_total,
                     })

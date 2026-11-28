@@ -577,14 +577,17 @@ class CourseViewSet(viewsets.ModelViewSet):
         user = User.objects.filter(id=user_id, role=User.Role.STUDENT).first()
         if not user:
             return Response({'error': 'Valid student user_id is required.'}, status=status.HTTP_404_NOT_FOUND)
-        Enrollment.objects.get_or_create(user=user, course=course, defaults={'status': 'ACTIVE'})
+        enrollment, created = Enrollment.objects.get_or_create(user=user, course=course, defaults={'status': 'ACTIVE'})
+        if not created and enrollment.status != 'ACTIVE':
+            enrollment.status = 'ACTIVE'
+            enrollment.save(update_fields=['status'])
         return Response({'message': f"Student {user.email} enrolled successfully into {course.title}."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='unenroll-student')
     def unenroll_student(self, request, pk=None):
         course = self.get_object()
         user_id = request.data.get('user_id')
-        Enrollment.objects.filter(course=course, user_id=user_id).delete()
+        Enrollment.objects.filter(course=course, user_id=user_id).update(status='INACTIVE')
         return Response({'message': f"Student un-enrolled from {course.title} successfully."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-image')
@@ -608,12 +611,35 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Response({'error': 'features must be a list'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            course.course_features.all().delete()
+            existing_features = {str(f.id): f for f in course.course_features.all()}
+            keep_ids = set()
+
             for idx, item in enumerate(features_data, start=1):
-                text = item if isinstance(item, str) else item.get('text', '')
-                order = idx if isinstance(item, str) else item.get('order', idx)
-                if text.strip():
-                    CourseFeature.objects.create(course=course, text=text.strip(), order=order)
+                feature_id = None
+                text = ''
+                order = idx
+                if isinstance(item, str):
+                    text = item.strip()
+                elif isinstance(item, dict):
+                    feature_id = str(item.get('id')) if item.get('id') else None
+                    text = str(item.get('text', '')).strip()
+                    order = item.get('order', idx)
+
+                if not text:
+                    continue
+
+                if feature_id and feature_id in existing_features:
+                    feat = existing_features[feature_id]
+                    feat.text = text
+                    feat.order = order
+                    feat.save(update_fields=['text', 'order'])
+                    keep_ids.add(feat.id)
+                else:
+                    new_feat = CourseFeature.objects.create(course=course, text=text, order=order)
+                    keep_ids.add(new_feat.id)
+
+            course.course_features.exclude(id__in=keep_ids).delete()
+
         from apps.academics.serializers import CourseSerializer
         return Response(CourseSerializer(course).data)
 
@@ -625,17 +651,44 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Response({'error': 'addons must be a list'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            course.addons.all().delete()
+            existing_addons = {str(a.id): a for a in course.addons.all()}
+            keep_ids = set()
+
             for idx, it in enumerate(addons_data, start=1):
-                CourseAddon.objects.create(
-                    course=course,
-                    title=it.get('title', 'Addon'),
-                    addon_type=it.get('addon_type', CourseAddon.AddonType.MODULE),
-                    price=it.get('price', 0),
-                    description=it.get('description', ''),
-                    order=it.get('order', idx),
-                    is_published=it.get('is_published', True),
-                )
+                if not isinstance(it, dict):
+                    continue
+                addon_id = str(it.get('id')) if it.get('id') else None
+                title = it.get('title', 'Addon')
+                addon_type = it.get('addon_type', CourseAddon.AddonType.MODULE)
+                price = it.get('price', 0)
+                description = it.get('description', '')
+                order = it.get('order', idx)
+                is_published = it.get('is_published', True)
+
+                if addon_id and addon_id in existing_addons:
+                    addon = existing_addons[addon_id]
+                    addon.title = title
+                    addon.addon_type = addon_type
+                    addon.price = price
+                    addon.description = description
+                    addon.order = order
+                    addon.is_published = is_published
+                    addon.save(update_fields=['title', 'addon_type', 'price', 'description', 'order', 'is_published'])
+                    keep_ids.add(addon.id)
+                else:
+                    new_addon = CourseAddon.objects.create(
+                        course=course,
+                        title=title,
+                        addon_type=addon_type,
+                        price=price,
+                        description=description,
+                        order=order,
+                        is_published=is_published,
+                    )
+                    keep_ids.add(new_addon.id)
+
+            course.addons.exclude(id__in=keep_ids).delete()
+
         from apps.academics.serializers import CourseSerializer
         return Response(CourseSerializer(course).data)
 
@@ -1073,7 +1126,7 @@ class StudentViewSet(viewsets.ReadOnlyModelViewSet):
     def unenroll_course(self, request, pk=None):
         student = self.get_object()
         course_id = request.data.get('course_id')
-        Enrollment.objects.filter(user=student, course_id=course_id).delete()
+        Enrollment.objects.filter(user=student, course_id=course_id).update(status='INACTIVE')
         return Response({'message': "Course un-enrolled successfully."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='progress')

@@ -429,5 +429,40 @@ class AcademicHierarchyIntegrationTestCase(TestCase):
         res_enroll = self.client.post('/api/academics/enroll/', {'course_id': str(draft_course.id)})
         self.assertEqual(res_enroll.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_student_subject_list_course_scoping_and_permissions(self):
+        """SubjectListView with ?course=<id> enforces active enrollment."""
+        # Course with physics only
+        course = Course.objects.create(
+            title='Physics Only Course',
+            slug='physics-only-course',
+            exam=self.exam_jee,
+            price=0,
+            is_published=True
+        )
+        course.classes.set([self.class_jee_11])
+        course.subjects.set([self.subj_jee_11_physics])
+
+        # 1. Anonymous -> 401
+        self.client.logout()
+        res_anon = self.client.get(f'/api/academics/subjects/?course={course.id}')
+        self.assertEqual(res_anon.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # 2. Student not enrolled -> 403 Forbidden
+        self.client.force_authenticate(user=self.student)
+        res_forbidden = self.client.get(f'/api/academics/subjects/?course={course.id}')
+        self.assertEqual(res_forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 3. Student actively enrolled -> 200 with course subjects and subject_label
+        Enrollment.objects.create(user=self.student, course=course, status='ACTIVE')
+        res_enrolled = self.client.get(f'/api/academics/subjects/?course={course.id}')
+        self.assertEqual(res_enrolled.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res_enrolled.data), 1)
+        subj_data = res_enrolled.data[0]
+        self.assertEqual(str(subj_data['id']), str(self.subj_jee_11_physics.id))
+        self.assertEqual(subj_data['subject_label'], f"{self.class_jee_11.name} · {self.subj_jee_11_physics.name}")
+        self.assertEqual(subj_data['class_name'], self.class_jee_11.name)
+        self.assertEqual(subj_data['exam_name'], self.exam_jee.name)
+
+
 
 

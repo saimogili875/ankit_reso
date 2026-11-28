@@ -386,7 +386,7 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         }, format='json')
         self.assertEqual(res1.status_code, status.HTTP_200_OK)
         self.assertIn('reply', res1.data)
-        self.assertIn('6:30 PM', res1.data['reply'])
+        self.assertIn('Schedule dashboard', res1.data['reply'])
 
         # 2. Chatbot handles fee query without inventing fees (directs to WhatsApp)
         res2 = self.client.post(reverse('chatbot'), {
@@ -809,6 +809,88 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         ser_invalid = AdminTestSerializer(data=data_invalid)
         self.assertFalse(ser_invalid.is_valid())
         self.assertIn('test_type', ser_invalid.errors)
+
+    def test_question_subject_forced_from_chapter_and_mismatch_rejected(self):
+        """When a chapter is set, question subject must match chapter.subject."""
+        from apps.questions.models import Question
+        from apps.adminpanel.serializers import AdminQuestionSerializer
+
+        # 1. Model save automatically derives subject from chapter if missing
+        q = Question.objects.create(
+            chapter=self.chapter,
+            question_text="What is displacement?",
+            difficulty=Question.Difficulty.EASY
+        )
+        self.assertEqual(q.subject, self.chapter.subject)
+
+        # 2. Serializer validation rejects mismatch
+        other_subj = Subject.objects.create(name='Other Subject', slug='other-sub', academic_class=self.academic_class)
+        data = {
+            'chapter': self.chapter.id,
+            'subject': other_subj.id,
+            'question_text': 'Mismatched question',
+            'difficulty': 'EASY',
+            'question_type': 'SINGLE',
+            'options': [
+                {'option_text': 'A', 'is_correct': True},
+                {'option_text': 'B', 'is_correct': False},
+            ]
+        }
+        ser = AdminQuestionSerializer(data=data)
+        self.assertFalse(ser.is_valid())
+        self.assertIn('chapter', ser.errors)
+
+    def test_course_sync_features_and_addons_differential(self):
+        """sync_features and sync_addons preserve existing row IDs and do not delete-all-recreate."""
+        self.client.force_authenticate(user=self.admin)
+        course = Course.objects.create(title='Sync Test Course', slug='sync-test-course', exam=self.exam, price=100)
+        f1 = CourseFeature.objects.create(course=course, text='Original Feature 1', order=1)
+        f2 = CourseFeature.objects.create(course=course, text='Original Feature 2', order=2)
+
+        # Sync features: update f1 text, omit f2 (deleted), add new f3
+        res = self.client.post(f'/api/admin-panel/courses/{course.id}/sync-features/', {
+            'features': [
+                {'id': f1.id, 'text': 'Updated Feature 1', 'order': 1},
+                {'text': 'New Feature 3', 'order': 2}
+            ]
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # f1 still exists with same PK
+        f1.refresh_from_db()
+        self.assertEqual(f1.text, 'Updated Feature 1')
+        self.assertFalse(CourseFeature.objects.filter(id=f2.id).exists())
+        self.assertTrue(CourseFeature.objects.filter(course=course, text='New Feature 3').exists())
+
+        # Sync addons: differential update
+        a1 = CourseAddon.objects.create(course=course, title='Addon 1', price=50, order=1)
+        a2 = CourseAddon.objects.create(course=course, title='Addon 2', price=75, order=2)
+
+        res_a = self.client.post(f'/api/admin-panel/courses/{course.id}/sync-addons/', {
+            'addons': [
+                {'id': a1.id, 'title': 'Updated Addon 1', 'price': 60, 'order': 1},
+                {'title': 'New Addon 3', 'price': 90, 'order': 2}
+            ]
+        }, format='json')
+        self.assertEqual(res_a.status_code, status.HTTP_200_OK)
+        a1.refresh_from_db()
+        self.assertEqual(a1.title, 'Updated Addon 1')
+        self.assertEqual(a1.price, 60)
+        self.assertFalse(CourseAddon.objects.filter(id=a2.id).exists())
+        self.assertTrue(CourseAddon.objects.filter(course=course, title='New Addon 3').exists())
+
+    def test_unenroll_student_sets_status_inactive(self):
+        """Unenrolling a student sets Enrollment.status to INACTIVE instead of deleting."""
+        self.client.force_authenticate(user=self.admin)
+        course = Course.objects.create(title='Unenroll Test Course', slug='unenroll-test-course', exam=self.exam, price=100)
+        enrollment = Enrollment.objects.create(user=self.student, course=course, status='ACTIVE')
+
+        res = self.client.post(f'/api/admin-panel/courses/{course.id}/unenroll-student/', {
+            'user_id': self.student.id
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        enrollment.refresh_from_db()
+        self.assertEqual(enrollment.status, 'INACTIVE')
+
 
 
 

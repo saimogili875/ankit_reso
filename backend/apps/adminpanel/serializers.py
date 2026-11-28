@@ -77,9 +77,12 @@ class AdminQuestionSerializer(serializers.ModelSerializer):
         required=False, allow_blank=True, default='', write_only=True
     )
 
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True, allow_null=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True, allow_null=True)
     class_name = serializers.CharField(source='subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True, allow_null=True)
     exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True, default='')
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
     topic_name = serializers.CharField(source='topic.name', read_only=True)
@@ -87,8 +90,8 @@ class AdminQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = [
-            'id', 'topic', 'topic_name', 'subject', 'subject_name', 'subject_label',
-            'class_name', 'exam_name',
+            'id', 'topic', 'topic_name', 'subject', 'subject_id', 'subject_name', 'subject_label',
+            'class_id', 'class_name', 'exam_id', 'exam_name',
             'chapter', 'chapter_name', 'question_text', 'solution_text',
             'solution_video_url', 'difficulty', 'question_type',
             'options', 'pyq_meta', 'pyq_exam', 'pyq_year', 'pyq_shift_or_paper',
@@ -241,6 +244,8 @@ class AdminChapterSerializer(serializers.ModelSerializer):
     subject_label = serializers.SerializerMethodField()
     academic_class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True)
     academic_class_name = serializers.CharField(source='subject.academic_class.name', read_only=True)
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True)
+    class_name = serializers.CharField(source='subject.academic_class.name', read_only=True)
     exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True)
     exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True, default='')
@@ -253,7 +258,8 @@ class AdminChapterSerializer(serializers.ModelSerializer):
         model = Chapter
         fields = [
             'id', 'subject', 'subject_id', 'subject_name', 'subject_label',
-            'academic_class_id', 'academic_class_name', 'exam_id', 'exam_name',
+            'academic_class_id', 'academic_class_name', 'class_id', 'class_name',
+            'exam_id', 'exam_name',
             'category', 'category_name', 'name', 'slug', 'order',
             'description', 'lectures_count', 'dpps_count', 'questions_count',
             'created_at', 'updated_at'
@@ -325,7 +331,9 @@ class AdminLectureSerializer(serializers.ModelSerializer):
     subject_id = serializers.IntegerField(source='chapter.subject.id', read_only=True)
     subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
     subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='chapter.subject.academic_class.id', read_only=True, allow_null=True)
     class_name = serializers.CharField(source='chapter.subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='chapter.subject.academic_class.exam.id', read_only=True, allow_null=True)
     exam_name = serializers.CharField(source='chapter.subject.academic_class.exam.name', read_only=True, default='')
     video = serializers.SerializerMethodField()
 
@@ -333,7 +341,7 @@ class AdminLectureSerializer(serializers.ModelSerializer):
         model = Lecture
         fields = [
             'id', 'chapter', 'chapter_name', 'subject_id', 'subject_name',
-            'subject_label', 'class_name', 'exam_name', 'lecture_number',
+            'subject_label', 'class_id', 'class_name', 'exam_id', 'exam_name', 'lecture_number',
             'title', 'slug', 'description', 'duration_seconds', 'is_published',
             'order', 'video', 'created_at', 'updated_at'
         ]
@@ -440,7 +448,9 @@ class AdminDPPSerializer(serializers.ModelSerializer):
     subject_id = serializers.IntegerField(source='chapter.subject.id', read_only=True)
     subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
     subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='chapter.subject.academic_class.id', read_only=True, allow_null=True)
     class_name = serializers.CharField(source='chapter.subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='chapter.subject.academic_class.exam.id', read_only=True, allow_null=True)
     exam_name = serializers.CharField(source='chapter.subject.academic_class.exam.name', read_only=True, default='')
     dpp_questions = AdminDPPQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
@@ -455,7 +465,7 @@ class AdminDPPSerializer(serializers.ModelSerializer):
         model = DPP
         fields = [
             'id', 'chapter', 'chapter_name', 'subject_id', 'subject_name',
-            'subject_label', 'class_name', 'exam_name', 'dpp_number',
+            'subject_label', 'class_id', 'class_name', 'exam_id', 'exam_name', 'dpp_number',
             'title', 'description', 'duration_minutes', 'is_published',
             'questions_count', 'dpp_questions', 'question_ids',
             'positive_marks', 'negative_marks', 'created_at', 'updated_at'
@@ -648,9 +658,12 @@ class AdminAcademicClassSerializer(serializers.ModelSerializer):
 class AdminSubjectSerializer(serializers.ModelSerializer):
     slug = serializers.SlugField(required=False, allow_blank=True)
     academic_class_id = serializers.UUIDField(source='academic_class.id', read_only=True)
+    class_id = serializers.UUIDField(source='academic_class.id', read_only=True)
     class_name = serializers.CharField(source='academic_class.name', read_only=True)
     exam_id = serializers.UUIDField(source='academic_class.exam.id', read_only=True)
     exam_name = serializers.CharField(source='academic_class.exam.name', read_only=True)
+    subject_id = serializers.IntegerField(source='id', read_only=True)
+    subject_name = serializers.CharField(source='name', read_only=True)
     subject_label = serializers.SerializerMethodField()
     categories_count = serializers.SerializerMethodField()
     chapters_count = serializers.SerializerMethodField()
@@ -658,8 +671,8 @@ class AdminSubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = [
-            'id', 'academic_class', 'academic_class_id', 'class_name',
-            'exam_id', 'exam_name', 'name', 'slug', 'subject_label',
+            'id', 'academic_class', 'academic_class_id', 'class_id', 'class_name',
+            'exam_id', 'exam_name', 'subject_id', 'subject_name', 'name', 'slug', 'subject_label',
             'description', 'icon', 'color_hex', 'topics', 'order',
             'is_visible', 'categories_count', 'chapters_count', 'created_at', 'updated_at'
         ]
@@ -1026,9 +1039,12 @@ class AdminTestSerializer(serializers.ModelSerializer):
 
 
 class AdminStudyMaterialSerializer(serializers.ModelSerializer):
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True, allow_null=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True, allow_null=True)
     class_name = serializers.CharField(source='subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True, allow_null=True)
     exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True, default='')
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
 
@@ -1036,7 +1052,8 @@ class AdminStudyMaterialSerializer(serializers.ModelSerializer):
         model = StudyMaterial
         fields = [
             'id', 'title', 'description', 'material_type',
-            'subject', 'subject_name', 'subject_label', 'class_name', 'exam_name',
+            'subject', 'subject_id', 'subject_name', 'subject_label',
+            'class_id', 'class_name', 'exam_id', 'exam_name',
             'chapter', 'chapter_name',
             'r2_object_key', 'file_size_bytes', 'is_published', 'created_at', 'updated_at'
         ]

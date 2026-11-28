@@ -1,5 +1,30 @@
 # AdeptEduverse / ANKIT JEE — Full-Stack Platform Update
 
+## Phase 1 — Step 1.2: Exam > Class > Subject Hierarchy Refinements & Course Feature/Addon Differential Sync
+
+### Summary of Major Deliverables
+1. **Model & Question Association Safeguards**:
+   - `Question.clean()` & `Question.save()`: Model-level enforcement ensuring `subject = chapter.subject` when chapter is set. Serializer validation rejects any mismatch between a question's subject and its chapter's subject.
+   - Preserved `topics` JSONField for legacy support while strictly binding subjects to their parent `academic_class`.
+
+2. **Course Differential Addon & Feature Updates**:
+   - Refactored `CourseViewSet.sync_features`: Identifies existing rows by ID and performs in-place differential updates (`feat.text`, `feat.order`) rather than destructive `delete()`-and-recreate cycles. Creates new records and prunes only omitted IDs.
+   - Refactored `CourseViewSet.sync_addons`: Updates existing addon records in place by ID, creates newly added addons, and deletes only omitted records.
+   - Replaced enrollment deletion in `CourseViewSet.unenroll_student` and `StudentViewSet.unenroll_course` with non-destructive status updates (`status='INACTIVE'`).
+
+3. **Complete Contextual Scoping on Admin & Student Serializers**:
+   - Added complete hierarchical metadata across `AdminSubjectSerializer`, `AdminChapterSerializer`, `AdminLectureSerializer`, `AdminDPPSerializer`, `AdminQuestionSerializer`, and `AdminStudyMaterialSerializer`: `exam_id`, `exam_name`, `class_id`, `class_name`, `subject_id`, `subject_name`, and formatted `subject_label` (`"Class 11 · Physics"`).
+   - Added `academic_class_id`, `academic_class_name`, `class_id`, `class_name`, `exam_id`, `exam_name`, and `subject_label` to public `SubjectSerializer`.
+
+4. **Student Subject Listing Scoped to Active Course Enrollment**:
+   - `SubjectListView`: Supports `?course=<id>`. Requires active enrollment (`Enrollment.status == 'ACTIVE'`) for students (returning 403 Forbidden for non-enrolled students and 401 Unauthorized for unauthenticated visitors) while permitting staff/admins. Returns only the subjects associated with the course.
+
+5. **Chatbot Service & Demo Data Refinements**:
+   - Made live class schedule copy in `apps.content.chatbot_service` generic, directing students to their dynamic student Schedule dashboard.
+   - Maintained `seed_course_data.py` and `seed_pricing.py` as optional, non-automatic DEMO seeds properly adhering to `Exam -> AcademicClass -> Subject`.
+
+---
+
 ## Phase 1 — Step 1.1: Quick Fixes (Test Types, Books Cover/PDF Independence & Draft Gating)
 
 ### Summary of Major Deliverables
