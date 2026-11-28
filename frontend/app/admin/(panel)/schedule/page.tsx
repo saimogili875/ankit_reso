@@ -381,7 +381,7 @@ export default function AdminSchedulePage() {
 
             <form onSubmit={handleSaveEvent} className="p-6 overflow-y-auto space-y-4 flex-1">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Course Batch *</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Course *</label>
                 <select
                   required
                   value={eventFormData.course}

@@ -600,7 +600,7 @@ export default function SettingsPage() {
               <p className="text-xs font-bold text-foreground">Export Account & Learning Data</p>
             </div>
             <p className="text-[11px] text-muted max-w-lg">
-              Download a complete JSON archive of your personal profile, enrolled batches, test attempt history, and invoice records under DPDP Act provisions.
+              Download a complete JSON archive of your personal profile, enrolled courses, test attempt history, and invoice records under DPDP Act provisions.
             </p>
           </div>
           <button

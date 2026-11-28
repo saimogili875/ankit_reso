@@ -114,7 +114,7 @@ class BannerAdminViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='reorder')
     def reorder(self, request):
         """
-        Batch updates slide ordering based on an ordered list of IDs.
+        Bulk updates slide ordering based on an ordered list of IDs.
         Payload: { "ids": ["<uuid1>", "<uuid2>", ...] }
         """
         serializer = BannerReorderSerializer(data=request.data)

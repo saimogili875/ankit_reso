@@ -94,9 +94,6 @@ class CoursePricingDetailView(APIView):
         return Response(CourseSerializer(course, context={'request': request}).data)
 
 
-# Backward compatibility alias
-BatchDetailView = CoursePricingDetailView
-
 
 class CourseCategoryDetailView(APIView):
     """
@@ -179,13 +176,9 @@ class CourseFeatureAdminViewSet(viewsets.ModelViewSet):
         clear_pricing_cache()
 
 
-# Backward compatibility alias
-BatchFeatureAdminViewSet = CourseFeatureAdminViewSet
-
-
 class CourseAddonAdminViewSet(viewsets.ModelViewSet):
     """
-    CRUD management for CourseAddon (replaces BatchItem).
+    CRUD management for CourseAddon (course optional extras).
     """
     permission_classes = [IsAdminRole]
     serializer_class = CourseAddonAdminSerializer
@@ -203,7 +196,3 @@ class CourseAddonAdminViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.delete()
         clear_pricing_cache()
-
-
-# Backward compatibility alias
-BatchItemAdminViewSet = CourseAddonAdminViewSet

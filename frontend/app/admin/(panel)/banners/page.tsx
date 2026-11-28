@@ -837,7 +837,7 @@ export default function AdminBannersPage() {
                   rows={2}
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="e.g. Class 11 &amp; 12 Live Online Batches + 2,700+ Concept Lectures"
+                  placeholder="e.g. Class 11 &amp; 12 Live Online Courses + 2,700+ Concept Lectures"
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
                 />
               </div>

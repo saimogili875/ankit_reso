@@ -15,8 +15,6 @@ import {
   Image as ImageIcon,
   Bell,
   ShieldCheck,
-  Tag,
-  Layers,
   BookOpen,
   Package,
   PlusCircle,
@@ -49,10 +47,8 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     title: 'Academics',
     items: [
-      { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses and course modules' },
+      { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses, pricing, add-ons and modules' },
       { label: 'Course Content', href: '/admin/course-content', icon: FolderTree, hint: 'Manage sections & items: modules, practice, notes, test series' },
-      { label: 'Batches & Pricing', href: '/admin/batches', icon: Layers, hint: 'Manage batches, prices, items and images' },
-      { label: 'Pricing Cards', href: '/admin/pricing-cards', icon: Tag, hint: 'Manage landing pricing category cards' },
       { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree, hint: 'Subjects, chapters, lectures and DPPs' },
       { label: 'Schedule', href: '/admin/schedule', icon: Calendar, hint: 'Live classes and daily timetable' },
     ],

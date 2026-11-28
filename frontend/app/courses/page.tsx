@@ -97,10 +97,10 @@ export default function CoursesCatalogPage() {
       <div>
         <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight text-[#101828] dark:text-slate-100 flex items-center gap-2.5">
           <GraduationCap className="w-7 h-7 sm:w-8 sm:h-8 text-[#2B2FB8] dark:text-blue-400" />
-          <span>JEE Academic Courses & Batches</span>
+          <span>JEE Academic Courses</span>
         </h1>
         <p className="text-xs sm:text-sm text-[#5B6475] dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-          Structured JEE Main and Advanced batches crafted by expert faculty. Enroll to access live classes, curriculum modules, and computer-based mock tests.
+          Structured JEE Main and Advanced courses crafted by expert faculty. Enroll to access live classes, curriculum modules, and computer-based mock tests.
         </p>
       </div>
 
@@ -110,7 +110,7 @@ export default function CoursesCatalogPage() {
           { key: 'all', label: 'All Programs' },
           { key: 'books', label: '📚 Books & Question Banks' },
           { key: 'enrolled', label: 'My Courses' },
-          { key: 'free', label: 'Free Batches' },
+          { key: 'free', label: 'Free Courses' },
           { key: 'paid', label: 'Paid Programs' },
         ].map((chip) => (
           <button
@@ -155,7 +155,7 @@ export default function CoursesCatalogPage() {
           {activeFilter === 'all' && (
             <div className="pt-6 pb-2 border-b border-[#E3E7EE] dark:border-slate-800">
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#101828] dark:text-white tracking-tight">
-                Academic Video Batches & Programs
+                Academic Video Courses & Programs
               </h2>
               <p className="text-xs sm:text-sm text-[#5B6475] dark:text-slate-400 mt-1">
                 Full-year live immersion & recorded lecture programs for JEE preparation.
@@ -176,8 +176,8 @@ export default function CoursesCatalogPage() {
               </h3>
               <p className="text-xs text-[#5B6475] dark:text-slate-400 max-w-sm mx-auto">
                 {activeFilter === 'enrolled'
-                  ? 'Select any course below to begin learning or purchase a batch.'
-                  : 'Faculty and administrators will publish upcoming JEE batches here.'}
+                  ? 'Select any course below to begin learning or purchase a course.'
+                  : 'Faculty and administrators will publish upcoming JEE courses here.'}
               </p>
               {activeFilter !== 'all' && (
                 <button
@@ -245,7 +245,7 @@ export default function CoursesCatalogPage() {
                     {course.features && course.features.length > 0 && (
                       <div className="space-y-1.5 pt-2 border-t border-[#E3E7EE] dark:border-slate-800">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#5B6475] dark:text-slate-500">
-                          Included in Batch
+                          Included in Course
                         </span>
                         <div className="space-y-1">
                           {course.features.slice(0, 3).map((f, idx) => (

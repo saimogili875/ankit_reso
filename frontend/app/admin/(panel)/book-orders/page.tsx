@@ -544,7 +544,7 @@ export default function AdminBookOrdersPage() {
                       type="text"
                       value={drawerAdminNote}
                       onChange={(e) => setDrawerAdminNote(e.target.value)}
-                      placeholder="e.g. Dispatched on Monday evening batch"
+                      placeholder="e.g. Dispatched on Monday evening dispatch"
                       className={inputClass}
                     />
                   </Field>

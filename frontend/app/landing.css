@@ -759,20 +759,20 @@
 }
 
 /* ==========================================================================
-   BATCHES & COURSES (THE CORE OFFERING)
+   COURSES & CURRICULUM (THE CORE OFFERING)
    ========================================================================== */
-.batches-section {
+.courses-section {
   background: radial-gradient(800px 500px at 50% 0%, rgba(37, 99, 235, 0.1), transparent 70%);
 }
 
-.batches-grid {
+.courses-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 28px;
   align-items: stretch;
 }
 
-.batch-card {
+.course-card {
   background: linear-gradient(180deg, rgba(14, 30, 58, 0.8) 0%, rgba(7, 16, 34, 0.9) 100%);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
@@ -785,19 +785,19 @@
   backdrop-filter: blur(16px);
 }
 
-.batch-card:hover {
+.course-card:hover {
   transform: translateY(-8px);
   border-color: var(--border-gold-glow);
   box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.7), 0 0 35px rgba(216, 185, 122, 0.18);
 }
 
-.batch-card.featured {
+.course-card.featured {
   border-color: var(--border-gold);
   background: linear-gradient(180deg, rgba(22, 44, 84, 0.85) 0%, rgba(9, 21, 44, 0.95) 100%);
   box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.6), 0 0 30px rgba(216, 185, 122, 0.15);
 }
 
-.batch-badge {
+.course-badge {
   position: absolute;
   top: -14px;
   left: 50%;
@@ -814,7 +814,7 @@
   white-space: nowrap;
 }
 
-.batch-type {
+.course-type {
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -823,23 +823,23 @@
   margin-bottom: 8px;
 }
 
-.batch-type.recorded {
+.course-type.recorded {
   color: var(--gold-400);
 }
 
-.batch-card h3 {
+.course-card h3 {
   font-size: 1.6rem;
   margin-bottom: 12px;
 }
 
-.batch-desc {
+.course-desc {
   font-size: 0.95rem;
   color: var(--text-secondary);
   margin-bottom: 24px;
   min-height: 48px;
 }
 
-.batch-schedule-chip {
+.course-schedule-chip {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -850,7 +850,7 @@
   margin-bottom: 28px;
 }
 
-.batch-schedule-chip svg {
+.course-schedule-chip svg {
   color: var(--gold-400);
   flex-shrink: 0;
 }
@@ -873,7 +873,7 @@
   color: var(--text-white);
 }
 
-.batch-features {
+.course-features {
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -883,7 +883,7 @@
   padding: 0;
 }
 
-.batch-features li {
+.course-features li {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -907,7 +907,7 @@
   margin-top: 2px;
 }
 
-.batch-footer {
+.course-footer {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1584,7 +1584,7 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .batches-grid {
+  .courses-grid {
     grid-template-columns: 1fr;
   }
 

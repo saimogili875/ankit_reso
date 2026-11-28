@@ -94,7 +94,7 @@ class BannerSlideAdminSerializer(serializers.ModelSerializer):
 
 class BannerReorderSerializer(serializers.Serializer):
     """
-    Serializer for batch reordering banner slides.
+    Serializer for bulk reordering banner slides.
     Accepts a list of slide IDs in the desired order.
     """
     ids = serializers.ListField(

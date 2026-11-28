@@ -64,13 +64,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  const batchCategories = ['school', 'senior', 'dropper'];
-  const batchRoutes: MetadataRoute.Sitemap = batchCategories.map((cat) => ({
-    url: `${baseUrl}/batches/${cat}`,
+  const courseCategories = ['school', 'senior', 'dropper'];
+  const courseRoutes: MetadataRoute.Sitemap = courseCategories.map((cat) => ({
+    url: `${baseUrl}/courses/${cat}`,
     lastModified: now,
     changeFrequency: 'weekly',
     priority: 0.8,
   }));
 
-  return [...staticRoutes, ...bookRoutes, ...batchRoutes];
+  return [...staticRoutes, ...bookRoutes, ...courseRoutes];
 }

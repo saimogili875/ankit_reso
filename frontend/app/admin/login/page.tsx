@@ -13,7 +13,7 @@ import { FormMessage } from '@/components/auth/form-message';
 import { Button } from '@/components/ui/button';
 
 const capabilities = [
-  { icon: GraduationCap, title: 'Courses and curriculum', text: 'Batches, subjects, chapters, lectures and DPPs' },
+  { icon: GraduationCap, title: 'Courses and curriculum', text: 'Courses, subjects, chapters, lectures and DPPs' },
   { icon: Video, title: 'Videos and materials', text: 'YouTube and R2 uploads, PDFs and notes' },
   { icon: HelpCircle, title: 'Question bank and tests', text: 'PYQs, CBT mock tests and analytics' },
   { icon: Users, title: 'Students and payments', text: 'Enrolments, doubts, orders and refunds' },

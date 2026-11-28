@@ -25,6 +25,30 @@ const backendOrigin = effectiveOrigin.replace(/\/api\/?$/, '').replace(/\/+$/, '
 const nextConfig: NextConfig = {
   // Suppress dev-mode cross-origin warnings when switching between localhost and 127.0.0.1
   allowedDevOrigins: ['127.0.0.1:3000', 'localhost:3000'],
+  async redirects() {
+    return [
+      {
+        source: '/batches',
+        destination: '/courses',
+        permanent: true,
+      },
+      {
+        source: '/batches/:path*',
+        destination: '/courses/:path*',
+        permanent: true,
+      },
+      {
+        source: '/admin/batches',
+        destination: '/admin/courses',
+        permanent: true,
+      },
+      {
+        source: '/admin/pricing-cards',
+        destination: '/admin/courses',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

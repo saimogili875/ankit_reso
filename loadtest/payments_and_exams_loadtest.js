@@ -51,7 +51,7 @@ export const options = {
 };
 
 const BASE_URL = __ENV.API_URL || 'http://127.0.0.1:8000/api';
-const MOCK_BATCH_ID = __ENV.BATCH_ID || '00000000-0000-0000-0000-000000000001';
+const MOCK_COURSE_ID = __ENV.COURSE_ID || '00000000-0000-0000-0000-000000000001';
 const MOCK_TEST_ID = __ENV.TEST_ID || '1';
 
 export default function () {
@@ -98,7 +98,7 @@ export default function () {
   // Step 1: Create Order
   const createOrderStart = Date.now();
   const createOrderPayload = JSON.stringify({
-    batch_id: MOCK_BATCH_ID,
+    course_id: MOCK_COURSE_ID,
     email: studentEmail,
     phone: '9876543210',
     full_name: `Student VU ${vuId}`,

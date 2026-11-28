@@ -4,8 +4,6 @@ from .pricing_views import (
     CourseCategoryDetailView,
     CoursePricingDetailView,
     PricingCardListView,
-    BatchDetailView,
-    PricingCategoryListView,
 )
 
 urlpatterns = [
@@ -16,5 +14,4 @@ urlpatterns = [
 
     # Legacy routes (alias to course pricing views)
     path('cards/', PricingCardListView.as_view(), name='pricing-cards-list'),
-    path('batches/<slug:slug>/', BatchDetailView.as_view(), name='pricing-batch-detail'),
 ]

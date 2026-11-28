@@ -100,7 +100,3 @@ def process_and_upload_course_image(uploaded_file, filename_hint: str = "course"
         image_url = presigned or f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{object_key}"
 
     return image_url, object_key
-
-
-# Backward-compatibility alias
-process_and_upload_batch_image = process_and_upload_course_image

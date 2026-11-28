@@ -31,7 +31,7 @@ urlpatterns = [
     # Explicit public list
     path('public/', BannerPublicListView.as_view(), name='banner-public-list'),
     
-    # Batch reorder endpoint
+    # Bulk reorder endpoint
     path('reorder/', BannerAdminViewSet.as_view({'post': 'reorder'}), name='banner-reorder'),
     path('manage/reorder/', BannerAdminViewSet.as_view({'post': 'reorder'}), name='banner-manage-reorder'),
 

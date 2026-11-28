@@ -203,7 +203,7 @@ class CreateOrderView(APIView):
 class VerifyPaymentView(APIView):
     """
     POST /api/payments/verify/
-    Verifies the Razorpay payment signature and activates Course / Batch enrollment.
+    Verifies the Razorpay payment signature and activates Course enrollment.
     """
     permission_classes = [permissions.IsAuthenticated]
 

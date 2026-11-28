@@ -59,7 +59,7 @@ class Payment(TimeStampedModel):
 
 class Entitlement(TimeStampedModel):
     """
-    Grants access to purchased curriculum add-ons and specialized batch components.
+    Grants access to purchased curriculum add-ons and specialized course components.
     Created automatically when a Payment is transitioned to PAID.
     """
     user = models.ForeignKey(

@@ -782,20 +782,20 @@ nav {
 }
 
 /* ==========================================================================
-   BATCHES & COURSES
+   COURSES & CURRICULUM
    ========================================================================== */
-.batches-section {
+.courses-section {
   background: radial-gradient(800px 500px at 50% 0%, rgba(37, 99, 235, 0.1), transparent 70%);
 }
 
-.batches-grid {
+.courses-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 28px;
   align-items: stretch;
 }
 
-.batch-card {
+.course-card {
   background: linear-gradient(180deg, rgba(14, 30, 58, 0.8) 0%, rgba(7, 16, 34, 0.9) 100%);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
@@ -808,19 +808,19 @@ nav {
   backdrop-filter: blur(16px);
 }
 
-.batch-card:hover {
+.course-card:hover {
   transform: translateY(-8px);
   border-color: var(--border-gold-glow);
   box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.7), 0 0 35px rgba(216, 185, 122, 0.18);
 }
 
-.batch-card.featured {
+.course-card.featured {
   border-color: var(--border-gold);
   background: linear-gradient(180deg, rgba(22, 44, 84, 0.85) 0%, rgba(9, 21, 44, 0.95) 100%);
   box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.6), 0 0 30px rgba(216, 185, 122, 0.15);
 }
 
-.batch-badge {
+.course-badge {
   position: absolute;
   top: -14px;
   left: 50%;
@@ -837,7 +837,7 @@ nav {
   white-space: nowrap;
 }
 
-.batch-type {
+.course-type {
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -846,23 +846,23 @@ nav {
   margin-bottom: 8px;
 }
 
-.batch-type.recorded {
+.course-type.recorded {
   color: var(--gold-400);
 }
 
-.batch-card h3 {
+.course-card h3 {
   font-size: 1.6rem;
   margin-bottom: 12px;
 }
 
-.batch-desc {
+.course-desc {
   font-size: 0.95rem;
   color: var(--text-secondary);
   margin-bottom: 24px;
   min-height: 48px;
 }
 
-.batch-schedule-chip {
+.course-schedule-chip {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -873,7 +873,7 @@ nav {
   margin-bottom: 28px;
 }
 
-.batch-schedule-chip svg {
+.course-schedule-chip svg {
   color: var(--gold-400);
   flex-shrink: 0;
 }
@@ -896,7 +896,7 @@ nav {
   color: var(--text-white);
 }
 
-.batch-features {
+.course-features {
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -905,7 +905,7 @@ nav {
   flex-grow: 1;
 }
 
-.batch-features li {
+.course-features li {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -929,7 +929,7 @@ nav {
   margin-top: 2px;
 }
 
-.batch-footer {
+.course-footer {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1605,7 +1605,7 @@ footer {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .batches-grid {
+  .courses-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1694,7 +1694,7 @@ footer {
 
     <nav aria-label="Main Navigation">
       <ul class="nav-links">
-        <li><a href="#batches">Batches</a></li>
+        <li><a href="#courses">Courses</a></li>
         <li><a href="#teacher">Faculty</a></li>
         <li><a href="#results">Results</a></li>
         <li><a href="#pedagogy">Methodology</a></li>
@@ -1720,7 +1720,7 @@ footer {
 
   <!-- Mobile Dropdown Menu -->
   <div class="mobile-menu" id="mobileMenu">
-    <a href="#batches" class="mobile-link">JEE Batches</a>
+    <a href="#courses" class="mobile-link">JEE Courses</a>
     <a href="#teacher" class="mobile-link">IIT Faculty</a>
     <a href="#results" class="mobile-link">Rank Results (AIR 125)</a>
     <a href="#pedagogy" class="mobile-link">How We Teach</a>
@@ -1758,8 +1758,8 @@ footer {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           Watch a Free Class
         </a>
-        <a class="btn btn-glass" href="#batches">
-          Explore Batches &amp; Fees
+        <a class="btn btn-glass" href="#courses">
+          Explore Courses &amp; Fees
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </a>
       </div>
@@ -1796,7 +1796,7 @@ footer {
       <div class="schedule-list">
         <div class="schedule-row">
           <div class="schedule-info">
-            <span class="schedule-label">Evening Batch</span>
+            <span class="schedule-label">Evening Course</span>
             <span class="schedule-name">Class 11 &amp; 12 Live</span>
           </div>
           <span class="schedule-time">Mon–Sat, 6:30–8:30 pm</span>
@@ -1874,25 +1874,25 @@ footer {
 </div>
 
 <!-- ==========================================================================
-     BATCHES & COURSES (THE CORE OFFERING)
+     COURSES & CURRICULUM (THE CORE OFFERING)
      ========================================================================== -->
-<section class="batches-section" id="batches">
+<section class="courses-section" id="courses">
   <div class="wrap">
     <div class="section-tag center">Curated Programs</div>
     <h2>Choose Your Learning Pathway</h2>
     <p class="section-subtitle">
-      Every batch rigorously prepares you for JEE Mains, with intense Advanced problem-solving for students determined to earn seats at the top IITs. Full class recordings always included.
+      Every course rigorously prepares you for JEE Mains, with intense Advanced problem-solving for students determined to earn seats at the top IITs. Full class recordings always included.
     </p>
 
-    <div class="batches-grid">
-      <!-- Batch 1: Class 11 and 12 -->
-      <div class="batch-card featured">
-        <div class="batch-badge">Most Popular · School Friendly</div>
-        <div class="batch-type">Live Comprehensive Batch</div>
+    <div class="courses-grid">
+      <!-- Course 1: Class 11 and 12 -->
+      <div class="course-card featured">
+        <div class="course-badge">Most Popular · School Friendly</div>
+        <div class="course-type">Live Comprehensive Course</div>
         <h3>Class 11 and 12</h3>
-        <p class="batch-desc">Evening live classes designed to fit harmoniously around your school hours, building foundational theory to JEE Advanced mastery.</p>
+        <p class="course-desc">Evening live classes designed to fit harmoniously around your school hours, building foundational theory to JEE Advanced mastery.</p>
 
-        <div class="batch-schedule-chip">
+        <div class="course-schedule-chip">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <div class="schedule-text-group">
             <span class="schedule-sub">Live Class Timing</span>
@@ -1900,7 +1900,7 @@ footer {
           </div>
         </div>
 
-        <ul class="batch-features">
+        <ul class="course-features">
           <li>
             <span class="check-icon">✓</span>
             <span>Comprehensive coverage from basic NCERT concepts to multi-concept JEE Advanced problems.</span>
@@ -1923,8 +1923,8 @@ footer {
           </li>
         </ul>
 
-        <div class="batch-footer">
-          <a class="btn btn-gold" href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20fee%20details%20and%20enrolment%20for%20the%20Class%2011%2F12%20Live%20batch" target="_blank" rel="noopener">
+        <div class="course-footer">
+          <a class="btn btn-gold" href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20fee%20details%20and%20enrolment%20for%20the%20Class%2011%2F12%20Live%20course" target="_blank" rel="noopener">
             Get Fee Details on WhatsApp
           </a>
           <a class="btn btn-glass btn-sm" href="https://www.youtube.com/@adepteduverse" target="_blank" rel="noopener">
@@ -1933,13 +1933,13 @@ footer {
         </div>
       </div>
 
-      <!-- Batch 2: Droppers -->
-      <div class="batch-card">
-        <div class="batch-type">Full-Year Accelerator</div>
+      <!-- Course 2: Droppers -->
+      <div class="course-card">
+        <div class="course-type">Full-Year Accelerator</div>
         <h3>Dropper Immersion</h3>
-        <p class="batch-desc">A rigorous morning schedule for dedicated aspirants giving their entire undivided focus to secure an elite All-India Rank.</p>
+        <p class="course-desc">A rigorous morning schedule for dedicated aspirants giving their entire undivided focus to secure an elite All-India Rank.</p>
 
-        <div class="batch-schedule-chip">
+        <div class="course-schedule-chip">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <div class="schedule-text-group">
             <span class="schedule-sub">Live Class Timing</span>
@@ -1947,7 +1947,7 @@ footer {
           </div>
         </div>
 
-        <ul class="batch-features">
+        <ul class="course-features">
           <li>
             <span class="check-icon">✓</span>
             <span>18 hours of weekly live instruction dissecting complex mathematical topics.</span>
@@ -1970,8 +1970,8 @@ footer {
           </li>
         </ul>
 
-        <div class="batch-footer">
-          <a class="btn btn-primary" href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20fee%20details%20and%20enrolment%20for%20the%20Dropper%20live%20batch" target="_blank" rel="noopener">
+        <div class="course-footer">
+          <a class="btn btn-primary" href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20fee%20details%20and%20enrolment%20for%20the%20Dropper%20live%20course" target="_blank" rel="noopener">
             Get Fee Details on WhatsApp
           </a>
           <a class="btn btn-glass btn-sm" href="https://www.youtube.com/@adepteduverse" target="_blank" rel="noopener">
@@ -1980,13 +1980,13 @@ footer {
         </div>
       </div>
 
-      <!-- Batch 3: Recorded Course -->
-      <div class="batch-card">
-        <div class="batch-type recorded">Self-Paced Masterclass</div>
+      <!-- Course 3: Recorded Course -->
+      <div class="course-card">
+        <div class="course-type recorded">Self-Paced Masterclass</div>
         <h3>Learn at Your Pace</h3>
-        <p class="batch-desc">The complete high-definition video lecture vault with annotated PDF notes, formula sheets, and chapter-wise practice tests.</p>
+        <p class="course-desc">The complete high-definition video lecture vault with annotated PDF notes, formula sheets, and chapter-wise practice tests.</p>
 
-        <div class="batch-schedule-chip">
+        <div class="course-schedule-chip">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <div class="schedule-text-group">
             <span class="schedule-sub">Access Mode</span>
@@ -1994,7 +1994,7 @@ footer {
           </div>
         </div>
 
-        <ul class="batch-features">
+        <ul class="course-features">
           <li>
             <span class="check-icon">✓</span>
             <span>Instant access to 2,700+ chapter-wise lectures covering entire syllabus.</span>
@@ -2013,11 +2013,11 @@ footer {
           </li>
           <li>
             <span class="check-icon">✓</span>
-            <span>Periodic live Q&amp;A sessions for recorded batch students.</span>
+            <span>Periodic live Q&amp;A sessions for recorded course students.</span>
           </li>
         </ul>
 
-        <div class="batch-footer">
+        <div class="course-footer">
           <a class="btn btn-glass" href="https://wa.me/919382557693?text=Hi%2C%20I%20want%20fee%20details%20for%20the%20Recorded%20course" target="_blank" rel="noopener">
             Get Fee Details on WhatsApp
           </a>
@@ -2100,7 +2100,7 @@ footer {
       </div>
 
       <div class="teacher-actions">
-        <a class="btn btn-whatsapp" href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20JEE%20Mathematics%20batch" target="_blank" rel="noopener">
+        <a class="btn btn-whatsapp" href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20JEE%20Mathematics%20course" target="_blank" rel="noopener">
           Connect on WhatsApp
         </a>
         <a class="btn btn-glass" href="https://www.youtube.com/@adepteduverse" target="_blank" rel="noopener">
@@ -2132,7 +2132,7 @@ footer {
       <div class="step-card">
         <span class="step-number">02</span>
         <h3>Consult the Academic Desk</h3>
-        <p>Reach out via WhatsApp (+91 93825 57693). Discuss your current grade, syllabus coverage, and target JEE year to select the optimal live or recorded batch.</p>
+        <p>Reach out via WhatsApp (+91 93825 57693). Discuss your current grade, syllabus coverage, and target JEE year to select the optimal live or recorded course.</p>
       </div>
 
       <div class="step-card">
@@ -2251,7 +2251,7 @@ footer {
           <span class="faq-icon" aria-hidden="true">+</span>
         </summary>
         <div class="faq-content">
-          Live classes for Class 11 and 12 run Monday through Saturday from 6:30 PM to 8:30 PM, while the Droppers Immersion batch meets Monday through Saturday from 9:00 AM to 12:00 PM. If you miss any session due to school exams or personal emergencies, high-definition video recordings are processed and uploaded to your student portal within 2 hours, accessible 24/7 for the entire academic year.
+          Live classes for Class 11 and 12 run Monday through Saturday from 6:30 PM to 8:30 PM, while the Droppers Immersion course meets Monday through Saturday from 9:00 AM to 12:00 PM. If you miss any session due to school exams or personal emergencies, high-definition video recordings are processed and uploaded to your student portal within 2 hours, accessible 24/7 for the entire academic year.
         </div>
       </details>
 
@@ -2277,7 +2277,7 @@ footer {
 
       <details class="faq-item">
         <summary>
-          <span>What study materials and test series are included in the batches?</span>
+          <span>What study materials and test series are included in the courses?</span>
           <span class="faq-icon" aria-hidden="true">+</span>
         </summary>
         <div class="faq-content">
@@ -2291,7 +2291,7 @@ footer {
           <span class="faq-icon" aria-hidden="true">+</span>
         </summary>
         <div class="faq-content">
-          You can click any "Get Fee Details on WhatsApp" button or reach out directly at +91 93825 57693. Our admissions counselors will verify batch availability, discuss your academic goals, and provide a secure payment link supporting UPI, all major credit/debit cards, and Net Banking.
+          You can click any "Get Fee Details on WhatsApp" button or reach out directly at +91 93825 57693. Our admissions counselors will verify course availability, discuss your academic goals, and provide a secure payment link supporting UPI, all major credit/debit cards, and Net Banking.
         </div>
       </details>
     </div>
@@ -2324,7 +2324,7 @@ footer {
 
     <div class="final-support-note">
       <span></span>
-      Admissions currently open for 2025–26 academic batches. Batch sizes strictly capped.
+      Admissions currently open for 2025–26 academic courses. Course sizes strictly capped.
     </div>
   </div>
 </section>
@@ -2362,9 +2362,9 @@ footer {
       <div class="footer-col">
         <h4>Programs</h4>
         <ul class="footer-links">
-          <li><a href="#batches">Class 11 &amp; 12 Live Batch</a></li>
-          <li><a href="#batches">Dropper Immersion Batch</a></li>
-          <li><a href="#batches">Self-Paced Recorded Vault</a></li>
+          <li><a href="#courses">Class 11 &amp; 12 Live Course</a></li>
+          <li><a href="#courses">Dropper Immersion Course</a></li>
+          <li><a href="#courses">Self-Paced Recorded Vault</a></li>
           <li><a href="#pedagogy">JEE Advanced Problem Solving</a></li>
           <li><a href="#faq">Sunday All-India Mock Tests</a></li>
         </ul>

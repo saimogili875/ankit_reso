@@ -372,9 +372,9 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         self.assertEqual(res.data['total_revenue_30d'], 4999.0)
 
     def test_chatbot_endpoint_responses(self):
-        # 1. Chatbot handles batch timing query via keyword fallback
+        # 1. Chatbot handles course timing query via keyword fallback
         res1 = self.client.post(reverse('chatbot'), {
-            'message': 'What are the batch timings and schedule?',
+            'message': 'What are the class timings and schedule?',
             'history': []
         }, format='json')
         self.assertEqual(res1.status_code, status.HTTP_200_OK)

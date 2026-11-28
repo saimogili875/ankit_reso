@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { useAuth } from '@/hooks/use-auth';
 import { GraduationCap, Star, LayoutDashboard, LogOut, BookOpen, ShieldCheck, MessageCircle, ArrowRight, Home, LogIn } from 'lucide-react';
 import { BannerSlider } from '@/components/banners/BannerSlider';
-import { BatchesSection } from './batches-section';
+import { CoursesSection } from './courses-section';
 import { BooksSection } from './books-section';
 import { StudentResultsSection } from './student-results-section';
 
@@ -20,7 +20,7 @@ const FAQ_ITEMS: FAQItemData[] = [
   {
     question: 'How do courses work and how can I access study materials?',
     answer:
-      'All batches provide 24/7 self-paced video lecture access, downloadable chapter-wise notes, and step-by-step problem solutions. You can study on your own schedule across mobile, tablet, or desktop with no expiration during the academic session.',
+      'All courses provide 24/7 self-paced video lecture access, downloadable chapter-wise notes, and step-by-step problem solutions. You can study on your own schedule across mobile, tablet, or desktop with no expiration during the academic session.',
   },
   {
     question: 'Is this curriculum aligned with CBSE Board and JEE exams?',
@@ -33,14 +33,14 @@ const FAQ_ITEMS: FAQItemData[] = [
       'Students get direct academic doubt assistance through our dedicated WhatsApp desk (+91 93825 57693) and the in-app doubt solver, where Ankit Sir and the academic team provide step-by-step written or video explanations.',
   },
   {
-    question: 'What study materials and practice papers are included in each batch?',
+    question: 'What study materials and practice papers are included in each course?',
     answer:
-      'Depending on the selected class batch, enrollments include sample papers, previous years solved questions (PYQs), mental ability modules, Olympiad drills, and comprehensive chapter-wise tests with detailed solutions.',
+      'Depending on the selected course, enrollments include sample papers, previous years solved questions (PYQs), mental ability modules, Olympiad drills, and comprehensive chapter-wise tests with detailed solutions.',
   },
   {
-    question: 'How do I purchase books or enroll in a batch?',
+    question: 'How do I purchase books or enroll in a course?',
     answer:
-      'Books can be purchased directly as instant Digital PDFs or ordered as printed hard copies delivered to your doorstep with no login required. Batch enrollments can be completed via our secure Razorpay checkout or assisted through our WhatsApp admissions desk (+91 93825 57693).',
+      'Books can be purchased directly as instant Digital PDFs or ordered as printed hard copies delivered to your doorstep with no login required. Course enrollments can be completed via our secure Razorpay checkout or assisted through our WhatsApp admissions desk (+91 93825 57693).',
   },
 ];
 
@@ -202,7 +202,7 @@ export const LandingPage: React.FC = () => {
         {/* Mobile Dropdown Menu */}
         <div className={`mobile-menu ${mobileMenuOpen ? 'active' : ''}`} id="mobileMenu">
           <a href="#courses" className="mobile-link" onClick={closeMobileMenu}>
-            Batches &amp; Curriculum
+            Courses &amp; Curriculum
           </a>
           <Link href="/books" className="mobile-link" onClick={closeMobileMenu}>
             Official Books
@@ -289,7 +289,7 @@ export const LandingPage: React.FC = () => {
 
               <div className="hero-actions">
                 <a className="landing-btn btn-primary" href="#courses">
-                  <span>Explore Batches</span>
+                  <span>Explore Courses</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
                 <Link className="landing-btn btn-glass" href="/books">
@@ -372,9 +372,9 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* ====================================================================
-             BATCHES (COURSES) - DYNAMIC PRICING SYSTEM & CLASS SELECTOR
+             COURSES - DYNAMIC PRICING SYSTEM & CLASS SELECTOR
              ==================================================================== */}
-        <BatchesSection />
+        <CoursesSection />
 
         {/* ====================================================================
              THREE STEPS TO JOIN (ROADMAP)
@@ -402,7 +402,7 @@ export const LandingPage: React.FC = () => {
                 <h3>Consult the Academic Desk</h3>
                 <p>
                   Reach out via WhatsApp (+91 93825 57693). Discuss your current grade, syllabus coverage, and target JEE
-                  year to select the optimal foundation or advanced batch.
+                  year to select the optimal foundation or advanced course.
                 </p>
               </div>
 
@@ -542,7 +542,7 @@ export const LandingPage: React.FC = () => {
               <div className="teacher-actions">
                 <a
                   className="landing-btn btn-whatsapp"
-                  href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20Mathematics%20batch"
+                  href="https://wa.me/919382557693?text=Hi%20Ankit%20Sir%2C%20I%20am%20interested%20in%20joining%20your%20Mathematics%20course"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -714,13 +714,13 @@ export const LandingPage: React.FC = () => {
               <h4>Programs</h4>
               <ul className="footer-links">
                 <li>
-                  <a href="#courses">Class VI-X Foundation Batches</a>
+                  <a href="#courses">Class VI-X Foundation Courses</a>
                 </li>
                 <li>
                   <a href="#courses">Class 11 &amp; 12 JEE + Board</a>
                 </li>
                 <li>
-                  <a href="#courses">Dropper Immersion Batch</a>
+                  <a href="#courses">Dropper Immersion Course</a>
                 </li>
                 <li>
                   <Link href="/books">Official Book Store</Link>
@@ -797,7 +797,7 @@ export const LandingPage: React.FC = () => {
           <Home className="w-5 h-5" />
           <span>Home</span>
         </a>
-        <a href="#courses" className="mobile-dock-tab" aria-label="Courses & Batches">
+        <a href="#courses" className="mobile-dock-tab" aria-label="Courses">
           <GraduationCap className="w-5 h-5 text-indigo-400" />
           <span>Courses</span>
         </a>

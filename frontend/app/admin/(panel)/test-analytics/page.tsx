@@ -96,7 +96,7 @@ interface TestDetailAnalytics {
   question_stats: QuestionStat[];
   toughest_questions: QuestionStat[];
   easiest_questions: QuestionStat[];
-  batch_weak_chapters: Array<{
+  weak_chapters: Array<{
     chapter_id: string;
     chapter_name: string;
     subject_name: string;
@@ -238,7 +238,7 @@ export default function AdminTestAnalyticsPage() {
             </h1>
           </div>
           <p className="text-xs text-slate-400">
-            Batch performance, distractor analysis, question difficulty calibration, and score curves.
+            Cohort performance, distractor analysis, question difficulty calibration, and score curves.
           </p>
         </div>
 
@@ -264,7 +264,7 @@ export default function AdminTestAnalyticsPage() {
         <div className="p-12 text-center rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
           <FileText className="w-10 h-10 text-slate-500 mx-auto" />
           <h3 className="text-base font-bold text-slate-200">No test papers created yet</h3>
-          <p className="text-xs text-slate-400">Create a test in CBT Mock Tests to view batch analytics.</p>
+          <p className="text-xs text-slate-400">Create a test in CBT Mock Tests to view test analytics.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">

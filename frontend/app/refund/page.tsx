@@ -46,7 +46,7 @@ export default function RefundPage() {
 
         <div className="space-y-8 text-sm md:text-base leading-relaxed text-slate-300">
           <section className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
-            <h2 className="text-xl font-bold text-white mb-3">1. Online Courses &amp; Batch Enrollments</h2>
+            <h2 className="text-xl font-bold text-white mb-3">1. Online Courses &amp; Program Enrollments</h2>
             <div className="space-y-3">
               <p>
                 We strive to ensure every student and parent receives exceptional mathematical training. Because our complete digital curriculum, past test solutions, and recorded lecture archives are unlocked immediately upon enrollment:
@@ -54,11 +54,11 @@ export default function RefundPage() {
               <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-2">
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 flex-shrink-0" />
-                  <span><strong>7-Day Course Cancellation Window:</strong> If you face genuine technical issues accessing course materials or find the course unsuitable within 7 days of purchase, you may request a review for batch transfer or prorated refund.</span>
+                  <span><strong>7-Day Course Cancellation Window:</strong> If you face genuine technical issues accessing course materials or find the course unsuitable within 7 days of purchase, you may request a review for course transfer or prorated refund.</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 flex-shrink-0" />
-                  <span><strong>Batch Transfer:</strong> Students transitioning between classes (e.g., Class X to Class XI) can transfer batch credit seamlessly without any penalty.</span>
+                  <span><strong>Course Transfer:</strong> Students transitioning between classes (e.g., Class X to Class XI) can transfer course credit seamlessly without any penalty.</span>
                 </div>
               </div>
             </div>

@@ -354,7 +354,7 @@ export default function LearnPage() {
               <Badge variant="blue">Courses Catalog</Badge>
               <h2 className="text-2xl font-extrabold text-white">Select a Course to Unlock</h2>
               <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-                You are currently previewing available courses. Enroll in a batch or course to unlock all video lectures, chapter notes, and mock tests.
+                You are currently previewing available courses. Enroll in a course to unlock all video lectures, chapter notes, and mock tests.
               </p>
             </div>
           </Card>

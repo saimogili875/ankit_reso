@@ -42,7 +42,7 @@ export default function ContactPage() {
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3">Contact Admissions &amp; Support</h1>
           <p className="text-sm md:text-base text-slate-400">
-            Have questions about batches for Class VI-XII, study materials, or book orders? Connect with Ankit Sir and our academic desk directly.
+            Have questions about courses for Class VI-XII, study materials, or book orders? Connect with Ankit Sir and our academic desk directly.
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export default function ContactPage() {
               </div>
               <h2 className="text-xl font-bold text-white mb-2">WhatsApp Admissions Desk</h2>
               <p className="text-sm text-slate-300 mb-4">
-                Quickest response for batch counseling, fee questions, curriculum details, or book orders.
+                Quickest response for course counseling, fee questions, curriculum details, or book orders.
               </p>
               <div className="space-y-1 text-sm text-slate-300">
                 <p className="font-semibold text-emerald-400">+91 93825 57693</p>

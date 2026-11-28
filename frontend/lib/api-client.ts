@@ -45,7 +45,7 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/reset-password',
   '/books',
-  '/batches',
+  '/courses',
   '/admin/login',
   '/admin/forgot-password',
   '/admin/reset-password',

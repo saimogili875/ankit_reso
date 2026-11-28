@@ -26,8 +26,6 @@ interface PaymentItem {
   user_email: string;
   user_name?: string;
   course_title: string;
-  batch_name?: string | null;
-  batch?: string | null;
   amount_paise: number;
   amount_rupees: number;
   currency: string;
@@ -45,9 +43,9 @@ export default function AdminPaymentsPage() {
 
   // Filter & Search
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'created' | 'failed'>('all');
-  const [batchFilter, setBatchFilter] = useState('');
+  const [courseFilter, setCourseFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [batchesList, setBatchesList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [coursesList, setCoursesList] = useState<Array<{ id: string; title?: string; name?: string; slug: string }>>([]);
 
   // Pagination
   const [totalCount, setTotalCount] = useState(0);
@@ -60,14 +58,14 @@ export default function AdminPaymentsPage() {
   // Grant Enrollment Modal
   const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
   const [grantEmail, setGrantEmail] = useState('');
-  const [grantBatchId, setGrantBatchId] = useState('');
+  const [grantCourseId, setGrantCourseId] = useState('');
   const [isGranting, setIsGranting] = useState(false);
   const [grantMsg, setGrantMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     apiClient
-      .get<Array<{ id: string; name: string; slug: string }>>('/admin-panel/batches/')
-      .then((res) => setBatchesList(asList(res)))
+      .get<Array<{ id: string; title?: string; name?: string; slug: string }>>('/admin-panel/courses/')
+      .then((res) => setCoursesList(asList(res)))
       .catch(() => {});
   }, []);
 
@@ -83,8 +81,8 @@ export default function AdminPaymentsPage() {
           if (statusFilter !== 'all') {
             params.set('status', statusFilter);
           }
-          if (batchFilter) {
-            params.set('batch', batchFilter);
+          if (courseFilter) {
+            params.set('course', courseFilter);
           }
           if (searchQuery.trim()) {
             params.set('search', searchQuery.trim());
@@ -108,13 +106,13 @@ export default function AdminPaymentsPage() {
         setIsLoading(false);
       }
     },
-    [statusFilter, batchFilter, searchQuery]
+    [statusFilter, courseFilter, searchQuery]
   );
 
   const handleGrantEnrollment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!grantEmail.trim() || !grantBatchId) {
-      setGrantMsg({ type: 'error', text: 'Student email and Batch selection are required.' });
+    if (!grantEmail.trim() || !grantCourseId) {
+      setGrantMsg({ type: 'error', text: 'Student email and Course selection are required.' });
       return;
     }
     setIsGranting(true);
@@ -122,11 +120,11 @@ export default function AdminPaymentsPage() {
     try {
       await apiClient.post('/admin/payments/grant-enrollment/', {
         user_email: grantEmail.trim().toLowerCase(),
-        batch_id: grantBatchId,
+        course_id: grantCourseId,
       });
       setGrantMsg({ type: 'success', text: `Successfully granted enrollment to ${grantEmail}!` });
       setGrantEmail('');
-      setGrantBatchId('');
+      setGrantCourseId('');
       fetchPayments();
       setTimeout(() => setIsGrantModalOpen(false), 1500);
     } catch (err: unknown) {
@@ -216,14 +214,14 @@ export default function AdminPaymentsPage() {
     },
     {
       key: 'course_title',
-      header: 'Program / Batch',
+      header: 'Program / Course',
       sortable: true,
       render: (p) => (
         <div>
           <span className="font-medium text-slate-700 dark:text-slate-300 max-w-xs block truncate">
-            {p.batch_name || p.course_title || 'General Enrollment'}
+            {p.course_title || 'General Enrollment'}
           </span>
-          {p.batch_name && p.course_title && p.batch_name !== p.course_title && (
+          {false && (
             <span className="text-[10px] text-slate-500 block truncate">Course: {p.course_title}</span>
           )}
         </div>
@@ -408,16 +406,16 @@ export default function AdminPaymentsPage() {
               </button>
             ))}
 
-            {batchesList.length > 0 && (
+            {coursesList.length > 0 && (
               <select
-                value={batchFilter}
-                onChange={(e) => setBatchFilter(e.target.value)}
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 ml-2"
               >
-                <option value="">All Batches</option>
-                {batchesList.map((b) => (
-                  <option key={b.id} value={b.slug}>
-                    {b.name}
+                <option value="">All Courses</option>
+                {coursesList.map((c) => (
+                  <option key={c.id} value={c.slug}>
+                    {c.title || c.name || c.slug}
                   </option>
                 ))}
               </select>
@@ -442,7 +440,7 @@ export default function AdminPaymentsPage() {
       <Modal
         open={isGrantModalOpen}
         title="Grant Manual Enrollment"
-        description="Manually authorize a student for a batch without charging via payment gateway (e.g. offline fee payment or scholarship)."
+        description="Manually authorize a student for a course without charging via payment gateway (e.g. offline fee payment or scholarship)."
         onClose={() => setIsGrantModalOpen(false)}
         footer={
           <>
@@ -489,17 +487,17 @@ export default function AdminPaymentsPage() {
             />
           </Field>
 
-          <Field label="Target Batch *">
+          <Field label="Target Course *">
             <select
-              value={grantBatchId}
-              onChange={(e) => setGrantBatchId(e.target.value)}
+              value={grantCourseId}
+              onChange={(e) => setGrantCourseId(e.target.value)}
               className={inputClass}
               required
             >
-              <option value="">Select Batch to grant</option>
-              {batchesList.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.slug})
+              <option value="">Select Course to grant</option>
+              {coursesList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title || c.name || c.slug}
                 </option>
               ))}
             </select>

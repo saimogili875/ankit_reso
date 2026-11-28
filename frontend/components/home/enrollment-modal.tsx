@@ -117,7 +117,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                 You are already enrolled!
               </h3>
               <p className="text-xs text-[#5B6475] dark:text-slate-400 max-w-sm mx-auto">
-                You have full access to all video lectures, DPP problems, and CBT mocks in this batch.
+                You have full access to all video lectures, DPP problems, and CBT mocks in this course.
               </p>
             </div>
 
@@ -162,7 +162,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
           <div className="space-y-5">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#2B2FB8] dark:text-blue-400 block mb-1">
-                Batch Enrollment
+                Course Enrollment
               </span>
               <h3 className="font-heading text-xl font-bold text-[#101828] dark:text-slate-100">
                 {courseTitle}
@@ -181,7 +181,7 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                 </span>
               </div>
               <Badge className={requiresPayment ? 'bg-[#2B2FB8] text-white' : 'bg-emerald-600 text-white'}>
-                {requiresPayment ? 'Standard Batch' : 'Open Access'}
+                {requiresPayment ? 'Standard Course' : 'Open Access'}
               </Badge>
             </div>
 

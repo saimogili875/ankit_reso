@@ -790,7 +790,7 @@ class TestAnalyticsViewSet(viewsets.ViewSet):
     Administrative analytics for Tests:
     - Test-level summaries (attempts count, highest/lowest/avg score, pass rate)
     - Question-level distractor analysis & anomaly detection (flagging questions where toppers failed)
-    - Batch weak chapters
+    - Aggregate weak chapters
     - Student roster per test with export to CSV
     """
     permission_classes = [IsAdminRole]
@@ -855,7 +855,7 @@ class TestAnalyticsViewSet(viewsets.ViewSet):
         ).prefetch_related('question__options').order_by('order')
 
         question_stats = []
-        batch_chapter_map = {}
+        weak_chapter_map = {}
 
         for tq in test_questions:
             q = tq.question
@@ -910,28 +910,28 @@ class TestAnalyticsViewSet(viewsets.ViewSet):
             }
             question_stats.append(stat_item)
 
-            # Batch chapter aggregation
+            # Aggregate weak chapters
             if q.chapter:
                 chap_id = str(q.chapter.id)
-                if chap_id not in batch_chapter_map:
-                    batch_chapter_map[chap_id] = {
+                if chap_id not in weak_chapter_map:
+                    weak_chapter_map[chap_id] = {
                         'chapter_id': chap_id,
                         'chapter_name': q.chapter.name,
                         'subject_name': q.chapter.category.subject.name if q.chapter.category and q.chapter.category.subject else '',
                         'total_questions': 0,
                         'correct_count': 0,
                     }
-                batch_chapter_map[chap_id]['total_questions'] += q_attempts
-                batch_chapter_map[chap_id]['correct_count'] += q_correct
+                weak_chapter_map[chap_id]['total_questions'] += q_attempts
+                weak_chapter_map[chap_id]['correct_count'] += q_correct
 
-        # Batch weak chapters
-        batch_chapters = []
-        for bc in batch_chapter_map.values():
+        # Aggregate weak chapters
+        top_weak_chapters = []
+        for bc in weak_chapter_map.values():
             tot = bc['total_questions']
             acc = round(bc['correct_count'] / tot * 100, 1) if tot > 0 else 0.0
             bc['accuracy'] = acc
-            batch_chapters.append(bc)
-        batch_chapters.sort(key=lambda x: x['accuracy'])
+            top_weak_chapters.append(bc)
+        top_weak_chapters.sort(key=lambda x: x['accuracy'])
 
         # Toughest & Easiest questions
         toughest_questions = sorted([q for q in question_stats if q['total_attempts'] > 0], key=lambda x: x['accuracy'])[:5]
@@ -979,7 +979,7 @@ class TestAnalyticsViewSet(viewsets.ViewSet):
             'question_stats': question_stats,
             'toughest_questions': toughest_questions,
             'easiest_questions': easiest_questions,
-            'batch_weak_chapters': batch_chapters[:5],
+            'weak_chapters': top_weak_chapters[:5],
             'student_roster': roster,
         }, status=status.HTTP_200_OK)
 

@@ -345,7 +345,7 @@ export default function AdminCoursesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
             <GraduationCap className="w-6 h-6 text-brand-400" />
-            Course & Batch Management
+            Course Management
           </h1>
           <p className="text-sm text-slate-400">
             Create academic courses, set pricing and admissions rules, and manage student enrollments.
@@ -386,7 +386,7 @@ export default function AdminCoursesPage() {
           <div className="p-12 text-center text-slate-400">
             <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-400" />
             <p className="text-base font-medium text-slate-300">No courses created yet</p>
-            <p className="text-sm text-slate-500 mt-1">Create your first JEE batch or comprehensive course above.</p>
+            <p className="text-sm text-slate-500 mt-1">Create your first comprehensive course above.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-800">
@@ -518,7 +518,7 @@ export default function AdminCoursesPage() {
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Comprehensive syllabus overview and batch methodology..."
+                  placeholder="Comprehensive syllabus overview and course methodology..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-brand-500"
                 />
               </div>

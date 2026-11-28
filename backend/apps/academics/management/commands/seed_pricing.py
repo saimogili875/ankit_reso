@@ -111,7 +111,7 @@ class Command(BaseCommand):
                         order=idx
                     )
 
-            # 3. Courses data (replacing Batches)
+            # 3. Courses data
             courses_data = [
                 {
                     'category_slug': 'school',
@@ -240,7 +240,7 @@ class Command(BaseCommand):
                     'class_num': 11,
                     'title': 'Class 11 JEE Mains + Advanced Evening Course',
                     'slug': 'class-11-jee-advanced',
-                    'tagline': 'Evening Live Batch (Mon-Sat, 6:30-8:30 PM) Designed Around School Hours',
+                    'tagline': 'Evening Live Course (Mon-Sat, 6:30-8:30 PM) Designed Around School Hours',
                     'description': 'Master foundational theory from ground zero to JEE Advanced peak difficulty. Real-time audio interaction with Ankit Sir in every class.',
                     'image': '/images/ankit-sir.jpg',
                     'price': Decimal('15000.00'),
@@ -295,7 +295,7 @@ class Command(BaseCommand):
                     'class_num': 12,
                     'title': 'Droppers Target JEE Advanced Elite Immersion Course',
                     'slug': 'dropper-target-jee-advanced',
-                    'tagline': 'Full-Year Morning Accelerated Batch (Mon-Sat, 9:00 AM - 12:00 Noon)',
+                    'tagline': 'Full-Year Morning Accelerated Course (Mon-Sat, 9:00 AM - 12:00 Noon)',
                     'description': 'Designed exclusively for repeat aspirants with 18+ hours of live weekly problem solving, rigorous concept deconstruction, and PYQ analysis.',
                     'image': '/images/ankit-sir.jpg',
                     'price': Decimal('18000.00'),
