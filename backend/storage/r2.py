@@ -245,6 +245,25 @@ class R2StorageClient:
         )
         return f"https://{public_bucket}.r2.cloudflarestorage.com/{clean_key}"
 
+    def normalize_public_url(self, raw_url: Optional[str]) -> str:
+        """
+        Normalizes internal or fallback R2 S3 API URLs to the permanent public URL
+        base (R2_PUBLIC_URL), e.g.:
+        https://bucket.r2.cloudflarestorage.com/images/books/x.webp -> https://pub-xxx.r2.dev/images/books/x.webp
+        """
+        if not raw_url:
+            return ""
+        url = str(raw_url).strip()
+        public_base = (getattr(settings, 'R2_PUBLIC_URL', '') or self.public_url or '').rstrip('/')
+        if not public_base:
+            return url
+        if "r2.cloudflarestorage.com/" in url:
+            parts = url.split("r2.cloudflarestorage.com/", 1)
+            if len(parts) == 2:
+                key = parts[1].lstrip('/')
+                return f"{public_base}/{key}"
+        return url
+
     def delete_object(self, object_key: str, bucket: Optional[str] = None) -> bool:
         """Deletes a single object from R2."""
         client = self._get_client()

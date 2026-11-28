@@ -40,6 +40,13 @@ class BookProductPublicSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        from storage.service import storage_service
+        if ret.get('cover_image'):
+            ret['cover_image'] = storage_service.normalize_public_url(ret['cover_image'])
+        return ret
+
 
 class BookProductAdminSerializer(serializers.ModelSerializer):
     """
@@ -75,6 +82,13 @@ class BookProductAdminSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        from storage.service import storage_service
+        if ret.get('cover_image'):
+            ret['cover_image'] = storage_service.normalize_public_url(ret['cover_image'])
+        return ret
 
 
 class BookOrderCreateSerializer(serializers.Serializer):
