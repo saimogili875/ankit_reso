@@ -446,6 +446,21 @@ class BookProductAdminViewSet(viewsets.ModelViewSet):
     queryset = BookProduct.objects.all().order_by('display_order', 'created_at')
     pagination_class = AdminPagination
 
+    def destroy(self, request, *args, **kwargs):
+        product = self.get_object()
+        order_count = product.orders.count()
+        if order_count > 0:
+            return Response(
+                {
+                    'detail': f"This book has {order_count} order(s). Unpublish it instead.",
+                    'action': 'unpublish',
+                    'order_count': order_count,
+                    'book_id': str(product.id),
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], url_path='upload-cover')
     def upload_cover(self, request, pk=None):
         """Uploads and compresses cover image to WebP in R2."""

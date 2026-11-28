@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source code
 COPY . /app/
 
-RUN SECRET_KEY=build-only-django-key VIDEO_STREAMING_SECRET=build-only-video-key REDIS_URL=redis://build-only:6379/0 DJANGO_SETTINGS_MODULE=config.settings.prod python manage.py collectstatic --noinput
+RUN SECRET_KEY=build-only-django-key VIDEO_STREAMING_SECRET=build-only-video-key REDIS_URL=redis://build-only:6379/0 RAZORPAY_WEBHOOK_SECRET=build-only-razorpay-webhook-secret DJANGO_SETTINGS_MODULE=config.settings.prod python manage.py collectstatic --noinput
 
 # Create and switch to non-root user
 RUN adduser --disabled-password --gecos '' --no-create-home appuser && \

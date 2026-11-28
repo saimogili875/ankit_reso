@@ -5,6 +5,38 @@ from apps.accounts.models import User
 from apps.questions.models import Question
 from apps.academics.models import Exam, Course, Subject
 
+
+class TestSeries(TimeStampedModel):
+    """
+    Test series bundle within a Course.
+    Can be included in the general course enrollment or sold as a CourseAddon (TEST_SERIES).
+    """
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='test_series')
+    order = models.IntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Standalone price if sold separately")
+    course_addon = models.ForeignKey(
+        'academics.CourseAddon',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='linked_test_series',
+        help_text="Optional link to a CourseAddon when sold as a standalone add-on."
+    )
+
+    class Meta:
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['course', 'is_published']),
+            models.Index(fields=['course', 'order']),
+        ]
+
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+
+
 class Test(TimeStampedModel):
     class TestType(models.TextChoices):
         MOCK = 'MOCK', 'Full Length Mock Test'
@@ -16,6 +48,14 @@ class Test(TimeStampedModel):
     description = models.TextField(blank=True)
     exam = models.ForeignKey(Exam, on_delete=models.SET_NULL, related_name='tests', null=True, blank=True)
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, related_name='tests', null=True, blank=True)
+    test_series = models.ForeignKey(
+        TestSeries,
+        on_delete=models.SET_NULL,
+        related_name='tests',
+        null=True,
+        blank=True,
+        help_text="Optional test series bundle this test belongs to."
+    )
     test_type = models.CharField(max_length=20, choices=TestType.choices, default=TestType.MOCK)
     duration_minutes = models.IntegerField(default=180)
     total_marks = models.IntegerField(default=300)
@@ -25,9 +65,19 @@ class Test(TimeStampedModel):
     end_time = models.DateTimeField(null=True, blank=True)
     publish_results_immediately = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
+    priority = models.IntegerField(default=0, help_text="Priority ordering for exams listing")
+    rank_board_enabled = models.BooleanField(default=True, help_text="Whether students can view the rank board / leaderboard")
+    rank_publish_time = models.DateTimeField(null=True, blank=True, help_text="When rank board unlocks for students")
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['start_time']),
+            models.Index(fields=['end_time']),
+            models.Index(fields=['course']),
+            models.Index(fields=['course', 'is_published']),
+            models.Index(fields=['test_series', 'is_published']),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.test_type})"

@@ -1,5 +1,40 @@
 # AdeptEduverse / ANKIT JEE — Full-Stack Platform Update
 
+## Phase 1 & Phase 2: Course Architecture, Test Series Bundles, Exams Section, Gated Rank Board & Multi-Course Scoping (Feature Release)
+
+### Summary of Major Deliverables
+1. **Course Slug Generation & Validation (Phase 1)**:
+   - Added automatic unique slug generation on `AdminCourseSerializer` using `slugify(title)` with collision suffix resolution (`-2`, `-3`, etc.).
+   - Implemented `validate_title`: trimmed whitespace and case-insensitive uniqueness check (`Course.objects.filter(title__iexact=trimmed)`), excluding `self` on updates.
+   - Updated frontend admin course save handler to extract and format real DRF field validation errors (e.g., `Title: A course with this title already exists.`) directly into user feedback banners.
+   - Ensured atomic course deletion in `CourseViewSet.destroy()` with actionable error handling for related objects and constraint violations.
+
+2. **Test Series in Courses & Addon Linkage (Phase 2A)**:
+   - Created `TestSeries` model (`backend/apps/tests/models.py`) with fields `title`, `description`, `course`, `order`, `is_published`, `price`, and `course_addon` linkage.
+   - Linked `Test` to `TestSeries` via `test_series` ForeignKey, and added `priority`, `rank_board_enabled`, and `rank_publish_time`.
+   - Created admin `TestSeriesAdminViewSet` (`/api/admin-panel/test-series/`) and added an interactive "Test Series" tab to the Course modal in the admin panel.
+   - Built student access gating in `TestSeriesListView` (`GET /api/tests/series/?course=<id>`): students can view a series only if they hold an active course enrollment or an active `Entitlement` for the linked `CourseAddon`.
+   - Added reversible, data-safe migration `backend/apps/academics/migrations/0009_check_duplicate_course_titles.py` that verifies and reports any duplicate course titles without failing migrations or destroying data.
+
+3. **Exams Section (`/exams`) & Navigation (Phase 2B)**:
+   - Added "Exams" to desktop sidebar navigation (`frontend/components/layout/sidebar.tsx`) and mobile bottom navigation (`frontend/components/layout/bottom-nav.tsx`).
+   - Built `/exams` page (`frontend/app/exams/page.tsx`) with two-column responsive layout (desktop: 2 columns, mobile: 2 stacked rows).
+   - Implemented server-side classification in `ExamsListView` (`GET /api/tests/exams/?course=<id>`) sorting by newest start time, priority, and creation time with zero N+1 queries.
+   - Implemented rectangular exam cards displaying title, test type, duration, marks, IST start/end dates, and state buttons (`Start`, `Resume`, `View Result`, `Starts in`, `Expired`).
+   - Added collapsed "Completed & Past Exams" section displaying historical submissions and scores.
+
+4. **Student Analytics & Gated Rank Board (Phase 2C)**:
+   - Added backend gating in `TestRankBoardView` (`GET /api/tests/<pk>/rank-board/`): returns 403 Forbidden with clear reason codes if the student has not submitted, if `rank_board_enabled=False`, or if `rank_publish_time` has not elapsed.
+   - Built Rank Board & Leaderboard modal in `frontend/app/tests/[id]/result/page.tsx` displaying own rank (`#X of Y`), percentile, topper score, batch average, and privacy-masked standings table.
+   - Built `StudentAnalyticsView` (`GET /api/tests/student-analytics/?course=<id>`) exposing student-only DPP accuracy, score trends, and subject strength without exposing cohort-wide administrative analytics.
+
+5. **Multi-Course Enrollment & Course Switcher (Phase 2D)**:
+   - Validated backend course selection in `SelectCourseView` (`POST /api/auth/select-course/`): validates active enrollment and automatically falls back to the student's first active enrolled course if the requested course was revoked.
+   - Integrated `useActiveCourse` and `CourseSwitcher` across `/learn`, `/practice`, `/exams`, `/schedule`, and `/analysis`.
+   - Handled 0 courses (displays informational enrollment prompt banner) and 1 course (hides course switcher).
+
+---
+
 ## 1. Overview
 This update completes end-to-end security hardening, role-based backend authorization, dual-portal authentication, idempotent user seeding, Next.js Edge route protection, full Admin Panel CMS control over all platform content, and complete elimination of mock/demo data in favor of live Django REST Framework database APIs.
 

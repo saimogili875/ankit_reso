@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   BarChart2,
@@ -8,8 +8,11 @@ import {
   Flame,
   CheckCircle2,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useActiveCourse } from '@/hooks/use-active-course';
+import { CourseSwitcher } from '@/components/courses/CourseSwitcher';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { KpiCard, LineTrend, BarCompare, Donut } from '@/components/charts';
@@ -75,20 +78,30 @@ interface RankPredictorData {
 }
 
 export default function OverallAnalysisPage() {
+  const {
+    activeCourse,
+    enrolledCourses,
+    enrolledCount,
+    allCourses,
+    setActiveCourse,
+    isLoading: isCourseLoading,
+  } = useActiveCourse();
+
   const [overview, setOverview] = useState<AnalyticsOverviewData | null>(null);
   const [chapters, setChapters] = useState<ChaptersData | null>(null);
   const [predictor, setPredictor] = useState<RankPredictorData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
+      const courseParam = activeCourse?.id ? `?course=${activeCourse.id}` : '';
       const [ovData, chapData, predData] = await Promise.all([
-        apiClient.get<AnalyticsOverviewData>('/analytics/overview/'),
-        apiClient.get<ChaptersData>('/analytics/chapters/').catch(() => null),
-        apiClient.get<RankPredictorData>('/analytics/rank-predictor/').catch(() => null),
+        apiClient.get<AnalyticsOverviewData>(`/analytics/overview/${courseParam}`).catch(() => null),
+        apiClient.get<ChaptersData>(`/analytics/chapters/${courseParam}`).catch(() => null),
+        apiClient.get<RankPredictorData>(`/analytics/rank-predictor/${courseParam}`).catch(() => null),
       ]);
 
       if (ovData) setOverview(ovData);
@@ -100,11 +113,13 @@ export default function OverallAnalysisPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeCourse?.id]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!isCourseLoading) {
+      loadData();
+    }
+  }, [loadData, isCourseLoading]);
 
   if (isLoading) {
     return (
@@ -196,14 +211,45 @@ export default function OverallAnalysisPage() {
           </p>
         </div>
 
-        <Link
-          href="/analysis/notebook"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 transition-colors shrink-0"
-        >
-          <Bookmark className="w-4 h-4" />
-          <span>Error Notebook & Bookmarks</span>
-        </Link>
+        <div className="flex items-center gap-3 shrink-0">
+          {enrolledCount > 1 && (
+            <CourseSwitcher
+              courses={enrolledCount > 0 ? enrolledCourses : allCourses}
+              activeCourse={activeCourse}
+              onSelectCourse={setActiveCourse}
+            />
+          )}
+
+          <Link
+            href="/analysis/notebook"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 transition-colors shrink-0"
+          >
+            <Bookmark className="w-4 h-4" />
+            <span>Error Notebook & Bookmarks</span>
+          </Link>
+        </div>
       </div>
+
+      {/* 0-Course Prompt */}
+      {enrolledCount === 0 && (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+          <div className="space-y-1 text-center sm:text-left">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2 justify-center sm:justify-start">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              Enroll to Access Full National Cohort Analytics
+            </h3>
+            <p className="text-xs text-slate-300">
+              Enroll in a complete JEE preparation course to track syllabus completion, rank predictions, and percentile trends.
+            </p>
+          </div>
+          <Link
+            href="/courses"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-all shrink-0"
+          >
+            Explore Courses
+          </Link>
+        </div>
+      )}
 
       {/* Naresh-Style Glass KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">

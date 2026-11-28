@@ -236,8 +236,8 @@ export default function AdminSchedulePage() {
       await apiClient.delete(`/admin-panel/schedule/${id}/`);
       setFeedback({ type: 'success', message: 'Schedule event deleted.' });
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to delete event.' });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete event.' });
     }
   };
 

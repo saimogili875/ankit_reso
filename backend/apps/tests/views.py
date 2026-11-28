@@ -18,7 +18,12 @@ from .models import (
     TestAttempt,
     QuestionAttemptLog,
     TestAttemptAnalysis,
+    TestSeries,
+    TestCohortStats,
 )
+from apps.academics.models import Enrollment
+from apps.payments.models import Entitlement
+from apps.progress.models import DPPAttempt
 from .serializers import (
     TestListSerializer,
     QuestionReviewSerializer,
@@ -866,3 +871,340 @@ class QuestionTagUpdateView(APIView):
             'is_bookmarked': log.is_bookmarked,
             'is_revised': log.is_revised,
         }, status=status.HTTP_200_OK)
+
+
+class TestSeriesListView(APIView):
+    """
+    Lists test series inside a course for students.
+    Students see a series only if they are actively enrolled in the course
+    or have an active Entitlement for the series' linked course_addon.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        if not course_id:
+            return Response({'error': 'course query parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_enrolled = Enrollment.objects.filter(
+            user=request.user, course_id=course_id, status='ACTIVE'
+        ).exists()
+
+        series_qs = TestSeries.objects.filter(course_id=course_id, is_published=True).select_related('course_addon')
+
+        if not is_enrolled:
+            entitled_addon_ids = Entitlement.objects.filter(
+                user=request.user, course_id=course_id
+            ).values_list('course_addon_id', flat=True)
+            series_qs = series_qs.filter(course_addon_id__in=entitled_addon_ids)
+
+        data = []
+        for s in series_qs:
+            tests_qs = s.tests.filter(is_published=True).order_by('priority', '-start_time', '-created_at')
+            data.append({
+                'id': str(s.id),
+                'title': s.title,
+                'description': s.description,
+                'order': s.order,
+                'price': str(s.price) if s.price else None,
+                'tests_count': tests_qs.count(),
+                'tests': [
+                    {
+                        'id': str(t.id),
+                        'title': t.title,
+                        'test_type': t.test_type,
+                        'duration_minutes': t.duration_minutes,
+                        'total_marks': t.total_marks,
+                        'start_time': t.start_time.isoformat() if t.start_time else None,
+                        'end_time': t.end_time.isoformat() if t.end_time else None,
+                    }
+                    for t in tests_qs
+                ]
+            })
+        return Response(data)
+
+
+class ExamsListView(APIView):
+    """
+    Server-side classified exams list for students:
+    - Present: live right now (or open-ended)
+    - Upcoming: start in future
+    - Completed: submitted by user or expired
+    Card states: Start, Resume, View Result, Starts in, Expired.
+    No N+1 queries.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        now = timezone.now()
+
+        # 1. Fetch published tests
+        tests_qs = Test.objects.filter(is_published=True).select_related('exam', 'course', 'test_series')
+        if course_id:
+            tests_qs = tests_qs.filter(course_id=course_id)
+
+        tests_list = list(tests_qs)
+        test_ids = [t.id for t in tests_list]
+
+        # 2. Fetch all student attempts for these tests in a single query (no N+1)
+        attempts = TestAttempt.objects.filter(
+            user=request.user,
+            test_id__in=test_ids
+        ).order_by('-created_at')
+
+        attempt_by_test_id = {}
+        for att in attempts:
+            if att.test_id not in attempt_by_test_id:
+                attempt_by_test_id[att.test_id] = att
+
+        present = []
+        upcoming = []
+        completed = []
+
+        for t in tests_list:
+            att = attempt_by_test_id.get(t.id)
+            is_submitted = att and att.status in [TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]
+            is_in_progress = att and att.status == TestAttempt.Status.IN_PROGRESS
+
+            # Determine state and bucket
+            if is_submitted:
+                state = 'View Result'
+                bucket = completed
+            elif t.start_time and t.start_time > now:
+                state = 'Starts in'
+                bucket = upcoming
+            elif t.end_time and t.end_time < now:
+                state = 'Expired'
+                bucket = completed
+            else:
+                state = 'Resume' if is_in_progress else 'Start'
+                bucket = present
+
+            # Format card item
+            card = {
+                'id': str(t.id),
+                'title': t.title,
+                'test_type': t.test_type,
+                'duration_minutes': t.duration_minutes,
+                'total_marks': t.total_marks,
+                'start_time': t.start_time.isoformat() if t.start_time else None,
+                'end_time': t.end_time.isoformat() if t.end_time else None,
+                'state': state,
+                'priority': t.priority,
+                'created_at': t.created_at.isoformat() if t.created_at else None,
+                'exam_name': t.exam.name if t.exam else None,
+                'series_title': t.test_series.title if t.test_series else None,
+                'attempt': {
+                    'id': str(att.id),
+                    'status': att.status,
+                    'score': float(att.score),
+                    'rank': att.rank,
+                    'percentile': float(att.percentile) if att.percentile is not None else None,
+                } if att else None,
+            }
+            bucket.append((t, card))
+
+        # Sort: newest start first, then Test.priority descending, then created_at descending
+        def sort_key(item):
+            t, _ = item
+            start_ts = t.start_time.timestamp() if t.start_time else 0.0
+            created_ts = t.created_at.timestamp() if t.created_at else 0.0
+            return (start_ts, t.priority, created_ts)
+
+        present.sort(key=sort_key, reverse=True)
+        upcoming.sort(key=sort_key, reverse=True)
+        completed.sort(key=sort_key, reverse=True)
+
+        return Response({
+            'present': [card for _, card in present],
+            'upcoming': [card for _, card in upcoming],
+            'completed': [card for _, card in completed],
+        })
+
+
+class TestRankBoardView(APIView):
+    """
+    Enforces backend gating for the test rank board / leaderboard:
+    - Student must have submitted an attempt
+    - Admin must have rank_board_enabled=True
+    - Current time must be past rank_publish_time (if set)
+    Returns student's own rank, percentile, and leaderboard.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        test = Test.objects.filter(id=pk, is_published=True).first()
+        if not test:
+            return Response({'error': 'Test not found or not published.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. Require student submitted attempt
+        attempt = TestAttempt.objects.filter(
+            test=test, user=request.user,
+            status__in=[TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]
+        ).order_by('-score').first()
+
+        if not attempt:
+            return Response({
+                'error': 'You must complete and submit this test to view the rank board.',
+                'locked': True,
+                'reason': 'NOT_SUBMITTED'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # 2. Check admin gating flag
+        if not test.rank_board_enabled:
+            return Response({
+                'error': 'Rank board is disabled for this test by the instructor.',
+                'locked': True,
+                'reason': 'DISABLED_BY_ADMIN'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # 3. Check rank publish time
+        now = timezone.now()
+        if test.rank_publish_time and test.rank_publish_time > now:
+            return Response({
+                'error': 'Rank board will be published once the scheduled window closes.',
+                'locked': True,
+                'reason': 'SCHEDULED',
+                'publish_time': test.rank_publish_time.isoformat()
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # 4. Generate rank board
+        all_attempts = (
+            TestAttempt.objects.filter(
+                test=test,
+                status__in=[TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]
+            )
+            .select_related('user', 'user__student_profile')
+            .order_by('-score', 'time_taken_seconds')
+        )
+        total_participants = all_attempts.count()
+
+        leaderboard = []
+        for idx, att in enumerate(all_attempts[:50]):
+            name = (att.user.get_full_name() or att.user.username or 'Student').strip()
+            # Mask student name for privacy (e.g., Ankit S. or S***r)
+            parts = name.split()
+            if len(parts) >= 2:
+                masked_name = f"{parts[0]} {parts[1][0]}."
+            elif len(name) > 2:
+                masked_name = f"{name[0]}***{name[-1]}"
+            else:
+                masked_name = name
+
+            is_own = (att.user_id == request.user.id)
+            leaderboard.append({
+                'rank': att.rank or (idx + 1),
+                'name': name if is_own else masked_name,
+                'is_current_user': is_own,
+                'score': float(att.score),
+                'percentile': float(att.percentile) if att.percentile is not None else None,
+                'time_taken_seconds': att.time_taken_seconds,
+            })
+
+        # Cohort summary stats
+        topper_score = float(all_attempts[0].score) if total_participants > 0 else 0.0
+        avg_score = float(all_attempts.aggregate(avg=Avg('score'))['avg'] or 0.0)
+
+        return Response({
+            'test_id': str(test.id),
+            'test_title': test.title,
+            'total_marks': float(test.total_marks),
+            'total_participants': total_participants,
+            'own_rank': attempt.rank,
+            'own_percentile': float(attempt.percentile) if attempt.percentile is not None else None,
+            'own_score': float(attempt.score),
+            'topper_score': topper_score,
+            'average_score': round(avg_score, 2),
+            'leaderboard': leaderboard,
+        })
+
+
+class StudentAnalyticsView(APIView):
+    """
+    Student-only dashboard graphs:
+    - DPP attempt rate & accuracy
+    - Time spent
+    - Score trend across recent tests
+    - Subject and chapter strength
+    Scoped to the student's selected course.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        course_id = request.query_params.get('course')
+
+        # 1. DPP analytics
+        dpp_qs = DPPAttempt.objects.filter(user=user)
+        if course_id:
+            dpp_qs = dpp_qs.filter(dpp__course_id=course_id)
+
+        dpp_count = dpp_qs.count()
+        dpp_correct = sum(d.correct_count for d in dpp_qs)
+        dpp_total_qs = sum(d.total_questions for d in dpp_qs)
+        dpp_accuracy = round((dpp_correct / dpp_total_qs * 100), 1) if dpp_total_qs > 0 else 0.0
+
+        # 2. Test attempts score trend
+        test_attempts_qs = (
+            TestAttempt.objects.filter(
+                user=user,
+                status__in=[TestAttempt.Status.SUBMITTED, TestAttempt.Status.AUTO_SUBMITTED]
+            )
+            .select_related('test')
+            .order_by('-submitted_at', '-completed_at')[:10]
+        )
+        if course_id:
+            test_attempts_qs = test_attempts_qs.filter(test__course_id=course_id)
+
+        score_trend = []
+        for att in reversed(list(test_attempts_qs)):
+            score_trend.append({
+                'test_id': str(att.test.id),
+                'test_title': att.test.title,
+                'score': float(att.score),
+                'total_marks': float(att.test.total_marks),
+                'percentage': round((float(att.score) / float(att.test.total_marks) * 100), 1) if att.test.total_marks > 0 else 0.0,
+                'date': (att.submitted_at or att.completed_at or att.created_at).strftime('%d %b'),
+                'rank': att.rank,
+                'accuracy': float(att.accuracy_percentage),
+            })
+
+        # 3. Subject strength
+        logs_qs = QuestionAttemptLog.objects.filter(attempt__user=user).select_related('question__chapter__subject')
+        if course_id:
+            logs_qs = logs_qs.filter(attempt__test__course_id=course_id)
+
+        subject_map = {}
+        for log in logs_qs:
+            subj_name = 'General'
+            if log.question and log.question.chapter and log.question.chapter.subject:
+                subj_name = log.question.chapter.subject.name
+
+            if subj_name not in subject_map:
+                subject_map[subj_name] = {'total': 0, 'correct': 0, 'time_seconds': 0}
+
+            subject_map[subj_name]['total'] += 1
+            if log.is_correct:
+                subject_map[subj_name]['correct'] += 1
+            subject_map[subj_name]['time_seconds'] += log.time_spent_seconds
+
+        subject_strength = []
+        for name, data in subject_map.items():
+            acc = round((data['correct'] / data['total'] * 100), 1) if data['total'] > 0 else 0.0
+            subject_strength.append({
+                'subject': name,
+                'accuracy': acc,
+                'total_questions': data['total'],
+                'avg_time_seconds': round(data['time_seconds'] / data['total'], 1) if data['total'] > 0 else 0,
+            })
+
+        return Response({
+            'dpp': {
+                'attempts_count': dpp_count,
+                'total_questions': dpp_total_qs,
+                'accuracy': dpp_accuracy,
+            },
+            'score_trend': score_trend,
+            'subject_strength': subject_strength,
+        })

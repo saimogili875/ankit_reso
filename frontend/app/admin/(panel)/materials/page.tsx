@@ -174,8 +174,8 @@ export default function AdminMaterialsPage() {
       await apiClient.delete(`/admin-panel/materials/${id}/`);
       setFeedback({ type: 'success', message: 'Material deleted successfully.' });
       fetchData();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to delete material.' });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete material.' });
     }
   };
 

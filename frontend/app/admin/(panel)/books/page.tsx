@@ -11,7 +11,9 @@ import {
   CheckCircle2, 
   X, 
   Loader2, 
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   PageHeader, 
@@ -25,7 +27,7 @@ import {
   inputClass, 
   errMsg 
 } from '@/components/admin/ui';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
 
 interface BookProductAdmin {
   id: number;
@@ -75,6 +77,7 @@ export default function AdminBooksPage() {
   // Media upload state
   const [uploadingCoverId, setUploadingCoverId] = useState<number | null>(null);
   const [uploadingPdfId, setUploadingPdfId] = useState<number | null>(null);
+  const [unpublishCandidate, setUnpublishCandidate] = useState<BookProductAdmin | null>(null);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -212,9 +215,60 @@ export default function AdminBooksPage() {
     }
   };
 
+  const handleDeleteBook = async (book: BookProductAdmin) => {
+    if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return;
+    try {
+      await apiClient.delete(`/api/admin/books/products/${book.id}/`);
+      success(`Deleted "${book.title}".`);
+      setUnpublishCandidate(null);
+      fetchBooks();
+    } catch (err: unknown) {
+      const msg = errMsg(err, 'Failed to delete book.');
+      error(msg);
+      if (
+        (err instanceof ApiError && (err.data as { action?: string })?.action === 'unpublish') ||
+        msg.toLowerCase().includes('unpublish') ||
+        msg.toLowerCase().includes('order')
+      ) {
+        setUnpublishCandidate(book);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Notice notice={notice} onClose={clear} />
+
+      {unpublishCandidate && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-800/60 bg-amber-950/40 p-4 text-amber-200 text-sm shadow-lg">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-white">Cannot delete &quot;{unpublishCandidate.title}&quot;</p>
+              <p className="text-xs text-amber-300/80">This book has existing student orders. You can hide/unpublish it from the store catalog instead.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                await handleTogglePublish(unpublishCandidate);
+                setUnpublishCandidate(null);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors"
+            >
+              {unpublishCandidate.is_published ? 'Unpublish Book' : 'Publish Book'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnpublishCandidate(null)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <PageHeader
         icon={BookOpen}
@@ -400,9 +454,20 @@ export default function AdminBooksPage() {
                         <button
                           type="button"
                           onClick={() => openEditModal(book)}
+                          title="Edit details"
                           className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
                         >
                           <Edit3 className="w-4 h-4" />
+                        </button>
+
+                        {/* Delete Book */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBook(book)}
+                          title="Delete book"
+                          className="p-1.5 rounded-lg border border-slate-700 hover:bg-rose-950/40 hover:border-rose-800/80 text-slate-400 hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

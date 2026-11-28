@@ -15,7 +15,7 @@ from apps.questions.models import (
     Question, QuestionOption, PYQ, DPP, DPPQuestion
 )
 from apps.materials.models import StudyMaterial
-from apps.tests.models import Test, TestQuestion, TestAttempt
+from apps.tests.models import Test, TestQuestion, TestAttempt, TestSeries
 from apps.accounts.models import User, StudentProfile
 from apps.progress.models import DPPAttempt, VideoProgress
 from apps.analytics.models import RankPredictor
@@ -514,6 +514,20 @@ class AdminCourseSerializer(serializers.ModelSerializer):
             'classes', 'subjects', 'classes_names', 'subjects_names',
             'enrolled_count', 'created_at', 'updated_at'
         ]
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True},
+        }
+
+    def validate_title(self, value):
+        trimmed = value.strip() if value else ''
+        if not trimmed:
+            raise serializers.ValidationError("Course title cannot be empty.")
+        qs = Course.objects.filter(title__iexact=trimmed)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("A course with this title already exists.")
+        return trimmed
 
     def get_enrolled_count(self, obj):
         return obj.enrollments.count()
@@ -526,7 +540,13 @@ class AdminCourseSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         if not validated_data.get('slug'):
-            validated_data['slug'] = slugify(validated_data['title'])
+            base_slug = slugify(validated_data.get('title', 'course')) or 'course'
+            slug = base_slug
+            counter = 2
+            while Course.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            validated_data['slug'] = slug
         if 'status' in validated_data:
             validated_data['is_published'] = (validated_data['status'] == 'PUBLISHED')
         return super().create(validated_data)
@@ -546,6 +566,23 @@ class AdminAcademicClassSerializer(serializers.ModelSerializer):
 
     def get_chapters_count(self, obj):
         return obj.chapters.count()
+
+
+class AdminTestSeriesSerializer(serializers.ModelSerializer):
+    tests_count = serializers.SerializerMethodField()
+    course_title = serializers.CharField(source='course.title', read_only=True)
+    addon_title = serializers.CharField(source='course_addon.title', read_only=True, default='')
+
+    class Meta:
+        model = TestSeries
+        fields = [
+            'id', 'title', 'description', 'course', 'course_title',
+            'order', 'is_published', 'price', 'course_addon', 'addon_title',
+            'tests_count', 'created_at', 'updated_at'
+        ]
+
+    def get_tests_count(self, obj):
+        return obj.tests.count()
 
 
 class AdminTestQuestionSerializer(serializers.ModelSerializer):
@@ -574,15 +611,17 @@ class AdminTestSerializer(serializers.ModelSerializer):
     negative_marks = serializers.DecimalField(max_digits=4, decimal_places=1, default=1.0, required=False, write_only=True)
 
     course_title = serializers.CharField(source='course.title', read_only=True)
+    test_series_title = serializers.CharField(source='test_series.title', read_only=True, default='')
 
     class Meta:
         model = Test
         fields = [
             'id', 'title', 'description', 'exam', 'exam_name',
             'course', 'course_title',
+            'test_series', 'test_series_title',
             'test_type', 'duration_minutes', 'total_marks', 'cutoff_score',
             'start_time', 'end_time', 'publish_results_immediately',
-            'instructions', 'is_published',
+            'instructions', 'is_published', 'priority', 'rank_board_enabled', 'rank_publish_time',
             'questions_count', 'attempts_count', 'test_questions',
             'question_ids', 'positive_marks', 'negative_marks', 'created_at', 'updated_at'
         ]

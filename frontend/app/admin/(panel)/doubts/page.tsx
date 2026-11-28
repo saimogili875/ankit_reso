@@ -100,8 +100,8 @@ export default function AdminDoubtsPage() {
       await apiClient.delete(`/admin-panel/doubts/${id}/`);
       setFeedback({ type: 'success', message: 'Doubt deleted successfully.' });
       fetchDoubts();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to delete doubt.' });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete doubt.' });
     }
   };
 
