@@ -399,7 +399,9 @@ def send_order_confirmation_email(order, raw_download_token: Optional[str] = Non
     try:
         product_title = order.product.title
         total_inr = f"₹{order.total_amount_paise / 100:.2f}"
-        base_url = getattr(settings, 'FRONTEND_URL', 'https://adepteduverse.com').rstrip('/')
+        base_url = (getattr(settings, 'FRONTEND_URL', None) or 'https://adepteduverse.com').strip().rstrip('/')
+        if not base_url:
+            base_url = 'https://adepteduverse.com'
         token_param = f"?token={raw_download_token}" if raw_download_token else ""
         receipt_url = f"{base_url}/books/order/{order.public_id}{token_param}"
 
@@ -584,7 +586,9 @@ def send_shipping_update_email(order) -> bool:
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'ANKIT JEE <no-reply@adepteduverse.com>')
         to_email = [order.buyer_email]
         subject = f"Your Book Has Shipped! - {order.product.title} [{order.courier or 'Courier'}: {order.tracking_id or 'Dispatched'}]"
-        base_url = getattr(settings, 'FRONTEND_URL', 'https://adepteduverse.com').rstrip('/')
+        base_url = (getattr(settings, 'FRONTEND_URL', None) or 'https://adepteduverse.com').strip().rstrip('/')
+        if not base_url:
+            base_url = 'https://adepteduverse.com'
         receipt_url = f"{base_url}/books/order/{order.public_id}"
 
         body_text = f"""Hello {order.buyer_name},

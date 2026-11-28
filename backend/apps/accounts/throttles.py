@@ -17,8 +17,9 @@ class LoginFailedIdentifierRateThrottle(SimpleRateThrottle):
     scope = 'login_failed_identifier'
 
     def get_rate(self):
-        rate = super().get_rate()
-        return rate if rate is not None else '5/15min'
+        from rest_framework.settings import api_settings
+        rates = getattr(api_settings, 'DEFAULT_THROTTLE_RATES', {}) or {}
+        return rates.get(self.scope) or '5/15min'
 
     def parse_rate(self, rate):
         """
@@ -115,6 +116,106 @@ class LoginFailedIdentifierRateThrottle(SimpleRateThrottle):
                 inst.clear_failures()
 
 
+class LoginFailedIPRateThrottle(SimpleRateThrottle):
+    """
+    Throttles repeated login failures for a specific client IP address.
+    Enforces a strict threshold (default 5 failures per 15 minutes) to protect
+    against credential stuffing and distributed brute-force attacks across accounts.
+
+    Only failed login attempts increment the counter. Successful logins clear the counter for that IP.
+    """
+    scope = 'login_failed_ip'
+
+    def get_rate(self):
+        from rest_framework.settings import api_settings
+        rates = getattr(api_settings, 'DEFAULT_THROTTLE_RATES', {}) or {}
+        return rates.get(self.scope) or '5/15min'
+
+    def parse_rate(self, rate):
+        if rate is None:
+            return (None, None)
+        num, period = rate.split('/')
+        num_requests = int(num)
+        period = period.strip().lower()
+        if period.endswith('min') and period[:-3].isdigit():
+            duration = int(period[:-3]) * 60
+        elif period.endswith('m') and period[:-1].isdigit():
+            duration = int(period[:-1]) * 60
+        elif period.endswith('s') and period[:-1].isdigit():
+            duration = int(period[:-1])
+        elif period.endswith('h') and period[:-1].isdigit():
+            duration = int(period[:-1]) * 3600
+        else:
+            duration = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}[period[0]]
+        return (num_requests, duration)
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        if not ident:
+            return None
+        ident_hash = hashlib.sha256(ident.encode('utf-8')).hexdigest()
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': ident_hash
+        }
+
+    def allow_request(self, request, view):
+        if self.rate is None:
+            return True
+
+        self.key = self.get_cache_key(request, view)
+        if self.key is None:
+            return True
+
+        self.history = self.cache.get(self.key, [])
+        self.now = self.timer()
+
+        while self.history and self.history[-1] <= self.now - self.duration:
+            self.history.pop()
+
+        if len(self.history) >= self.num_requests:
+            return self.throttle_failure()
+
+        request._login_ip_throttle = self
+        return True
+
+    def record_failure(self):
+        if not self.key:
+            return
+        self.now = self.timer()
+        self.history = self.cache.get(self.key, [])
+        while self.history and self.history[-1] <= self.now - self.duration:
+            self.history.pop()
+        self.history.insert(0, self.now)
+        self.cache.set(self.key, self.history, self.duration)
+
+    def clear_failures(self):
+        if self.key:
+            self.cache.delete(self.key)
+
+    @classmethod
+    def record_login_failure(cls, request):
+        throttle = getattr(request, '_login_ip_throttle', None)
+        if throttle and throttle.key:
+            throttle.record_failure()
+        else:
+            inst = cls()
+            inst.key = inst.get_cache_key(request, None)
+            if inst.key:
+                inst.record_failure()
+
+    @classmethod
+    def clear_login_failures(cls, request):
+        throttle = getattr(request, '_login_ip_throttle', None)
+        if throttle and throttle.key:
+            throttle.clear_failures()
+        else:
+            inst = cls()
+            inst.key = inst.get_cache_key(request, None)
+            if inst.key:
+                inst.clear_failures()
+
+
 class AdminLoginThrottle(LoginFailedIdentifierRateThrottle):
     """
     Dedicated rate limit & lockout for administrator login attempts.
@@ -123,8 +224,9 @@ class AdminLoginThrottle(LoginFailedIdentifierRateThrottle):
     scope = 'admin_login'
 
     def get_rate(self):
-        rate = super().get_rate()
-        return rate if rate is not None else '5/15min'
+        from rest_framework.settings import api_settings
+        rates = getattr(api_settings, 'DEFAULT_THROTTLE_RATES', {}) or {}
+        return rates.get(self.scope) or '5/15min'
 
     def get_cache_key(self, request, view):
         portal = (getattr(request, 'data', {}) or {}).get('portal', '')

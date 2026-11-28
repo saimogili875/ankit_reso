@@ -400,14 +400,35 @@ class BookOrderDownloadView(APIView):
                 'error': f'Maximum download limit ({order.max_downloads} downloads) exceeded for this purchase.'
             }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-        # Increment download count atomically with F()
-        BookOrder.objects.filter(id=order.id).update(download_count=models.F('download_count') + 1)
-        order.refresh_from_db(fields=['download_count'])
+        # Check if book has pdf_key
+        if not getattr(order.product, 'pdf_key', None):
+            logger.error(
+                "Book download failed: BookProduct %s ('%s') has no pdf_key configured. Order public_id=%s",
+                order.product.id,
+                order.product.title,
+                order.public_id,
+            )
+            return Response(
+                {'error': 'Download temporarily unavailable, contact support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Generate temporary 10-minute presigned URL
         presigned_url = get_book_download_url(order.product.pdf_key, expiration_seconds=600)
         if not presigned_url:
-            return Response({'error': 'PDF file is currently unavailable. Please contact support.'}, status=status.HTTP_404_NOT_FOUND)
+            logger.error(
+                "Book download failed: R2 storage provider is not configured or presigned URL generation failed for pdf_key='%s'. Order public_id=%s",
+                order.product.pdf_key,
+                order.public_id,
+            )
+            return Response(
+                {'error': 'Download temporarily unavailable, contact support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Increment download count atomically with F() only after URL generation succeeds
+        BookOrder.objects.filter(id=order.id).update(download_count=models.F('download_count') + 1)
+        order.refresh_from_db(fields=['download_count'])
 
         # Check if caller wants JSON (e.g. frontend fetch) or direct redirect
         if request.query_params.get('format') == 'json' or 'application/json' in request.headers.get('Accept', ''):

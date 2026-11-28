@@ -49,6 +49,16 @@ STORAGES = {
 FRONTEND_URL = config('FRONTEND_URL', default='').strip()
 PREVIEW_ORIGINS_ENABLED = config('PREVIEW_ORIGINS_ENABLED', default=False, cast=bool)
 
+if FRONTEND_URL and 'vercel.app' in FRONTEND_URL.lower():
+    import warnings
+    import logging
+    _warn_msg = (
+        f"FRONTEND_URL '{FRONTEND_URL}' contains 'vercel.app' in production. "
+        "Customer emails and download links should use the canonical domain (e.g. https://adepteduverse.com)."
+    )
+    warnings.warn(_warn_msg, UserWarning, stacklevel=2)
+    logging.getLogger('config.settings.prod').warning("STARTUP WARNING: %s", _warn_msg)
+
 def _normalize_origin(url: str) -> str:
     url = url.strip()
     if not url:
