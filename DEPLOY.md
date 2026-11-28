@@ -100,13 +100,17 @@ The repository includes a production-ready `render.yaml` Blueprint file defining
 The table below outlines all production environment variables, which services require them, and instructions on generating them.
 
 > [!IMPORTANT]
-> In `config/settings/prod.py`, `SECRET_KEY`, `VIDEO_STREAMING_SECRET`, and `REDIS_URL` are strictly validated at import time. If any of these are missing, or if `VIDEO_STREAMING_SECRET == SECRET_KEY`, the service raises `ImproperlyConfigured` and halts boot.
+> In `config/settings/prod.py`, `SECRET_KEY`, `VIDEO_STREAMING_SECRET`, `REDIS_URL`, and `RAZORPAY_WEBHOOK_SECRET` are strictly validated at import time. If any of these are missing, or if `VIDEO_STREAMING_SECRET == SECRET_KEY`, the service raises `ImproperlyConfigured` and halts boot.
 
 | Variable | Which Services Need It | How to Generate / Configure | Description |
 |---|---|---|---|
 | `SECRET_KEY` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Generate via shell: `python -c "import secrets; print(secrets.token_urlsafe(50))"` (or generated automatically via `generateValue: true` on Blueprint). | Cryptographic signing key for Django sessions and security tokens. Must never equal `VIDEO_STREAMING_SECRET`. |
 | `VIDEO_STREAMING_SECRET` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Generate via shell: `python -c "import secrets; print(secrets.token_hex(32))"` (or generated automatically via `generateValue: true` on Blueprint). | 64-char hex secret used for HMAC-SHA256 signing of HLS streaming URLs. Must be distinct from `SECRET_KEY`. |
 | `REDIS_URL` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Automatically populated via `fromService: ankit-reso-redis` (or external URI: `rediss://default:<password>@<host>:<port>`). | Redis connection string used for caching, Celery task broker, rate limiting, and session storage. |
+| `RAZORPAY_WEBHOOK_SECRET` | `ankit-reso` (web) | Set in Razorpay Dashboard → Settings → Webhooks. | **Strictly required in production.** Secret used to verify HMAC-SHA256 signatures on Razorpay webhook callbacks. Container startup / `prod.py` will fail to boot if unset. |
+| `RAZORPAY_KEY_ID` | `ankit-reso` (web) | Razorpay Dashboard → Settings → API Keys. | Public key for frontend Razorpay checkout modal. |
+| `RAZORPAY_KEY_SECRET` | `ankit-reso` (web) | Razorpay Dashboard → Settings → API Keys. | Secret key used to verify payment signatures and fetch orders from Razorpay API. |
+| `ALLOW_BATCH_REMOVAL` | `ankit-reso` (web) | Set to `"1"` only if deploying database migrations past `academics 0007` on a database with legacy batch data. | Safety guard in migration `academics 0007`. Prevents accidental silent loss of batch revenue data. |
 | `DATABASE_URL` | `ankit-reso` (web), `celery-worker`, `video-worker`, `celery-beat` | Copy from Neon or Supabase pooled connection string (`port 6543`, `sslmode=require`). | PostgreSQL URI with PgBouncer session/transaction pooler. |
 | `MIGRATION_DATABASE_URL` | `ankit-reso` (web) | Direct connection URI on port 5432 (e.g. `postgres://user:pass@ep-cool.us-east-2.aws.neon.tech:5432/neondb?sslmode=require`). | Direct Postgres URI used ONLY for running `migrate`. Bypasses transaction pooler to eliminate advisory lock timeouts and prepared statement conflicts. |
 | `PREVIEW_ORIGINS_ENABLED` | `ankit-reso` (web) | Set to `"true"` or `"false"` (default `"false"`). | When `"true"`, allows Vercel preview URLs (`*.vercel.app`) in CORS and CSRF for PR review deployments. |
