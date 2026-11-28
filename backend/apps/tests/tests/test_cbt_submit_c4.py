@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
-from apps.academics.models import Subject, Chapter, Category, Exam
+from apps.academics.models import Subject, Chapter, Category, Exam, AcademicClass
 from apps.questions.models import Question, QuestionOption
 from apps.tests.models import Test, TestSection, TestQuestion, TestAttempt
 
@@ -27,9 +27,10 @@ class CBTTestSubmitC4Tests(TestCase):
         self.client.force_authenticate(user=self.user)
 
         self.exam = Exam.objects.create(name='JEE Main CBT', slug='jee-main-cbt')
-        self.subject = Subject.objects.create(name='Chemistry CBT', slug='chem-cbt')
+        self.academic_class = AcademicClass.objects.create(exam=self.exam, name='Class 12', slug='class-12', code='12')
+        self.subject = Subject.objects.create(academic_class=self.academic_class, name='Chemistry CBT', slug='chem-cbt')
         self.category = Category.objects.create(subject=self.subject, name='Physical', slug='physical-cbt')
-        self.chapter = Chapter.objects.create(category=self.category, name='Thermodynamics', slug='thermo-cbt', order=1)
+        self.chapter = Chapter.objects.create(subject=self.subject, category=self.category, name='Thermodynamics', slug='thermo-cbt', order=1)
 
         self.test = Test.objects.create(
             exam=self.exam,

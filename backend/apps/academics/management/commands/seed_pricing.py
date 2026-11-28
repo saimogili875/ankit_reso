@@ -2,17 +2,22 @@ import logging
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from apps.academics.models import AcademicClass, CourseCategory, Course, CourseFeature, CourseAddon
+from apps.academics.models import Exam, AcademicClass, CourseCategory, Course, CourseFeature, CourseAddon
 
 logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
-    help = "Idempotently seed CourseCategories, Courses, Features, and Addons (update_or_create demo data)."
+    help = "Idempotently seed demo CourseCategories, Courses, Features, and Addons (update_or_create demo data)."
 
     def handle(self, *args, **options):
-        self.stdout.write("Seeding Academic Classes and Course Categories...")
+        self.stdout.write("Seeding Academic Classes and Course Categories (DEMO SEED)...")
 
         with transaction.atomic():
+            demo_exam, _ = Exam.objects.get_or_create(
+                slug='jee-main',
+                defaults={'name': 'JEE Main', 'order': 1, 'is_active': True, 'description': 'Demo JEE Main Exam'}
+            )
+
             # 1. Academic Classes 6-12
             class_defs = [
                 (6, "Class 6", "class-6", "class6"),
@@ -26,6 +31,7 @@ class Command(BaseCommand):
             class_map = {}
             for num, name, slug, code in class_defs:
                 ac, _ = AcademicClass.objects.update_or_create(
+                    exam=demo_exam,
                     code=code,
                     defaults={
                         'name': name,
@@ -333,6 +339,7 @@ class Command(BaseCommand):
                     slug=slug,
                     defaults={
                         **cdata,
+                        'exam': demo_exam,
                         'category': category,
                         'academic_class': academic_class,
                         'is_published': True,

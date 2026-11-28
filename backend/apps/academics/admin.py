@@ -3,21 +3,24 @@ from .models import Exam, AcademicClass, Subject, Course, Category, Chapter, Top
 
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug']
+    list_display = ['name', 'slug', 'order', 'is_active']
+    list_filter = ['is_active']
 
 @admin.register(AcademicClass)
 class AcademicClassAdmin(admin.ModelAdmin):
-    list_display = ['name', 'code', 'slug', 'order']
+    list_display = ['name', 'exam', 'code', 'slug', 'order']
+    list_filter = ['exam']
     ordering = ['order', 'name']
 
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug', 'color_hex']
+    list_display = ['name', 'academic_class', 'slug', 'color_hex', 'order', 'is_visible']
+    list_filter = ['academic_class__exam', 'academic_class', 'is_visible']
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'price', 'is_free', 'is_published']
-    list_filter = ['is_published', 'is_free']
+    list_display = ['title', 'exam', 'price', 'is_free', 'is_published']
+    list_filter = ['exam', 'is_published', 'is_free']
     search_fields = ['title', 'description']
 
 @admin.register(Category)
@@ -27,8 +30,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Chapter)
 class ChapterAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'academic_class', 'order']
-    list_filter = ['category__subject', 'academic_class']
+    list_display = ['name', 'subject', 'category', 'order']
+    list_filter = ['subject__academic_class__exam', 'subject__academic_class', 'subject']
     search_fields = ['name']
 
 @admin.register(Topic)

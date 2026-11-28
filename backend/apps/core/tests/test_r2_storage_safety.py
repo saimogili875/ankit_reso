@@ -46,7 +46,8 @@ class R2StorageSafetyTests(TestCase):
             password='Password123!',
             role=User.Role.STUDENT,
         )
-        self.academic_class = AcademicClass.objects.create(name='Class 10', slug='class-10', code='class10')
+        self.exam = Exam.objects.create(name='Class 10 Exam', slug='class-10-exam')
+        self.academic_class = AcademicClass.objects.create(exam=self.exam, name='Class 10', slug='class-10', code='class10')
         self.course = Course.objects.create(
             title='Sample Course',
             slug='sample-course',

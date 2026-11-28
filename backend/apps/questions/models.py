@@ -62,6 +62,9 @@ class DPP(TimeStampedModel):
 
     class Meta:
         ordering = ['dpp_number', 'title']
+        constraints = [
+            models.UniqueConstraint(fields=['chapter', 'dpp_number'], name='unique_chapter_dpp_number')
+        ]
 
     def __str__(self):
         return f"DPP {self.dpp_number}: {self.title} ({self.chapter.name})"
