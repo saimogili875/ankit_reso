@@ -261,6 +261,16 @@ class R2StorageClient:
             parts = url.split("r2.cloudflarestorage.com/", 1)
             if len(parts) == 2:
                 key = parts[1].lstrip('/')
+                # If key begins with the bucket name (e.g. "bucket/images/books/..."), strip it
+                for b_name in (
+                    getattr(settings, 'R2_PUBLIC_BUCKET_NAME', ''),
+                    self.public_bucket_name,
+                    getattr(settings, 'R2_BUCKET_NAME', ''),
+                    self.bucket_name,
+                ):
+                    if b_name and key.startswith(f"{b_name}/"):
+                        key = key[len(b_name) + 1:]
+                        break
                 return f"{public_base}/{key}"
         return url
 
