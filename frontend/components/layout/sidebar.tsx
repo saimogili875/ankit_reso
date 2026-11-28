@@ -17,6 +17,7 @@ import {
   User,
   Settings,
   ChevronRight,
+  Award,
 } from 'lucide-react';
 
 export const navItems = [
@@ -25,6 +26,7 @@ export const navItems = [
   { label: 'Books', href: '/books', icon: BookCheck },
   { label: 'Learn', href: '/learn', icon: BookOpen },
   { label: 'Practice', href: '/practice', icon: Edit3 },
+  { label: 'Exams', href: '/exams', icon: Award },
   { label: 'Schedule', href: '/schedule', icon: CalendarDays },
   { label: 'Analysis', href: '/analysis', icon: BarChart3 },
   { label: 'Doubt Solver', href: '/doubt-solver', icon: MessageSquare },

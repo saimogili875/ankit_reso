@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Home, BookOpen, GraduationCap, MoreHorizontal, Video } from 'lucide-react';
+import { Home, GraduationCap, MoreHorizontal, Video, Award } from 'lucide-react';
 import { MoreSheet } from './more-sheet';
 
 interface NavTab {
@@ -16,8 +16,8 @@ interface NavTab {
 const mobileTabs: NavTab[] = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Courses', href: '/courses', icon: GraduationCap },
-  { label: 'Books', href: '/books', icon: BookOpen },
   { label: 'Learn', href: '/learn', icon: Video },
+  { label: 'Exams', href: '/exams', icon: Award },
 ];
 
 export const BottomNav: React.FC = () => {
