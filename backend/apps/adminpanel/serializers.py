@@ -942,6 +942,34 @@ class AdminTestSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.title', read_only=True)
     test_series_title = serializers.CharField(source='test_series.title', read_only=True, default='')
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and 'test_type' in data:
+            val = str(data.get('test_type') or '').strip().upper()
+            mapping = {
+                'FULL': Test.TestType.MOCK,
+                'SUBJECT': Test.TestType.SECTIONAL,
+            }
+            mapped_val = mapping.get(val, val)
+            data = data.copy()
+            data['test_type'] = mapped_val
+        return super().to_internal_value(data)
+
+    def validate_test_type(self, value):
+        if not value:
+            return value
+        val_upper = str(value).strip().upper()
+        mapping = {
+            'FULL': Test.TestType.MOCK,
+            'SUBJECT': Test.TestType.SECTIONAL,
+        }
+        val_mapped = mapping.get(val_upper, val_upper)
+        valid_choices = [c[0] for c in Test.TestType.choices]
+        if val_mapped not in valid_choices:
+            raise serializers.ValidationError(
+                f"'{value}' is not a valid choice. Valid choices are: {', '.join(valid_choices)}."
+            )
+        return val_mapped
+
     class Meta:
         model = Test
         fields = [

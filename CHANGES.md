@@ -1,5 +1,35 @@
 # AdeptEduverse / ANKIT JEE — Full-Stack Platform Update
 
+## Phase 1 — Step 1.1: Quick Fixes (Test Types, Books Cover/PDF Independence & Draft Gating)
+
+### Summary of Major Deliverables
+1. **Test Type Normalization & Mapping**:
+   - Resolved mismatch where frontend passed legacy `FULL` or `SUBJECT` while backend enum required `MOCK`, `PYQ`, `CHAPTER`, `SECTIONAL`.
+   - Updated `AdminTestSerializer` with `to_internal_value()` mapping `FULL` -> `MOCK` and `SUBJECT` -> `SECTIONAL` case-insensitively, and custom `validate_test_type()` returning descriptive allowed choices.
+   - Updated frontend TypeScript interface (`Test.test_type: 'MOCK' | 'PYQ' | 'CHAPTER' | 'SECTIONAL'`) and admin test modal dropdown with human-friendly labels.
+   - Enhanced `handleSaveTest` in admin tests console to catch and render structured DRF validation error payloads.
+   - Renamed admin navigation item from `"Add Exam"` to `"Add Test"` with hint `"Create a timed test"`.
+
+2. **Books Cover & PDF Independence**:
+   - Decoupled cover image and PDF document uploads so either can exist or be updated without the other.
+   - Updated `BookProductAdminSerializer` and `BookProductPublicSerializer` with computed boolean indicators `has_cover` and `has_pdf`. Kept `pdf_key` strictly admin-only.
+   - Enforced validation rule in `BookProductAdminSerializer` disallowing publishing of books with `digital_price > 0` unless a valid PDF document is attached.
+   - Guarded digital guest checkout (`BookOrderCreateView`): returns 400 Bad Request if digital copy is purchased for a book without an attached PDF.
+   - Updated `upload_pdf` in `books/views.py`: default behavior preserves existing cover images; page-1 cover extraction is only performed when explicitly requested via `auto_cover=True` (and no cover is set) or `replace_cover=True`.
+   - Added dedicated admin endpoints `@action(detail=True, methods=['delete'])` for `/remove-cover/` and `/remove-pdf/`.
+   - Admin Books UI updated with:
+     - Clear status chips in catalog table: `Cover set` / `No cover`, `PDF attached` / `No PDF` / `PDF not needed`.
+     - Labelled action buttons for `Cover` and `PDF`.
+     - Independent Cover Image (preview, upload, remove) and Book PDF (status, upload, remove, optional page-1 cover checkbox) sections in Create/Edit modal.
+     - Student storefront guards: digital purchase disabled with clear badges if digital edition lacks an attached PDF.
+
+3. **Draft Course Gating**:
+   - `CourseDetailView.get_queryset()`: returns unpublished courses strictly for staff/admins; returns 404 for non-admin students and unauthenticated visitors.
+   - `CourseClassesView.get()`: non-admins receive 404 for draft courses.
+   - `EnrollView.post()`: rejects student self-enrollment into unpublished courses with 404.
+
+---
+
 ## Admin-Driven Academic Hierarchy (Phase 1 - Phase 5)
 
 ### Summary of Major Deliverables

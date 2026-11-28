@@ -92,7 +92,7 @@ export interface Test {
   id: string;
   title: string;
   description?: string;
-  test_type: 'FULL' | 'CHAPTER' | 'SUBJECT';
+  test_type: 'MOCK' | 'PYQ' | 'CHAPTER' | 'SECTIONAL';
   duration_minutes: number;
   total_marks: number;
   is_published: boolean;

@@ -36,11 +36,13 @@ interface BookProductAdmin {
   subtitle: string;
   description: string;
   cover_image: string;
+  has_cover?: boolean;
   class_label: string;
   digital_price: number | string;
   hardcopy_price: number | string;
   gst_percent: number | string;
   pdf_key: string;
+  has_pdf?: boolean;
   is_published: boolean;
   display_order: number;
   stock_hardcopy: number | null;
@@ -112,7 +114,15 @@ export default function AdminBooksPage() {
   const [formIsPublished, setFormIsPublished] = useState(true);
   const [formHighlightsText, setFormHighlightsText] = useState('');
 
-  // Media upload state
+  // Independent Modal File States
+  const [modalCoverFile, setModalCoverFile] = useState<File | null>(null);
+  const [modalPdfFile, setModalPdfFile] = useState<File | null>(null);
+  const [modalAutoCoverFromPdf, setModalAutoCoverFromPdf] = useState(false);
+  const [modalCoverPreview, setModalCoverPreview] = useState<string | null>(null);
+  const [removeCoverFlag, setRemoveCoverFlag] = useState(false);
+  const [removePdfFlag, setRemovePdfFlag] = useState(false);
+
+  // Media upload state for table
   const [uploadingCoverId, setUploadingCoverId] = useState<number | null>(null);
   const [uploadingPdfId, setUploadingPdfId] = useState<number | null>(null);
   const [unpublishCandidate, setUnpublishCandidate] = useState<BookProductAdmin | null>(null);
@@ -160,6 +170,12 @@ export default function AdminBooksPage() {
     setFormOrder('0');
     setFormIsPublished(true);
     setFormHighlightsText('');
+    setModalCoverFile(null);
+    setModalPdfFile(null);
+    setModalAutoCoverFromPdf(false);
+    setModalCoverPreview(null);
+    setRemoveCoverFlag(false);
+    setRemovePdfFlag(false);
     setIsModalOpen(true);
   };
 
@@ -169,14 +185,20 @@ export default function AdminBooksPage() {
     setFormTitle(book.title);
     setFormSubtitle(book.subtitle || '');
     setFormClassLabel(book.class_label || 'Class 10th');
-    setFormDigitalPrice(String(book.digital_price));
-    setFormHardcopyPrice(String(book.hardcopy_price));
+    setFormDigitalPrice(String(book.digital_price ?? ''));
+    setFormHardcopyPrice(String(book.hardcopy_price ?? ''));
     setFormGstPercent(String(book.gst_percent || '18.00'));
     setFormBadge(book.badge || '');
     setFormStock(book.stock_hardcopy !== null ? String(book.stock_hardcopy) : '');
     setFormOrder(String(book.display_order || '0'));
     setFormIsPublished(book.is_published);
     setFormHighlightsText((book.highlights || []).join('\n'));
+    setModalCoverFile(null);
+    setModalPdfFile(null);
+    setModalAutoCoverFromPdf(false);
+    setModalCoverPreview(book.cover_image || null);
+    setRemoveCoverFlag(false);
+    setRemovePdfFlag(false);
     setIsModalOpen(true);
   };
 
@@ -192,8 +214,8 @@ export default function AdminBooksPage() {
       title: formTitle.trim(),
       subtitle: formSubtitle.trim(),
       class_label: formClassLabel.trim(),
-      digital_price: parseFloat(formDigitalPrice) || 299.0,
-      hardcopy_price: parseFloat(formHardcopyPrice) || 399.0,
+      digital_price: parseFloat(formDigitalPrice) || 0,
+      hardcopy_price: parseFloat(formHardcopyPrice) || 0,
       gst_percent: parseFloat(formGstPercent) || 18.0,
       badge: formBadge.trim(),
       stock_hardcopy: formStock.trim() ? parseInt(formStock, 10) : null,
@@ -203,21 +225,73 @@ export default function AdminBooksPage() {
     };
 
     setSaving(true);
+    let targetBookId: number | null = null;
+    let savedTitle = payload.title;
+
     try {
       if (editingBook) {
-        await apiClient.patch(`/api/admin/books/products/${editingBook.id}/`, payload);
-        success(`Updated "${payload.title}".`);
+        targetBookId = editingBook.id;
+        await apiClient.patch(`/api/admin/books/products/${targetBookId}/`, payload);
       } else {
-        await apiClient.post('/api/admin/books/products/', payload);
-        success(`Created book "${payload.title}".`);
+        const created = await apiClient.post<BookProductAdmin>('/api/admin/books/products/', payload);
+        targetBookId = created.id;
+        savedTitle = created.title;
       }
-      setIsModalOpen(false);
-      fetchBooks();
     } catch (err) {
-      error(errMsg(err, 'Failed to save book.'));
-    } finally {
       setSaving(false);
+      error(errMsg(err, 'Failed to save book record.'));
+      return;
     }
+
+    // Process file attachments independently
+    if (targetBookId) {
+      // 1. Process removals if requested on existing book
+      if (editingBook && removeCoverFlag && !modalCoverFile) {
+        try {
+          await apiClient.delete(`/api/admin/books/products/${targetBookId}/remove-cover/`);
+        } catch (err) {
+          error(errMsg(err, 'Cover removal failed.'));
+        }
+      }
+      if (editingBook && removePdfFlag && !modalPdfFile) {
+        try {
+          await apiClient.delete(`/api/admin/books/products/${targetBookId}/remove-pdf/`);
+        } catch (err) {
+          error(errMsg(err, 'PDF removal failed.'));
+        }
+      }
+
+      // 2. Upload cover if selected
+      if (modalCoverFile) {
+        try {
+          const coverFormData = new FormData();
+          coverFormData.append('cover', modalCoverFile);
+          await apiClient.post(`/api/admin/books/products/${targetBookId}/upload-cover/`, coverFormData);
+        } catch (err) {
+          error(`Book created, but cover upload failed: ${errMsg(err, 'Failed to upload cover')}. You can retry using the Cover button in the table.`);
+        }
+      }
+
+      // 3. Upload PDF if selected
+      if (modalPdfFile) {
+        try {
+          const pdfFormData = new FormData();
+          pdfFormData.append('pdf', modalPdfFile);
+          if (modalAutoCoverFromPdf) {
+            pdfFormData.append('auto_cover', 'true');
+          }
+          await apiClient.post(`/api/admin/books/products/${targetBookId}/upload-pdf/`, pdfFormData);
+        } catch (err) {
+          error(`Book created, but PDF upload failed: ${errMsg(err, 'Failed to upload PDF')}. You can retry using the PDF button in the table.`);
+        }
+      }
+
+      success(`Successfully saved "${savedTitle}".`);
+    }
+
+    setSaving(false);
+    setIsModalOpen(false);
+    fetchBooks();
   };
 
   const handleTogglePublish = async (book: BookProductAdmin) => {
@@ -240,7 +314,7 @@ export default function AdminBooksPage() {
     setUploadingCoverId(bookId);
     try {
       await apiClient.post<{ message: string }>(`/api/admin/books/products/${bookId}/upload-cover/`, formData);
-      success('Cover image uploaded and converted to WebP successfully!');
+      success('Cover image uploaded successfully!');
       fetchBooks();
     } catch (err) {
       error(errMsg(err, 'Failed to upload cover image.'));
@@ -252,7 +326,7 @@ export default function AdminBooksPage() {
   const handlePdfUpload = async (bookId: number, file: File) => {
     const formData = new FormData();
     formData.append('pdf', file);
-    formData.append('auto_cover', 'true');
+    // Never auto-overwrite existing cover on standalone PDF upload
     setUploadingPdfId(bookId);
     try {
       await apiClient.post<{ message: string }>(`/api/admin/books/products/${bookId}/upload-pdf/`, formData);
@@ -404,11 +478,20 @@ export default function AdminBooksPage() {
                           <BookThumbnail src={book.cover_image} title={book.title} />
                         </div>
                         <div>
-                          <div className="font-bold text-white flex items-center gap-1.5">
+                          <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                             <span>{book.title}</span>
                             {book.badge && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
                                 {book.badge}
+                              </span>
+                            )}
+                            {book.has_cover ?? Boolean(book.cover_image) ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                Cover set
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                                No cover
                               </span>
                             )}
                           </div>
@@ -438,13 +521,17 @@ export default function AdminBooksPage() {
 
                     {/* PDF Key */}
                     <td className="py-3.5 px-4">
-                      {book.pdf_key ? (
+                      {(book.has_pdf ?? Boolean(book.pdf_key)) ? (
                         <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> PDF Attached
+                          <CheckCircle2 className="w-3.5 h-3.5" /> PDF attached
+                        </span>
+                      ) : Number(book.digital_price) > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium">
+                          No PDF
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-400">
-                          Missing PDF
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                          PDF not needed
                         </span>
                       )}
                     </td>
@@ -464,11 +551,11 @@ export default function AdminBooksPage() {
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         {/* Cover Upload */}
                         <label
                           title="Upload new cover image"
-                          className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
                         >
                           <input
                             type="file"
@@ -481,16 +568,17 @@ export default function AdminBooksPage() {
                             }}
                           />
                           {uploadingCoverId === book.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
                           ) : (
-                            <Upload className="w-4 h-4" />
+                            <Upload className="w-3.5 h-3.5" />
                           )}
+                          <span>Cover</span>
                         </label>
 
                         {/* PDF Upload */}
                         <label
                           title="Upload PDF file"
-                          className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
                         >
                           <input
                             type="file"
@@ -503,10 +591,11 @@ export default function AdminBooksPage() {
                             }}
                           />
                           {uploadingPdfId === book.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
                           ) : (
-                            <FileText className="w-4 h-4" />
+                            <FileText className="w-3.5 h-3.5" />
                           )}
+                          <span>PDF</span>
                         </label>
 
                         {/* Edit Details */}
@@ -514,9 +603,10 @@ export default function AdminBooksPage() {
                           type="button"
                           onClick={() => openEditModal(book)}
                           title="Edit details"
-                          className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors inline-flex items-center gap-1 text-xs"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
                         </button>
 
                         {/* Delete Book */}
@@ -659,6 +749,136 @@ export default function AdminBooksPage() {
                   className={inputClass}
                 />
               </Field>
+
+              {/* Media Section: Cover Image & Book PDF (Independent) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                {/* Cover Image Section */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 text-indigo-400" /> Cover Image
+                    </span>
+                    {(modalCoverPreview && !removeCoverFlag) && (
+                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        Set
+                      </span>
+                    )}
+                  </div>
+
+                  {modalCoverPreview && !removeCoverFlag ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-20 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={modalCoverPreview}
+                          alt="Cover preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalCoverFile(null);
+                            setRemoveCoverFlag(true);
+                            setModalCoverPreview(null);
+                          }}
+                          className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                        >
+                          Remove Cover
+                        </button>
+                        <p className="text-[10px] text-slate-500">JPG, PNG, WebP up to 5MB.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="block">
+                        <span className="text-[11px] text-slate-400 block mb-1">
+                          {modalCoverFile ? modalCoverFile.name : 'Upload custom cover image'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setModalCoverFile(file);
+                              setRemoveCoverFlag(false);
+                              setModalCoverPreview(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                        />
+                      </label>
+                      <p className="text-[10px] text-slate-500">JPG, PNG, WebP up to 5MB.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* PDF Document Section */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-indigo-400" /> Book PDF
+                    </span>
+                    {(editingBook?.pdf_key || modalPdfFile) && !removePdfFlag && (
+                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        Attached
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {(editingBook?.pdf_key && !removePdfFlag && !modalPdfFile) ? (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Existing PDF attached
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalPdfFile(null);
+                            setRemovePdfFlag(true);
+                          }}
+                          className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                        >
+                          Remove PDF
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="block">
+                        <span className="text-[11px] text-slate-400 block mb-1">
+                          {modalPdfFile ? modalPdfFile.name : 'Select PDF file'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setModalPdfFile(file);
+                              setRemovePdfFlag(false);
+                            }
+                          }}
+                          className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                        />
+                      </label>
+                    )}
+
+                    <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={modalAutoCoverFromPdf}
+                        onChange={(e) => setModalAutoCoverFromPdf(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[11px] text-slate-400 leading-tight">
+                        Generate cover from page 1 of PDF (only if no cover is set)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                 <div className="flex items-center gap-3">

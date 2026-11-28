@@ -646,13 +646,19 @@ export default function BooksPage() {
 
                   {/* Dual Action Buttons + Details Link */}
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenModal(book, 'DIGITAL')}
-                      className="py-2 px-2.5 rounded-xl font-bold text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Digital
-                    </button>
+                    {book.has_pdf !== false ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenModal(book, 'DIGITAL')}
+                        className="py-2 px-2.5 rounded-xl font-bold text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Digital
+                      </button>
+                    ) : (
+                      <span className="py-2 px-2.5 rounded-xl font-medium text-[11px] bg-slate-900 text-slate-500 border border-slate-800 flex items-center justify-center gap-1 cursor-not-allowed">
+                        Printed Only
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleOpenModal(book, 'HARDCOPY')}

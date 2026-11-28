@@ -24,6 +24,8 @@ export interface BookItem {
   class_label?: string;
   highlights?: string[];
   cover_image?: string;
+  has_cover?: boolean;
+  has_pdf?: boolean;
   coverColor?: string;
   pages?: number;
   has_solutions?: boolean;

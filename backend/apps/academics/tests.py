@@ -396,4 +396,38 @@ class AcademicHierarchyIntegrationTestCase(TestCase):
         self.assertIn(res_confirmed.status_code, [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT])
         self.assertFalse(Exam.objects.filter(id=self.exam_jee.id).exists())
 
+    def test_draft_course_hidden_from_students(self):
+        """Unpublished courses must not be visible or enrollable by students/public."""
+        draft_course = Course.objects.create(
+            title='Draft Secret Course',
+            slug='draft-secret-course',
+            exam=self.exam_jee,
+            price=999,
+            is_published=False
+        )
+
+        # 1. Anonymous & Student cannot get detail
+        self.client.logout()
+        res_anon = self.client.get(f'/api/academics/courses/{draft_course.slug}/')
+        self.assertEqual(res_anon.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.client.force_authenticate(user=self.student)
+        res_stud = self.client.get(f'/api/academics/courses/{draft_course.slug}/')
+        self.assertEqual(res_stud.status_code, status.HTTP_404_NOT_FOUND)
+
+        # 2. Admin can view draft course
+        self.client.force_authenticate(user=self.admin)
+        res_admin = self.client.get(f'/api/academics/courses/{draft_course.slug}/')
+        self.assertEqual(res_admin.status_code, status.HTTP_200_OK)
+
+        # 3. Student cannot access classes of unpublished course
+        self.client.force_authenticate(user=self.student)
+        res_classes = self.client.get(f'/api/academics/courses/{draft_course.slug}/classes/')
+        self.assertEqual(res_classes.status_code, status.HTTP_404_NOT_FOUND)
+
+        # 4. Student cannot self-enroll in draft course
+        res_enroll = self.client.post('/api/academics/enroll/', {'course_id': str(draft_course.id)})
+        self.assertEqual(res_enroll.status_code, status.HTTP_404_NOT_FOUND)
+
+
 

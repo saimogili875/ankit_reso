@@ -28,11 +28,20 @@ interface QuestionItem {
   chapter_name?: string;
 }
 
+const TEST_TYPE_LABELS: Record<string, string> = {
+  MOCK: 'Full Length Mock',
+  PYQ: 'Previous Year Paper',
+  CHAPTER: 'Chapter Wise',
+  SECTIONAL: 'Sectional',
+  FULL: 'Full Length Mock',
+  SUBJECT: 'Sectional',
+};
+
 interface TestItem {
   id: string;
   title: string;
   description: string;
-  test_type: 'FULL' | 'CHAPTER' | 'SUBJECT';
+  test_type: 'MOCK' | 'PYQ' | 'CHAPTER' | 'SECTIONAL' | string;
   duration_minutes: number;
   total_marks: number;
   is_published: boolean;
@@ -87,7 +96,7 @@ export default function AdminTestsPage() {
     setEditingTest({
       title: '',
       description: '',
-      test_type: 'FULL',
+      test_type: 'MOCK',
       duration_minutes: 180,
       total_marks: 300,
       is_published: true,
@@ -139,7 +148,23 @@ export default function AdminTestsPage() {
       setEditingTest(null);
       fetchTests();
     } catch (err: unknown) {
-      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Save failed' });
+      let message = 'Save failed';
+      if (err && typeof err === 'object' && 'data' in err && (err as { data: unknown }).data) {
+        const data = (err as { data: unknown }).data;
+        if (typeof data === 'string') {
+          message = data;
+        } else if (typeof data === 'object' && data !== null) {
+          const lines = Object.entries(data as Record<string, unknown>).map(([field, val]) => {
+            const prefix = field === 'detail' || field === 'error' || field === 'non_field_errors' ? '' : `${field}: `;
+            const valStr = Array.isArray(val) ? val.join(', ') : String(val);
+            return `${prefix}${valStr}`;
+          });
+          message = lines.join(' | ') || (err instanceof Error ? err.message : 'Save failed');
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setFeedback({ type: 'error', message });
     } finally {
       setIsSaving(false);
     }
@@ -243,7 +268,7 @@ export default function AdminTestsPage() {
 
               <div>
                 <span className="text-[10px] font-bold font-mono text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-900">
-                  {test.test_type} • {test.duration_minutes} Mins
+                  {TEST_TYPE_LABELS[test.test_type] || test.test_type} • {test.duration_minutes} Mins
                 </span>
                 <h3 className="font-extrabold text-base text-white mt-1.5">{test.title}</h3>
                 <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{test.description || 'NTA CBT formatted paper'}</p>
@@ -303,13 +328,14 @@ export default function AdminTestsPage() {
                 <div>
                   <label className="text-xs font-semibold text-slate-400">Pattern Type</label>
                   <select
-                    value={editingTest.test_type || 'FULL'}
+                    value={editingTest.test_type || 'MOCK'}
                     onChange={(e) => setEditingTest({ ...editingTest, test_type: e.target.value as TestItem['test_type'] })}
                     className="w-full mt-1 p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white"
                   >
-                    <option value="FULL">Full Length (Mock)</option>
+                    <option value="MOCK">Full Length Mock</option>
+                    <option value="PYQ">Previous Year Paper</option>
                     <option value="CHAPTER">Chapter Wise</option>
-                    <option value="SUBJECT">Subject Wise</option>
+                    <option value="SECTIONAL">Sectional</option>
                   </select>
                 </div>
 

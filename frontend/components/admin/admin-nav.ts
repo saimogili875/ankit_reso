@@ -63,7 +63,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle, hint: 'Single, multi and numerical questions' },
       { label: 'Study Materials', href: '/admin/materials', icon: FileText, hint: 'PDFs, notes and handouts' },
       { label: 'CBT Mock Tests', href: '/admin/tests', icon: Clock, hint: 'Build and publish timed tests' },
-      { label: 'Add Exam', href: '/admin/tests?create=true', icon: PlusCircle, hint: 'Create an exam (title, duration, marks, questions)' },
+      { label: 'Add Test', href: '/admin/tests?create=true', icon: PlusCircle, hint: 'Create a timed test' },
     ],
   },
   {

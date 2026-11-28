@@ -766,6 +766,51 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         self.assertIn('tree', res.data)
         self.assertIsInstance(res.data['tree'], list)
 
+    def test_admin_test_serializer_test_type_mapping(self):
+        """AdminTestSerializer maps legacy FULL to MOCK and SUBJECT to SECTIONAL."""
+        from apps.adminpanel.serializers import AdminTestSerializer
+
+        # Test FULL -> MOCK
+        data_full = {
+            'title': 'Test Full Mock',
+            'test_type': 'FULL',
+            'duration_minutes': 180,
+            'total_marks': 300,
+            'exam': self.exam.id,
+            'classes': [self.academic_class.id],
+            'subjects': [self.subject.id],
+        }
+        ser_full = AdminTestSerializer(data=data_full)
+        self.assertTrue(ser_full.is_valid(), ser_full.errors)
+        self.assertEqual(ser_full.validated_data['test_type'], 'MOCK')
+
+        # Test SUBJECT -> SECTIONAL
+        data_subj = {
+            'title': 'Test Sectional',
+            'test_type': 'SUBJECT',
+            'duration_minutes': 60,
+            'total_marks': 100,
+            'exam': self.exam.id,
+            'classes': [self.academic_class.id],
+            'subjects': [self.subject.id],
+        }
+        ser_subj = AdminTestSerializer(data=data_subj)
+        self.assertTrue(ser_subj.is_valid(), ser_subj.errors)
+        self.assertEqual(ser_subj.validated_data['test_type'], 'SECTIONAL')
+
+        # Test invalid type returns validation error with allowed choices
+        data_invalid = {
+            'title': 'Invalid Type Test',
+            'test_type': 'RANDOM_TYPE',
+            'duration_minutes': 60,
+            'total_marks': 100,
+            'exam': self.exam.id,
+        }
+        ser_invalid = AdminTestSerializer(data=data_invalid)
+        self.assertFalse(ser_invalid.is_valid())
+        self.assertIn('test_type', ser_invalid.errors)
+
+
 
 
 

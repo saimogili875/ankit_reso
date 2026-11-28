@@ -779,3 +779,91 @@ class BookGuestCheckoutTests(TestCase):
         self.assertIn("'-10% Discount Coupon Street", content)
         self.assertIn("'@HYPERLINK", content)
 
+    # --------------------------------------------------------------------------
+    # 9. STEP 1.1 COVER & PDF INDEPENDENCE & DIGITAL GATING
+    # --------------------------------------------------------------------------
+    def test_digital_purchase_rejected_if_no_pdf(self):
+        """Digital order creation must return 400 if book has no attached PDF."""
+        book_no_pdf = BookProduct.objects.create(
+            slug='no-pdf-math',
+            title='No PDF Math Book',
+            digital_price=Decimal('150.00'),
+            hardcopy_price=Decimal('350.00'),
+            pdf_key='',  # No PDF
+            is_published=True,
+            stock_hardcopy=10,
+        )
+
+        payload = {
+            'product_slug': book_no_pdf.slug,
+            'format': 'DIGITAL',
+            'buyer_name': 'Test Buyer',
+            'buyer_phone': '+919876543210',
+            'buyer_email': 'buyer@example.com',
+        }
+        res = self.client.post('/api/books/orders/', payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('PDF document is attached', str(res.data.get('error', '')))
+
+        # But hardcopy order proceeds
+        payload['format'] = 'HARDCOPY'
+        payload['shipping_address'] = '123 Main St'
+        payload['city'] = 'Delhi'
+        payload['state'] = 'Delhi'
+        payload['pincode'] = '110001'
+        with patch('apps.books.views.get_razorpay_client') as mock_client:
+            mock_client.return_value.order.create.return_value = {
+                'id': 'order_rzp_hardcopy_123',
+                'amount': 41300,
+                'currency': 'INR',
+            }
+            res_hardcopy = self.client.post('/api/books/orders/', payload)
+            self.assertEqual(res_hardcopy.status_code, status.HTTP_201_CREATED)
+
+    def test_admin_serializer_validates_digital_publish_requires_pdf(self):
+        """Cannot publish book with digital_price > 0 without PDF."""
+        from apps.books.serializers import BookProductAdminSerializer
+        from rest_framework.exceptions import ValidationError
+
+        data = {
+            'title': 'Test Publishing Validation',
+            'slug': 'test-pub-val',
+            'digital_price': '199.00',
+            'hardcopy_price': '0.00',
+            'is_published': True,
+            'pdf_key': '',
+        }
+        ser = BookProductAdminSerializer(data=data)
+        self.assertFalse(ser.is_valid())
+        self.assertIn('pdf_key', ser.errors)
+        self.assertTrue(any('Cannot publish digital-only book' in str(e) for e in ser.errors['pdf_key']))
+
+    def test_admin_remove_cover_and_remove_pdf_endpoints(self):
+        """Admin can remove cover and PDF independently without deleting the book."""
+        test_book = BookProduct.objects.create(
+            slug='cover-pdf-removal-test',
+            title='Removal Test Book',
+            digital_price=Decimal('200.00'),
+            cover_image='https://example.com/cover.jpg',
+            pdf_key='books/pdfs/sample.pdf',
+            is_published=False,
+        )
+
+        self.client.force_authenticate(user=self.admin)
+
+        # 1. Remove cover
+        res_cov = self.client.delete(f'/api/admin/books/products/{test_book.id}/remove-cover/')
+        self.assertEqual(res_cov.status_code, status.HTTP_200_OK)
+        self.assertFalse(res_cov.data['has_cover'])
+        test_book.refresh_from_db()
+        self.assertEqual(test_book.cover_image, '')
+        self.assertEqual(test_book.pdf_key, 'books/pdfs/sample.pdf')
+
+        # 2. Remove PDF
+        res_pdf = self.client.delete(f'/api/admin/books/products/{test_book.id}/remove-pdf/')
+        self.assertEqual(res_pdf.status_code, status.HTTP_200_OK)
+        self.assertFalse(res_pdf.data['has_pdf'])
+        test_book.refresh_from_db()
+        self.assertEqual(test_book.pdf_key, '')
+
+
