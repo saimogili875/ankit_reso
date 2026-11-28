@@ -405,4 +405,66 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
             reply = generate_chatbot_response('Hello', [])
             self.assertEqual(reply, 'Hello from Swecha powered by Claude!')
 
+    def test_delete_course_with_all_relations(self):
+        """
+        Verify deleting a course with enrollments, payments, schedule events,
+        features, add-ons, and tests succeeds cleanly via the Admin API without 500 error.
+        """
+        import uuid
+        from django.utils import timezone
+        from apps.academics.models import Course, Enrollment, CourseFeature, CourseAddon
+        from apps.payments.models import Payment, Entitlement
+        from apps.content.models import ScheduleEvent
+        from apps.tests.models import Test
+
+        self.client.force_authenticate(user=self.admin)
+        course = Course.objects.create(
+            title="Complete Deletion Target Course",
+            slug=f"del-target-{uuid.uuid4().hex[:6]}",
+            price=1999
+        )
+
+        # 1. Feature & Addon
+        CourseFeature.objects.create(course=course, text="Comprehensive curriculum", order=1)
+        addon = CourseAddon.objects.create(course=course, title="Specialized Test Series", price=499)
+
+        # 2. Enrollment
+        Enrollment.objects.create(user=self.student, course=course, status="ACTIVE")
+
+        # 3. Payment & Entitlement
+        payment = Payment.objects.create(
+            user=self.student,
+            course=course,
+            amount_paise=199900,
+            status=Payment.Status.PAID,
+            razorpay_order_id=f"order_{uuid.uuid4().hex[:12]}",
+            razorpay_payment_id=f"pay_{uuid.uuid4().hex[:12]}"
+        )
+        Entitlement.objects.create(user=self.student, payment=payment, course=course, course_addon=addon)
+
+        # 4. Schedule Event
+        now = timezone.now()
+        ScheduleEvent.objects.create(
+            course=course,
+            title="Doubt Clearing Live Session",
+            start_time=now,
+            end_time=now + timezone.timedelta(hours=1)
+        )
+
+        # 5. Test
+        Test.objects.create(title="Weekly Exam", course=course, total_marks=100)
+
+        # 6. Student profile last_selected_course_id
+        if hasattr(self.student, 'profile') and self.student.profile:
+            self.student.profile.last_selected_course_id = course.id
+            self.student.profile.save()
+
+        # Delete course via admin endpoint
+        res = self.client.delete(f'/api/admin-panel/courses/{course.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+        # Confirm course is gone
+        self.assertFalse(Course.objects.filter(id=course.id).exists())
+
+
 
