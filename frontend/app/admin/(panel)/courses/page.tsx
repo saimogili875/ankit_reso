@@ -61,6 +61,16 @@ interface EnrolledStudent {
   enrolled_at: string;
 }
 
+interface AdminTestSeriesItem {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  is_published: boolean;
+  price?: number | string | null;
+  tests_count: number;
+}
+
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [classesList, setClassesList] = useState<OptionItem[]>([]);
@@ -102,6 +112,75 @@ export default function AdminCoursesPage() {
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
 
+  // Test Series Modal Tab
+  const [modalTab, setModalTab] = useState<'details' | 'test-series'>('details');
+  const [testSeriesList, setTestSeriesList] = useState<AdminTestSeriesItem[]>([]);
+  const [isLoadingSeries, setIsLoadingSeries] = useState(false);
+  const [isSavingSeries, setIsSavingSeries] = useState(false);
+  const [seriesFormData, setSeriesFormData] = useState({
+    title: '',
+    description: '',
+    order: 0,
+    is_published: true,
+    price: '',
+  });
+  const [editingSeriesId, setEditingSeriesId] = useState<string | null>(null);
+
+  const loadTestSeries = async (courseId: string) => {
+    setIsLoadingSeries(true);
+    try {
+      const res = await apiClient.get<AdminTestSeriesItem[]>(`/admin-panel/test-series/?course=${courseId}`);
+      setTestSeriesList(asList<AdminTestSeriesItem>(res));
+    } catch (err) {
+      console.error('Failed to load test series', err);
+    } finally {
+      setIsLoadingSeries(false);
+    }
+  };
+
+  const handleSaveSeries = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId || !seriesFormData.title.trim()) return;
+    setIsSavingSeries(true);
+    try {
+      const payload = {
+        title: seriesFormData.title.trim(),
+        description: seriesFormData.description.trim(),
+        order: Number(seriesFormData.order) || 0,
+        is_published: seriesFormData.is_published,
+        price: seriesFormData.price !== '' ? Number(seriesFormData.price) : null,
+        course: editingId,
+      };
+      if (editingSeriesId) {
+        await apiClient.patch(`/admin-panel/test-series/${editingSeriesId}/`, payload);
+        setFeedback({ type: 'success', message: 'Test series updated.' });
+      } else {
+        await apiClient.post('/admin-panel/test-series/', payload);
+        setFeedback({ type: 'success', message: 'Test series created.' });
+      }
+      setEditingSeriesId(null);
+      setSeriesFormData({ title: '', description: '', order: 0, is_published: true, price: '' });
+      loadTestSeries(editingId);
+    } catch (err: unknown) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to save test series.';
+      setFeedback({ type: 'error', message: msg });
+    } finally {
+      setIsSavingSeries(false);
+    }
+  };
+
+  const handleDeleteSeries = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this test series?')) return;
+    try {
+      await apiClient.delete(`/admin-panel/test-series/${id}/`);
+      setFeedback({ type: 'success', message: 'Test series deleted.' });
+      if (editingId) loadTestSeries(editingId);
+    } catch (err: unknown) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to delete test series.';
+      setFeedback({ type: 'error', message: msg });
+    }
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -127,6 +206,8 @@ export default function AdminCoursesPage() {
 
   const openCreateModal = () => {
     setEditingId(null);
+    setModalTab('details');
+    setTestSeriesList([]);
     setFormData({
       title: '',
       subtitle: '',
@@ -151,6 +232,8 @@ export default function AdminCoursesPage() {
 
   const openEditModal = (course: CourseItem) => {
     setEditingId(course.id);
+    setModalTab('details');
+    loadTestSeries(course.id);
     setFormData({
       title: course.title,
       subtitle: course.subtitle || '',
@@ -506,6 +589,43 @@ export default function AdminCoursesPage() {
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-200">✕</button>
             </div>
 
+            {/* Tabs when editing an existing course */}
+            {editingId && (
+              <div className="flex border-b border-slate-800 px-6 bg-slate-950/40">
+                <button
+                  type="button"
+                  onClick={() => setModalTab('details')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors ${
+                    modalTab === 'details'
+                      ? 'border-brand-500 text-brand-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Course Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalTab('test-series');
+                    loadTestSeries(editingId);
+                  }}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+                    modalTab === 'test-series'
+                      ? 'border-brand-500 text-brand-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>Test Series</span>
+                  {testSeriesList.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-brand-500/20 text-brand-400 font-bold">
+                      {testSeriesList.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {modalTab === 'details' ? (
             <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-4 flex-1">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">Course Title *</label>
@@ -676,6 +796,149 @@ export default function AdminCoursesPage() {
                 </Button>
               </div>
             </form>
+            ) : (
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {/* Form to add or edit a test series */}
+                <form onSubmit={handleSaveSeries} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                    <h3 className="text-xs font-semibold text-slate-200">
+                      {editingSeriesId ? 'Edit Test Series' : 'Add New Test Series'}
+                    </h3>
+                    {editingSeriesId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSeriesId(null);
+                          setSeriesFormData({ title: '', description: '', order: 0, is_published: true, price: '' });
+                        }}
+                        className="text-[11px] text-slate-400 hover:text-slate-200"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Series Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={seriesFormData.title}
+                      onChange={(e) => setSeriesFormData({ ...seriesFormData, title: e.target.value })}
+                      placeholder="e.g. JEE Advanced Full Syllabus Mock Series"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">Display Order</label>
+                      <input
+                        type="number"
+                        value={seriesFormData.order}
+                        onChange={(e) => setSeriesFormData({ ...seriesFormData, order: Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">Add-on Price (₹, optional)</label>
+                      <input
+                        type="number"
+                        value={seriesFormData.price}
+                        onChange={(e) => setSeriesFormData({ ...seriesFormData, price: e.target.value })}
+                        placeholder="Leave blank if included"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <label className="flex items-center gap-2 cursor-pointer pb-2 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={seriesFormData.is_published}
+                          onChange={(e) => setSeriesFormData({ ...seriesFormData, is_published: e.target.checked })}
+                          className="rounded border-slate-800 bg-slate-950 text-brand-500"
+                        />
+                        Published Live
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={isSavingSeries} size="sm" className="bg-brand-500 hover:bg-brand-600 text-white text-xs">
+                      {isSavingSeries && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                      {editingSeriesId ? 'Save Changes' : 'Create Series'}
+                    </Button>
+                  </div>
+                </form>
+
+                {/* List of existing test series */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Existing Test Series ({testSeriesList.length})
+                  </h4>
+                  {isLoadingSeries ? (
+                    <div className="py-6 flex justify-center text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    </div>
+                  ) : testSeriesList.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800/60">
+                      No test series created for this course yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {testSeriesList.map((ts) => (
+                        <div key={ts.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-200">{ts.title}</span>
+                              {ts.is_published ? (
+                                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Live</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] bg-slate-800 text-slate-400">Draft</Badge>
+                              )}
+                              {ts.price ? (
+                                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20">Add-on ₹{ts.price}</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">Included</Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {ts.tests_count} test(s) • Order: {ts.order}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-slate-400 hover:text-slate-200 h-7 w-7 p-0"
+                              onClick={() => {
+                                setEditingSeriesId(ts.id);
+                                setSeriesFormData({
+                                  title: ts.title,
+                                  description: ts.description || '',
+                                  order: ts.order,
+                                  is_published: ts.is_published,
+                                  price: ts.price !== null && ts.price !== undefined ? String(ts.price) : '',
+                                });
+                              }}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-400 hover:text-rose-300 h-7 w-7 p-0"
+                              onClick={() => handleDeleteSeries(ts.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

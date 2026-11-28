@@ -14,6 +14,7 @@ from .views import (
     LectureViewSet,
     VideoViewSet,
     DPPViewSet,
+    TestSeriesAdminViewSet,
     TestViewSet,
     StudyMaterialViewSet,
     AnnouncementViewSet,
@@ -53,6 +54,7 @@ router.register('chapters', ChapterViewSet, basename='admin-chapters')
 router.register('lectures', LectureViewSet, basename='admin-lectures')
 router.register('videos', VideoViewSet, basename='admin-videos')
 router.register('dpps', DPPViewSet, basename='admin-dpps')
+router.register('test-series', TestSeriesAdminViewSet, basename='admin-test-series')
 router.register('tests', TestViewSet, basename='admin-tests')
 router.register('test-analytics', TestAnalyticsViewSet, basename='admin-test-analytics')
 router.register('rank-predictor', RankPredictorViewSet, basename='admin-rank-predictor')

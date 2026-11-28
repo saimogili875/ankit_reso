@@ -11,11 +11,19 @@ from .views import (
     TestAnalysisComparativeView,
     TestNotesView,
     TestReportPdfView,
+    TestSeriesListView,
+    ExamsListView,
+    TestRankBoardView,
+    StudentAnalyticsView,
 )
 
 urlpatterns = [
     path('', TestListView.as_view(), name='test-list'),
+    path('series/', TestSeriesListView.as_view(), name='test-series-list'),
+    path('exams/', ExamsListView.as_view(), name='tests-exams-list'),
+    path('student-analytics/', StudentAnalyticsView.as_view(), name='test-student-analytics'),
     path('<str:pk>/start/', TestStartView.as_view(), name='test-start'),
+    path('<str:pk>/rank-board/', TestRankBoardView.as_view(), name='test-rank-board'),
     path('attempts/<str:pk>/event/', TestEventLogView.as_view(), name='test-attempt-event'),
     path('attempts/<str:pk>/events/', TestEventLogView.as_view(), name='test-attempt-events'),
     path('attempts/<str:pk>/submit/', TestSubmitView.as_view(), name='test-attempt-submit'),

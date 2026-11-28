@@ -31,7 +31,7 @@ from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
 from apps.materials.models import StudyMaterial
 from apps.tests.models import (
     Test, TestSection, TestQuestion, TestAttempt, QuestionAttemptLog,
-    TestAttemptAnalysis, AnalysisSettings
+    TestAttemptAnalysis, AnalysisSettings, TestSeries
 )
 from apps.progress.models import DPPAttempt, VideoProgress
 from apps.analytics.models import RankPredictor
@@ -49,6 +49,7 @@ from .serializers import (
     AdminSubjectSerializer,
     AdminCourseSerializer,
     AdminAcademicClassSerializer,
+    AdminTestSeriesSerializer,
     AdminTestSerializer,
     AdminStudyMaterialSerializer,
     AdminAnnouncementSerializer,
@@ -557,11 +558,27 @@ class DPPViewSet(viewsets.ModelViewSet):
         return qs
 
 
+class TestSeriesAdminViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminTestSeriesSerializer
+    pagination_class = AdminPagination
+    queryset = TestSeries.objects.select_related('course', 'course_addon').prefetch_related('tests').all().order_by('order', '-created_at')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'description', 'course__title']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        course_id = self.request.query_params.get('course') or self.request.query_params.get('course_id')
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        return qs
+
+
 class TestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminTestSerializer
     pagination_class = AdminPagination
-    queryset = Test.objects.select_related('exam').prefetch_related('test_questions__question').all().order_by('-created_at')
+    queryset = Test.objects.select_related('exam', 'course', 'test_series').prefetch_related('test_questions__question').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description']
 
@@ -570,6 +587,12 @@ class TestViewSet(viewsets.ModelViewSet):
         test_type = self.request.query_params.get('test_type')
         if test_type:
             qs = qs.filter(test_type=test_type)
+        course_id = self.request.query_params.get('course') or self.request.query_params.get('course_id')
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        series_id = self.request.query_params.get('series') or self.request.query_params.get('test_series')
+        if series_id:
+            qs = qs.filter(test_series_id=series_id)
         return qs
 
     @action(detail=True, methods=['post'], url_path='clone')
