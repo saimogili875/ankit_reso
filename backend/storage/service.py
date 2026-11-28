@@ -93,6 +93,10 @@ class StorageService:
         """Returns the permanent public URL for an asset in the public bucket."""
         return self.provider.get_public_url(object_key)
 
+    def normalize_public_url(self, raw_url: Optional[str]) -> str:
+        """Normalizes an asset URL to use R2_PUBLIC_URL if pointing to internal R2 S3 endpoint."""
+        return self.provider.normalize_public_url(raw_url)
+
     def delete_object(self, object_key: str, bucket: Optional[str] = None) -> bool:
         """Deletes a file object from R2."""
         return self.provider.delete_object(object_key, bucket=bucket)

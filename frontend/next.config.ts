@@ -26,6 +26,30 @@ const backendOrigin = effectiveOrigin.replace(/\/api\/?$/, '').replace(/\/+$/, '
 const nextConfig: NextConfig = {
   // Suppress dev-mode cross-origin warnings when switching between localhost and 127.0.0.1
   allowedDevOrigins: ['127.0.0.1:3000', 'localhost:3000'],
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.r2.dev',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.r2.cloudflarestorage.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.adepteduverse.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'adepteduverse.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
   async redirects() {
     return [
       {
