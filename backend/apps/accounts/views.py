@@ -13,8 +13,10 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.utils.decorators import method_decorator
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.core.exceptions import ValidationError
 
 from .models import User, StudentProfile, normalize_phone
+from apps.academics.models import Enrollment
 from .otp import OTPService, TOKEN_MAX_AGE_SECONDS
 from .sms import send_sms
 from .tasks import send_email_otp_task
@@ -419,6 +421,8 @@ class SelectCourseView(APIView):
     """
     POST /api/auth/select-course/
     Persists student's active course selection to server profile.
+    Validated against active enrollment. If enrollment is missing or removed,
+    falls back to the student's first active enrolled course.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -427,12 +431,52 @@ class SelectCourseView(APIView):
         if not course_id:
             return Response({'error': 'course_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        course_id = str(course_id).strip()
         profile, _ = StudentProfile.objects.get_or_create(user=request.user)
-        profile.last_selected_course_id = str(course_id).strip()
+
+        # Validate that the student has an ACTIVE enrollment for this course
+        is_enrolled = False
+        try:
+            is_enrolled = Enrollment.objects.filter(
+                user=request.user, course_id=course_id, status='ACTIVE'
+            ).exists()
+        except (ValueError, ValidationError):
+            is_enrolled = Enrollment.objects.filter(
+                user=request.user, course__slug=course_id, status='ACTIVE'
+            ).exists()
+
+        if not is_enrolled:
+            first_active = Enrollment.objects.filter(
+                user=request.user, status='ACTIVE'
+            ).select_related('course').first()
+
+            if first_active:
+                profile.last_selected_course_id = str(first_active.course_id)
+                profile.save(update_fields=['last_selected_course_id'])
+                return Response({
+                    'success': True,
+                    'fallback': True,
+                    'is_enrolled': True,
+                    'last_selected_course_id': profile.last_selected_course_id,
+                    'message': 'Selected course is not enrolled. Reverted to active enrolled course.'
+                }, status=status.HTTP_200_OK)
+            else:
+                profile.last_selected_course_id = course_id
+                profile.save(update_fields=['last_selected_course_id'])
+                return Response({
+                    'success': True,
+                    'fallback': False,
+                    'is_enrolled': False,
+                    'last_selected_course_id': profile.last_selected_course_id
+                }, status=status.HTTP_200_OK)
+
+        profile.last_selected_course_id = course_id
         profile.save(update_fields=['last_selected_course_id'])
 
         return Response({
             'success': True,
+            'fallback': False,
+            'is_enrolled': True,
             'last_selected_course_id': profile.last_selected_course_id
         }, status=status.HTTP_200_OK)
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   CalendarDays,
@@ -19,6 +19,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useActiveCourse } from '@/hooks/use-active-course';
+import { CourseSwitcher } from '@/components/courses/CourseSwitcher';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -54,16 +56,26 @@ interface ScheduleResponse {
 }
 
 export default function SchedulePage() {
+  const {
+    activeCourse,
+    enrolledCourses,
+    enrolledCount,
+    allCourses,
+    setActiveCourse,
+    isLoading: isCourseLoading,
+  } = useActiveCourse();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'past'>('today');
 
-  const fetchSchedule = async () => {
+  const fetchSchedule = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get<ScheduleResponse>('/schedule/');
+      const endpoint = activeCourse?.id ? `/schedule/?course=${activeCourse.id}` : '/schedule/';
+      const res = await apiClient.get<ScheduleResponse>(endpoint);
       if (res) {
         setScheduleData(res);
       }
@@ -73,11 +85,13 @@ export default function SchedulePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCourse?.id]);
 
   useEffect(() => {
-    fetchSchedule();
-  }, []);
+    if (!isCourseLoading) {
+      fetchSchedule();
+    }
+  }, [fetchSchedule, isCourseLoading]);
 
   // Calendar / filter state for upcoming
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -398,8 +412,16 @@ export default function SchedulePage() {
           </p>
         </div>
 
-        {/* Course Count indicator */}
-        <div className="flex items-center gap-2">
+        {/* Course Switcher / Count indicator */}
+        <div className="flex items-center gap-3">
+          {enrolledCount > 1 && (
+            <CourseSwitcher
+              enrolledCourses={enrolledCourses}
+              allCourses={allCourses}
+              activeCourse={activeCourse}
+              onSelectCourse={setActiveCourse}
+            />
+          )}
           <Badge variant="blue" className="text-xs py-1 px-3">
             <Sparkles className="w-3.5 h-3.5 text-blue-400" />
             {scheduleData.enrolled_courses_count} Enrolled Course{scheduleData.enrolled_courses_count !== 1 ? 's' : ''}

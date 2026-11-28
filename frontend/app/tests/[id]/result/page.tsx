@@ -17,8 +17,11 @@ import {
   Check,
   ChevronRight,
   Zap,
+  Lock,
+  Trophy,
+  ShieldAlert,
 } from 'lucide-react';
-import { apiClient, API_BASE_URL } from '@/lib/api-client';
+import { apiClient, API_BASE_URL, ApiError } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -317,6 +320,57 @@ export default function TestResultPage() {
   const [qTypeFilter, setQTypeFilter] = useState<'all' | 'correct' | 'wrong' | 'skipped' | 'bookmarked'>('all');
   const [activeModalQuestion, setActiveModalQuestion] = useState<ReviewQuestion | null>(null);
 
+  // Gated Rank Board State
+  const [isRankBoardOpen, setIsRankBoardOpen] = useState(false);
+  const [rankBoardLoading, setRankBoardLoading] = useState(false);
+  const [rankBoardData, setRankBoardData] = useState<{
+    test_id: string;
+    test_title: string;
+    total_marks: number;
+    total_participants: number;
+    own_rank: number | null;
+    own_percentile: number | null;
+    own_score: number;
+    topper_score: number;
+    average_score: number;
+    leaderboard: Array<{
+      rank: number;
+      name: string;
+      is_current_user: boolean;
+      score: number;
+      percentile: number | null;
+      time_taken_seconds: number;
+    }>;
+  } | null>(null);
+  const [rankBoardError, setRankBoardError] = useState<{ message: string; locked: boolean; reason?: string; publish_time?: string } | null>(null);
+
+  const openRankBoard = async (testId: string) => {
+    setIsRankBoardOpen(true);
+    setRankBoardLoading(true);
+    setRankBoardError(null);
+    try {
+      const data = await apiClient.get<any>(`/tests/${testId}/rank-board/`);
+      setRankBoardData(data);
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.data && typeof err.data === 'object') {
+        const errorData = err.data as Record<string, unknown>;
+        setRankBoardError({
+          message: String(errorData.error || err.message),
+          locked: Boolean(errorData.locked),
+          reason: errorData.reason as string | undefined,
+          publish_time: errorData.publish_time as string | undefined,
+        });
+      } else {
+        setRankBoardError({
+          message: err instanceof Error ? err.message : 'Rank board is not available yet.',
+          locked: true,
+        });
+      }
+    } finally {
+      setRankBoardLoading(false);
+    }
+  };
+
   const loadData = useCallback(async () => {
     setError(null);
     try {
@@ -588,15 +642,27 @@ export default function TestResultPage() {
                     <span className="text-[11px] text-slate-400 mt-1 block">Accuracy: {ov.accuracy}%</span>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Leaderboard Rank</span>
-                    <div className="mt-1 flex items-baseline gap-1">
-                      <span className="text-2xl sm:text-3xl font-extrabold text-purple-400">#{ov.rank || 'N/A'}</span>
-                      <span className="text-xs text-slate-500">of {ov.total_participants}</span>
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Leaderboard Rank</span>
+                      <div className="mt-1 flex items-baseline gap-1">
+                        <span className="text-2xl sm:text-3xl font-extrabold text-purple-400">#{ov.rank || 'N/A'}</span>
+                        <span className="text-xs text-slate-500">of {ov.total_participants}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 mt-1 block">
+                        Percentile: {ov.percentile !== null && ov.percentile !== undefined ? `${ov.percentile}%` : 'Too few attempts'}
+                      </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 mt-1 block">
-                      Percentile: {ov.percentile !== null && ov.percentile !== undefined ? `${ov.percentile}%` : 'Too few attempts'}
-                    </span>
+                    {result?.test_id && (
+                      <button
+                        type="button"
+                        onClick={() => openRankBoard(result.test_id)}
+                        className="mt-3 text-[11px] font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors self-start"
+                      >
+                        <Trophy className="w-3.5 h-3.5" />
+                        Full Rank Board &rarr;
+                      </button>
+                    )}
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
@@ -1470,6 +1536,143 @@ export default function TestResultPage() {
                 <Bookmark className="w-3.5 h-3.5" />
                 {activeModalQuestion.is_bookmarked ? 'Bookmarked in Notebook' : 'Add to Notebook'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gated Rank Board Modal */}
+      {isRankBoardOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">
+                  Rank Board & All-India Leaderboard
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsRankBoardOpen(false)}
+                className="text-slate-400 hover:text-slate-200 text-sm p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {rankBoardLoading ? (
+                <div className="py-12 flex justify-center text-slate-400">
+                  <LoadingState message="Decrypting rank board standings..." />
+                </div>
+              ) : rankBoardError ? (
+                <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-100">
+                    {rankBoardError.reason === 'SCHEDULED' ? 'Rank Board Scheduled' : 'Rank Board Locked'}
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    {rankBoardError.message}
+                  </p>
+                  {rankBoardError.publish_time && (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs">
+                      Unlocks: {new Date(rankBoardError.publish_time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
+                    </Badge>
+                  )}
+                </div>
+              ) : rankBoardData ? (
+                <div className="space-y-6">
+                  {/* KPI Row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Rank</span>
+                      <span className="text-xl font-extrabold text-purple-400 mt-0.5 block">
+                        #{rankBoardData.own_rank || 'N/A'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">of {rankBoardData.total_participants}</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Percentile</span>
+                      <span className="text-xl font-extrabold text-purple-400 mt-0.5 block">
+                        {rankBoardData.own_percentile !== null ? `${rankBoardData.own_percentile}%` : 'N/A'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Score: {rankBoardData.own_score}</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Topper Score</span>
+                      <span className="text-xl font-extrabold text-emerald-400 mt-0.5 block">
+                        {rankBoardData.topper_score}
+                      </span>
+                      <span className="text-[10px] text-slate-400">/ {rankBoardData.total_marks}</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Average Score</span>
+                      <span className="text-xl font-extrabold text-blue-400 mt-0.5 block">
+                        {rankBoardData.average_score}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Batch Average</span>
+                    </div>
+                  </div>
+
+                  {/* Leaderboard Table */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Standings ({rankBoardData.leaderboard.length})
+                    </h4>
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-800">
+                          <tr>
+                            <th className="py-2.5 px-3 text-center w-12">Rank</th>
+                            <th className="py-2.5 px-3">Student</th>
+                            <th className="py-2.5 px-3 text-right">Score</th>
+                            <th className="py-2.5 px-3 text-right">Percentile</th>
+                            <th className="py-2.5 px-3 text-right">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {rankBoardData.leaderboard.map((item) => (
+                            <tr
+                              key={item.rank}
+                              className={`transition-colors ${
+                                item.is_current_user
+                                  ? 'bg-purple-500/10 font-bold text-purple-200'
+                                  : 'hover:bg-slate-900/40 text-slate-300'
+                              }`}
+                            >
+                              <td className="py-2.5 px-3 text-center font-extrabold">
+                                {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`}
+                              </td>
+                              <td className="py-2.5 px-3 flex items-center gap-1.5">
+                                <span>{item.name}</span>
+                                {item.is_current_user && (
+                                  <Badge variant="outline" className="text-[9px] bg-purple-500/20 text-purple-300 border-purple-500/30 px-1 py-0">
+                                    You
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-200">
+                                {item.score}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-purple-300">
+                                {item.percentile !== null ? `${item.percentile}%` : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-right text-slate-400">
+                                {Math.round(item.time_taken_seconds / 60)} min
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

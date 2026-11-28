@@ -49,6 +49,10 @@ class ScheduleListView(APIView):
             'course', 'subject', 'chapter', 'test', 'dpp', 'lecture'
         )
 
+        course_id = request.query_params.get('course')
+        if course_id:
+            events_qs = events_qs.filter(course_id=course_id)
+
         # 1. Today items (events starting or active today)
         today_events = events_qs.filter(
             Q(start_time__range=(start_of_today, end_of_today)) |
