@@ -14,6 +14,7 @@ from django.db import transaction, models
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from rest_framework.exceptions import ValidationError
+from apps.core.exceptions import R2StorageNotConfiguredError
 from storage.service import storage_service
 
 logger = logging.getLogger(__name__)
@@ -167,38 +168,44 @@ def finalize_book_order(order_or_id, payment_id: str, signature: Optional[str] =
 def get_book_download_url(pdf_key: str, expiration_seconds: int = 600) -> Optional[str]:
     """
     Generates a secure, temporary presigned URL for downloading a purchased PDF (10 minutes default).
-    Does not expose storage credentials or buckets.
+    Private PDFs are stored exclusively in R2_BUCKET_NAME and served only through short-lived presigned URLs.
+    Never exposes storage credentials or bucket names.
+    When settings.DEBUG is False, removes the local-disk fallback.
     """
     if not pdf_key:
         return None
 
     try:
+        private_bucket = getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
         url = storage_service.provider.generate_presigned_url(
             pdf_key,
             expiration=expiration_seconds,
-            client_method='get_object'
+            client_method='get_object',
+            bucket=private_bucket
         )
         if url:
             return url
     except Exception as e:
         logger.warning("Failed to generate presigned R2 URL for %s: %s", pdf_key, e)
 
-    # Local development / media fallback
-    local_path = os.path.join(settings.MEDIA_ROOT, 'books', 'pdfs', os.path.basename(pdf_key))
-    if os.path.exists(local_path):
-        return f"{settings.MEDIA_URL.rstrip('/')}/books/pdfs/{os.path.basename(pdf_key)}"
+    # Local development / media fallback is only allowed when DEBUG is True
+    if settings.DEBUG:
+        local_path = os.path.join(settings.MEDIA_ROOT, 'books', 'pdfs', os.path.basename(pdf_key))
+        if os.path.exists(local_path):
+            return f"{settings.MEDIA_URL.rstrip('/')}/books/pdfs/{os.path.basename(pdf_key)}"
 
     return None
 
 
 def process_and_upload_book_cover(uploaded_file, filename_hint: str = "book-cover") -> Tuple[str, str]:
     """
-    Validates, optimizes, and uploads a book cover image to Cloudflare R2:
+    Validates, optimizes, and uploads a book cover image to Cloudflare R2 public bucket:
     - Validates size <= 5 MB.
     - Verifies image integrity with Pillow.
     - Converts to high-quality WebP (85 quality).
-    - Uploads under images/books/<uuid>.webp.
-    - Returns (image_url, object_key).
+    - Uploads under images/books/<uuid>.webp in R2_PUBLIC_BUCKET_NAME.
+    - Saves and returns the permanent URL R2_PUBLIC_URL/<object_key>. Never saves a presigned URL.
+    - When settings.DEBUG is False, removes local-disk fallback; raises R2StorageNotConfiguredError on failure.
     """
     file_size = getattr(uploaded_file, 'size', None)
     if file_size is None:
@@ -254,9 +261,12 @@ def process_and_upload_book_cover(uploaded_file, filename_hint: str = "book-cove
     with tempfile.NamedTemporaryFile(suffix=".webp", delete=True) as temp_dest:
         temp_dest.write(webp_bytes)
         temp_dest.flush()
-        uploaded = storage_service.upload_file_direct(temp_dest.name, object_key, content_type="image/webp")
+        uploaded = storage_service.upload_public_file(temp_dest.name, object_key, content_type="image/webp")
 
     if not uploaded:
+        if not settings.DEBUG:
+            logger.error("R2 public upload failed for book cover %s in production", object_key)
+            raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
         media_dir = os.path.join(settings.MEDIA_ROOT, 'books', 'covers')
         os.makedirs(media_dir, exist_ok=True)
         local_path = os.path.join(media_dir, unique_name)
@@ -269,8 +279,11 @@ def process_and_upload_book_cover(uploaded_file, filename_hint: str = "book-cove
     if r2_public_url:
         image_url = f"{r2_public_url}/{object_key}"
     else:
-        presigned = storage_service.provider.generate_presigned_url(object_key, expiration=86400 * 30)
-        image_url = presigned or f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{object_key}"
+        if not settings.DEBUG:
+            logger.error("R2_PUBLIC_URL is not configured in production")
+            raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
+        public_bucket = getattr(settings, 'R2_PUBLIC_BUCKET_NAME', '') or getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
+        image_url = f"https://{public_bucket}.r2.cloudflarestorage.com/{object_key}"
 
     return image_url, object_key
 
@@ -278,7 +291,8 @@ def process_and_upload_book_cover(uploaded_file, filename_hint: str = "book-cove
 def generate_cover_from_pdf(pdf_file_or_bytes) -> Tuple[Optional[str], Optional[str]]:
     """
     Renders page 1 of a PDF into an optimized WebP cover image using pypdfium2.
-    Uploads the resulting image to R2 (or media fallback) and returns (image_url, object_key).
+    Uploads the resulting image to R2 public bucket and returns permanent (image_url, object_key).
+    When settings.DEBUG is False, removes local-disk fallback and raises R2StorageNotConfiguredError on failure.
     """
     try:
         import pypdfium2 as pdfium
@@ -321,9 +335,12 @@ def generate_cover_from_pdf(pdf_file_or_bytes) -> Tuple[Optional[str], Optional[
         with tempfile.NamedTemporaryFile(suffix=".webp", delete=True) as temp_dest:
             temp_dest.write(webp_bytes)
             temp_dest.flush()
-            uploaded = storage_service.upload_file_direct(temp_dest.name, object_key, content_type="image/webp")
+            uploaded = storage_service.upload_public_file(temp_dest.name, object_key, content_type="image/webp")
 
         if not uploaded:
+            if not settings.DEBUG:
+                logger.error("R2 public upload failed for auto-generated cover %s in production", object_key)
+                raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
             media_dir = os.path.join(settings.MEDIA_ROOT, 'books', 'covers')
             os.makedirs(media_dir, exist_ok=True)
             local_path = os.path.join(media_dir, unique_name)
@@ -336,21 +353,27 @@ def generate_cover_from_pdf(pdf_file_or_bytes) -> Tuple[Optional[str], Optional[
         if r2_public_url:
             image_url = f"{r2_public_url}/{object_key}"
         else:
-            presigned = storage_service.provider.generate_presigned_url(object_key, expiration=86400 * 30)
-            image_url = presigned or f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{object_key}"
+            if not settings.DEBUG:
+                logger.error("R2_PUBLIC_URL is not configured in production")
+                raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
+            public_bucket = getattr(settings, 'R2_PUBLIC_BUCKET_NAME', '') or getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
+            image_url = f"https://{public_bucket}.r2.cloudflarestorage.com/{object_key}"
 
         return image_url, object_key
 
     except Exception as exc:
+        if isinstance(exc, R2StorageNotConfiguredError):
+            raise
         logger.exception("Failed to generate cover image from PDF: %s", exc)
         return None, None
 
 
 def upload_book_pdf_private(pdf_file, filename: str) -> Optional[str]:
     """
-    Uploads a private book PDF to Cloudflare R2 (or local media fallback).
+    Uploads a private book PDF exclusively to Cloudflare R2 private bucket (R2_BUCKET_NAME).
     Returns the private object key (e.g. 'books/pdfs/<uuid>_<filename>').
     Never exposes this key directly to students.
+    When settings.DEBUG is False, removes local-disk fallback; raises R2StorageNotConfiguredError on failure.
     """
     try:
         clean_name = os.path.basename(filename).replace(' ', '_')
@@ -369,15 +392,28 @@ def upload_book_pdf_private(pdf_file, filename: str) -> Optional[str]:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temp_dest:
             temp_dest.write(content)
             temp_dest.flush()
-            uploaded = storage_service.upload_file_direct(temp_dest.name, unique_key, content_type="application/pdf")
+            uploaded = storage_service.upload_private_file(temp_dest.name, unique_key, content_type="application/pdf")
 
         if not uploaded:
+            if not settings.DEBUG:
+                logger.error("R2 private upload failed for book PDF %s in production", unique_key)
+                raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
             media_dir = os.path.join(settings.MEDIA_ROOT, 'books', 'pdfs')
             os.makedirs(media_dir, exist_ok=True)
             local_path = os.path.join(media_dir, os.path.basename(unique_key))
             with open(local_path, "wb") as f:
                 f.write(content)
             return unique_key
+
+        return unique_key
+
+    except Exception as exc:
+        if isinstance(exc, (ValidationError, R2StorageNotConfiguredError)):
+            raise
+        logger.exception("Failed to upload book PDF: %s", exc)
+        if not settings.DEBUG:
+            raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
+        return None
 
         return unique_key
 

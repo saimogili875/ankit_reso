@@ -50,6 +50,26 @@ interface BookProductAdmin {
   updated_at: string;
 }
 
+interface StorageStatus {
+  credentials_set: boolean;
+  private_bucket: {
+    bucket_name: string;
+    configured: boolean;
+    reachable: boolean;
+    error?: string | null;
+  };
+  public_bucket: {
+    bucket_name: string;
+    configured: boolean;
+    reachable: boolean;
+    public_url?: string;
+    public_url_configured?: boolean;
+    error?: string | null;
+  };
+  all_healthy: boolean;
+  message?: string;
+}
+
 export default function AdminBooksPage() {
   const { notice, success, error, clear } = useNotice();
   const [books, setBooks] = useState<BookProductAdmin[]>([]);
@@ -78,6 +98,7 @@ export default function AdminBooksPage() {
   const [uploadingCoverId, setUploadingCoverId] = useState<number | null>(null);
   const [uploadingPdfId, setUploadingPdfId] = useState<number | null>(null);
   const [unpublishCandidate, setUnpublishCandidate] = useState<BookProductAdmin | null>(null);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -94,6 +115,17 @@ export default function AdminBooksPage() {
 
   useEffect(() => {
     fetchBooks();
+    apiClient.get<StorageStatus>('/api/admin/storage-status/')
+      .then((data) => setStorageStatus(data))
+      .catch(() => {
+        setStorageStatus({
+          credentials_set: false,
+          private_bucket: { bucket_name: '', configured: false, reachable: false },
+          public_bucket: { bucket_name: '', configured: false, reachable: false },
+          all_healthy: false,
+          message: 'Unable to verify Cloudflare R2 storage status.'
+        });
+      });
   }, [fetchBooks]);
 
   const openCreateModal = () => {
@@ -238,6 +270,25 @@ export default function AdminBooksPage() {
   return (
     <div className="space-y-6">
       <Notice notice={notice} onClose={clear} />
+
+      {storageStatus && !storageStatus.all_healthy && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-800/70 bg-amber-950/50 p-4 text-amber-200 text-sm shadow-lg">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-white">Cloudflare R2 Storage Warning</p>
+              <p className="text-xs text-amber-300/90">
+                {storageStatus.message || 'File storage (R2) is not fully configured or buckets are unreachable. Add or verify R2_* environment variables.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 text-xs font-mono text-amber-300/80 bg-amber-900/40 px-3 py-1.5 rounded-xl border border-amber-700/50">
+            <span>Private PDF Bucket: <strong className={storageStatus.private_bucket?.reachable ? "text-emerald-400" : "text-rose-400"}>{storageStatus.private_bucket?.reachable ? "REACHABLE" : "OFFLINE"}</strong></span>
+            <span>•</span>
+            <span>Public Image Bucket: <strong className={storageStatus.public_bucket?.reachable ? "text-emerald-400" : "text-rose-400"}>{storageStatus.public_bucket?.reachable ? "REACHABLE" : "OFFLINE"}</strong></span>
+          </div>
+        </div>
+      )}
 
       {unpublishCandidate && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-800/60 bg-amber-950/40 p-4 text-amber-200 text-sm shadow-lg">

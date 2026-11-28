@@ -5,6 +5,7 @@ import logging
 from PIL import Image
 from django.conf import settings
 from rest_framework.exceptions import ValidationError
+from apps.core.exceptions import R2StorageNotConfiguredError
 from storage.service import storage_service
 
 logger = logging.getLogger(__name__)
@@ -14,14 +15,16 @@ ALLOWED_FORMATS = {'JPEG', 'PNG', 'WEBP'}
 
 def process_and_upload_banner_image(uploaded_file, filename_hint: str = "banner") -> tuple[str, str]:
     """
-    Validates, compresses, and uploads a banner slide image to Cloudflare R2:
+    Validates, compresses, and uploads a banner slide image to Cloudflare R2 public bucket:
     1. Validates size <= 5 MB.
     2. Verifies real image integrity with Pillow.
     3. Verifies format is JPG, PNG, or WebP.
     4. Auto-resizes to max 1600px width with high-quality Lanczos resampling.
     5. Strips all EXIF metadata for privacy and size reduction.
     6. Converts to optimized WebP format (quality 85).
-    7. Uploads via StorageService to Cloudflare R2 under 'images/banners/<uuid>.webp'.
+    7. Uploads via StorageService to Cloudflare R2 public bucket under 'images/banners/<uuid>.webp'.
+    8. Saves and returns the permanent URL R2_PUBLIC_URL/<object_key>. Never saves a presigned URL.
+    9. When settings.DEBUG is False, removes local-disk fallback; raises R2StorageNotConfiguredError on failure.
     
     Returns:
         tuple (image_url, object_key)
@@ -80,7 +83,7 @@ def process_and_upload_banner_image(uploaded_file, filename_hint: str = "banner"
     converted_img.save(buffer, format='WEBP', quality=85, method=6)
     webp_bytes = buffer.getvalue()
 
-    # 6. Upload to Cloudflare R2 via storage_service abstraction
+    # 6. Upload to Cloudflare R2 public bucket via storage_service abstraction
     unique_name = f"{uuid.uuid4().hex}.webp"
     object_key = f"images/banners/{unique_name}"
 
@@ -88,8 +91,11 @@ def process_and_upload_banner_image(uploaded_file, filename_hint: str = "banner"
         temp_dest.write(webp_bytes)
         temp_dest.flush()
         
-        uploaded = storage_service.upload_file_direct(temp_dest.name, object_key, content_type="image/webp")
+        uploaded = storage_service.upload_public_file(temp_dest.name, object_key, content_type="image/webp")
         if not uploaded:
+            if not settings.DEBUG:
+                logger.error("R2 public upload failed for banner image %s in production", object_key)
+                raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
             # Fallback for local development if R2 credentials are not set in environment
             import os
             media_banners_dir = os.path.join(settings.MEDIA_ROOT, 'banners')
@@ -101,14 +107,16 @@ def process_and_upload_banner_image(uploaded_file, filename_hint: str = "banner"
             image_url = f"{settings.MEDIA_URL.rstrip('/')}/banners/{unique_name}"
             return image_url, object_key
 
-    # Resolve public image URL
+    # Resolve permanent public image URL (never presigned URL)
     r2_public_url = getattr(settings, 'R2_PUBLIC_URL', '').rstrip('/')
     if r2_public_url:
         image_url = f"{r2_public_url}/{object_key}"
     else:
-        # Generate presigned download URL with long expiration (7 days)
-        presigned = storage_service.provider.generate_presigned_url(object_key, expiration=86400 * 7)
-        image_url = presigned or f"https://{settings.R2_BUCKET_NAME}.r2.cloudflarestorage.com/{object_key}"
+        if not settings.DEBUG:
+            logger.error("R2_PUBLIC_URL is not configured in production")
+            raise R2StorageNotConfiguredError("File storage (R2) is not configured. Add the R2_* environment variables.")
+        public_bucket = getattr(settings, 'R2_PUBLIC_BUCKET_NAME', '') or getattr(settings, 'R2_BUCKET_NAME', 'adepteduverse-storage')
+        image_url = f"https://{public_bucket}.r2.cloudflarestorage.com/{object_key}"
 
     return image_url, object_key
 
@@ -120,13 +128,14 @@ def delete_banner_image(object_key: str) -> bool:
     if not object_key:
         return False
     try:
-        res = storage_service.delete_object(object_key)
-        # Also check local media fallback
-        import os
-        filename = os.path.basename(object_key)
-        local_path = os.path.join(settings.MEDIA_ROOT, 'banners', filename)
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        res = storage_service.delete_public_object(object_key)
+        # Also check local media fallback if in dev
+        if settings.DEBUG:
+            import os
+            filename = os.path.basename(object_key)
+            local_path = os.path.join(settings.MEDIA_ROOT, 'banners', filename)
+            if os.path.exists(local_path):
+                os.remove(local_path)
         return res
     except Exception as e:
         logger.error(f"Failed to delete banner image from R2 ({object_key}): {e}")

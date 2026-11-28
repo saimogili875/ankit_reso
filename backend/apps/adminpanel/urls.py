@@ -28,6 +28,7 @@ from .views import (
     AdminUserViewSet,
     LandingBannerViewSet,
     LandingBannerSettingsView,
+    StorageStatusView,
 )
 from apps.academics.pricing_views import (
     CourseCategoryAdminViewSet,
@@ -68,6 +69,7 @@ router.register('settings', SettingsViewSet, basename='admin-settings')
 router.register('admins', AdminUserViewSet, basename='admin-users')
 
 urlpatterns = [
+    path('storage-status/', StorageStatusView.as_view(), name='admin-storage-status'),
     path('landing-banner-settings/', LandingBannerSettingsView.as_view(), name='admin-landing-banner-settings'),
     path('overview/trends/', OverviewTrendsView.as_view(), name='admin-overview-trends'),
     path('overview/', OverviewView.as_view(), name='admin-overview'),

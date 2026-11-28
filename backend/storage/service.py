@@ -61,13 +61,51 @@ class StorageService:
         """Downloads an object from R2 to local filesystem."""
         return self.provider.download_file(object_key, local_dest)
 
-    def upload_file_direct(self, local_src: str, object_key: str, content_type: Optional[str] = None) -> bool:
+    def upload_file_direct(
+        self,
+        local_src: str,
+        object_key: str,
+        content_type: Optional[str] = None,
+        bucket: Optional[str] = None
+    ) -> bool:
         """Uploads a local file to R2."""
-        return self.provider.upload_file_direct(local_src, object_key, content_type=content_type)
+        return self.provider.upload_file_direct(local_src, object_key, content_type=content_type, bucket=bucket)
 
-    def delete_object(self, object_key: str) -> bool:
+    def upload_public_file(
+        self,
+        local_src: str,
+        object_key: str,
+        content_type: Optional[str] = None
+    ) -> bool:
+        """Uploads a public asset to the R2 public bucket."""
+        return self.provider.upload_public_file(local_src, object_key, content_type=content_type)
+
+    def upload_private_file(
+        self,
+        local_src: str,
+        object_key: str,
+        content_type: Optional[str] = None
+    ) -> bool:
+        """Uploads a private file (e.g. book PDF) to the private R2 bucket."""
+        return self.provider.upload_file_direct(local_src, object_key, content_type=content_type, bucket=self.provider.bucket_name)
+
+    def get_public_url(self, object_key: str) -> str:
+        """Returns the permanent public URL for an asset in the public bucket."""
+        return self.provider.get_public_url(object_key)
+
+    def delete_object(self, object_key: str, bucket: Optional[str] = None) -> bool:
         """Deletes a file object from R2."""
-        return self.provider.delete_object(object_key)
+        return self.provider.delete_object(object_key, bucket=bucket)
+
+    def delete_public_object(self, object_key: str) -> bool:
+        """Deletes a file object from the public R2 bucket."""
+        from django.conf import settings
+        target_bucket = (
+            getattr(settings, 'R2_PUBLIC_BUCKET_NAME', '') or
+            self.provider.public_bucket_name or
+            getattr(settings, 'R2_BUCKET_NAME', self.provider.bucket_name)
+        )
+        return self.provider.delete_object(object_key, bucket=target_bucket)
 
     def delete_prefix(self, prefix: str) -> int:
         """Deletes all files within a directory prefix in R2."""

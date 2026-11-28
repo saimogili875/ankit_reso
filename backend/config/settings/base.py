@@ -406,7 +406,9 @@ VIDEO_CELERY_TIME_LIMIT = config('VIDEO_CELERY_TIME_LIMIT', default=7200, cast=i
 R2_ACCOUNT_ID = config('R2_ACCOUNT_ID', default='')
 R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID', default='')
 R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY', default='')
-R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='adepteduverse-storage')
+R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='adepteduverse-storage')  # Private bucket for book PDFs and secure media
+R2_PUBLIC_BUCKET_NAME = config('R2_PUBLIC_BUCKET_NAME', default='')        # Public bucket for covers, banners, course images
+R2_PUBLIC_URL = config('R2_PUBLIC_URL', default='').strip()               # Permanent public CDN/R2 URL (e.g. https://pub-xxx.r2.dev)
 R2_ENDPOINT = config('R2_ENDPOINT', default='')
 
 # Structured Logging

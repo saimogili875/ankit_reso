@@ -60,6 +60,10 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         value: "adepteduverse-storage"
+      - key: R2_PUBLIC_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
       - key: R2_ENDPOINT
         sync: false
       - key: SENTRY_DSN
@@ -128,6 +132,16 @@ services:
           type: web
           name: ankit-reso
           envVarKey: R2_BUCKET_NAME
+      - key: R2_PUBLIC_BUCKET_NAME
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: R2_PUBLIC_BUCKET_NAME
+      - key: R2_PUBLIC_URL
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: R2_PUBLIC_URL
       - key: R2_ENDPOINT
         fromService:
           type: web
@@ -198,6 +212,16 @@ services:
           type: web
           name: ankit-reso
           envVarKey: R2_BUCKET_NAME
+      - key: R2_PUBLIC_BUCKET_NAME
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: R2_PUBLIC_BUCKET_NAME
+      - key: R2_PUBLIC_URL
+        fromService:
+          type: web
+          name: ankit-reso
+          envVarKey: R2_PUBLIC_URL
       - key: R2_ENDPOINT
         fromService:
           type: web
