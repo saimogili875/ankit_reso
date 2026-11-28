@@ -6,7 +6,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Count, Q, Avg, Max, Min, Sum
+from django.db import transaction
+from django.db.models import Count, Q, Avg, Max, Min, Sum, ProtectedError
+import logging
+
+logger = logging.getLogger(__name__)
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
@@ -266,6 +270,25 @@ class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.prefetch_related('classes', 'subjects', 'enrollments').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'slug', 'subtitle', 'description']
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            with transaction.atomic():
+                self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProtectedError as pe:
+            protected_objects = [str(o) for o in pe.protected_objects]
+            return Response(
+                {'error': f"Cannot delete course because it is referenced by: {', '.join(protected_objects[:5])}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as exc:
+            logger.exception("Failed to delete course: %s", exc)
+            return Response(
+                {'error': f"Failed to delete course: {str(exc)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=True, methods=['get'])
     def students(self, request, pk=None):
