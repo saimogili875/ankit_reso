@@ -214,8 +214,7 @@ export default function OverallAnalysisPage() {
         <div className="flex items-center gap-3 shrink-0">
           {enrolledCount > 1 && (
             <CourseSwitcher
-              enrolledCourses={enrolledCourses}
-              allCourses={allCourses}
+              courses={enrolledCount > 0 ? enrolledCourses : allCourses}
               activeCourse={activeCourse}
               onSelectCourse={setActiveCourse}
             />

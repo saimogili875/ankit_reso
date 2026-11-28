@@ -282,8 +282,7 @@ export default function ExamsPage() {
         {enrolledCount > 1 && (
           <div className="flex-shrink-0">
             <CourseSwitcher
-              enrolledCourses={enrolledCourses}
-              allCourses={allCourses}
+              courses={enrolledCount > 0 ? enrolledCourses : allCourses}
               activeCourse={activeCourse}
               onSelectCourse={setActiveCourse}
             />

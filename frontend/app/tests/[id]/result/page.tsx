@@ -19,7 +19,6 @@ import {
   Zap,
   Lock,
   Trophy,
-  ShieldAlert,
 } from 'lucide-react';
 import { apiClient, API_BASE_URL, ApiError } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
@@ -349,7 +348,7 @@ export default function TestResultPage() {
     setRankBoardLoading(true);
     setRankBoardError(null);
     try {
-      const data = await apiClient.get<any>(`/tests/${testId}/rank-board/`);
+      const data = await apiClient.get<NonNullable<typeof rankBoardData>>(`/tests/${testId}/rank-board/`);
       setRankBoardData(data);
     } catch (err: unknown) {
       if (err instanceof ApiError && err.data && typeof err.data === 'object') {

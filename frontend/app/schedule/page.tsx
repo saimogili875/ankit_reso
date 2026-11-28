@@ -416,8 +416,7 @@ export default function SchedulePage() {
         <div className="flex items-center gap-3">
           {enrolledCount > 1 && (
             <CourseSwitcher
-              enrolledCourses={enrolledCourses}
-              allCourses={allCourses}
+              courses={enrolledCount > 0 ? enrolledCourses : allCourses}
               activeCourse={activeCourse}
               onSelectCourse={setActiveCourse}
             />

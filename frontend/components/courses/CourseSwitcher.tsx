@@ -12,7 +12,9 @@ import {
 
 interface CourseSwitcherProps {
   activeCourse: CourseData | null;
-  courses: CourseData[];
+  courses?: CourseData[];
+  enrolledCourses?: CourseData[];
+  allCourses?: CourseData[];
   onSelectCourse: (course: CourseData) => void;
   isEnrolledInAny?: boolean;
   enrolledCount?: number;
@@ -21,9 +23,12 @@ interface CourseSwitcherProps {
 export const CourseSwitcher: React.FC<CourseSwitcherProps> = ({
   activeCourse,
   courses,
+  enrolledCourses,
+  allCourses,
   onSelectCourse,
 }) => {
   if (!activeCourse) return null;
+  const courseList = courses || (enrolledCourses && enrolledCourses.length > 0 ? enrolledCourses : allCourses) || [];
 
   return (
     <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 sm:p-4 mb-6 shadow-sm">
@@ -59,7 +64,7 @@ export const CourseSwitcher: React.FC<CourseSwitcherProps> = ({
 
         {/* Switcher Dropdown (Shown when 2+ courses available) */}
         <div className="flex items-center gap-2 self-end md:self-auto">
-          {courses.length > 1 ? (
+          {courseList.length > 1 ? (
             <div className="flex items-center gap-2">
               <label className="text-xs text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
                 Switch Course:
@@ -67,12 +72,12 @@ export const CourseSwitcher: React.FC<CourseSwitcherProps> = ({
               <select
                 value={activeCourse.id}
                 onChange={(e) => {
-                  const found = courses.find((c) => c.id === e.target.value);
+                  const found = courseList.find((c) => c.id === e.target.value);
                   if (found) onSelectCourse(found);
                 }}
                 className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-medium"
               >
-                {courses.map((c) => (
+                {courseList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} {c.is_enrolled ? '(Enrolled)' : ''}
                   </option>
