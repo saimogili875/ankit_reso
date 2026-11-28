@@ -6,8 +6,12 @@ from apps.academics.models import (
     Exam, Subject, Category, Chapter, Lecture, AcademicClass,
     Course, CourseFeature, CourseAddon, Enrollment
 )
-from apps.content.models import Video, LandingBanner, LandingBannerSettings
+from apps.content.models import Video, LandingBanner, LandingBannerSettings, ScheduleEvent
 from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
+from apps.books.models import BookProduct, BookOrder
+from apps.tests.models import Test, TestAttempt, TestQuestion
+from apps.coursecontent.models import CourseSection, ContentItem
+from apps.payments.models import Payment
 from django.utils import timezone
 from datetime import timedelta
 
@@ -511,6 +515,115 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         })
         self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
         self.assertEqual(patch_res.data['description'], 'Updated description')
+
+    def test_delete_book_with_orders_returns_409(self):
+        self.client.force_authenticate(user=self.admin)
+        book = BookProduct.objects.create(
+            slug='physics-handbook',
+            title='Physics Handbook',
+            digital_price=299,
+            hardcopy_price=499,
+            is_published=True
+        )
+        BookOrder.objects.create(
+            user=self.student,
+            product=book,
+            format='DIGITAL',
+            buyer_name='Student User',
+            buyer_phone='9876543210',
+            buyer_email='student@example.com',
+            base_amount=299,
+            gst_amount=53.82,
+            total_amount_paise=35282,
+            razorpay_order_id='order_del_test_1',
+            status='PAID'
+        )
+
+        res = self.client.delete(f'/api/admin/books/products/{book.id}/')
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('This book has 1 order(s). Unpublish it instead.', res.data.get('detail', ''))
+        self.assertEqual(res.data.get('action'), 'unpublish')
+
+    def test_delete_book_without_orders_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        book = BookProduct.objects.create(
+            slug='chemistry-handbook',
+            title='Chemistry Handbook',
+            digital_price=199,
+            is_published=True
+        )
+        res = self.client.delete(f'/api/admin/books/products/{book.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BookProduct.objects.filter(id=book.id).exists())
+
+    def test_delete_test_with_attempts_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        test = Test.objects.create(
+            title='Full Mock Test 1',
+            total_marks=300,
+            duration_minutes=180
+        )
+        attempt = TestAttempt.objects.create(
+            user=self.student,
+            test=test,
+            score=250,
+            status='SUBMITTED'
+        )
+
+        res = self.client.delete(f'/api/admin-panel/tests/{test.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Test.objects.filter(id=test.id).exists())
+        self.assertFalse(TestAttempt.objects.filter(id=attempt.id).exists())
+
+    def test_delete_question_used_in_test_and_dpp_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        q = Question.objects.create(
+            chapter=self.chapter,
+            question_text='Sample Question for deletion?',
+            question_type='SINGLE'
+        )
+        test = Test.objects.create(title='Question Test', total_marks=100)
+        TestQuestion.objects.create(test=test, question=q, positive_marks=4)
+
+        dpp = DPP.objects.create(chapter=self.chapter, title='Kinematics DPP')
+        DPPQuestion.objects.create(dpp=dpp, question=q, order=1)
+
+        res = self.client.delete(f'/api/admin-panel/questions/{q.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Question.objects.filter(id=q.id).exists())
+
+    def test_delete_video_used_in_course_content_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        video = Video.objects.create(
+            title='Vector Basics',
+            video_source_type='YOUTUBE',
+            original_key='test.mp4'
+        )
+        course = Course.objects.create(title='Course for Video Test', price=500)
+        section = CourseSection.objects.create(course=course, title='Section 1')
+        ContentItem.objects.create(section=section, title='Lecture 1 Video', video=video)
+
+        res = self.client.delete(f'/api/admin-panel/videos/{video.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Video.objects.filter(id=video.id).exists())
+
+    def test_delete_subject_and_academic_class_with_chapters_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        subject = Subject.objects.create(name='Mathematics', slug='mathematics')
+        cat = Category.objects.create(subject=subject, name='Algebra', slug='algebra')
+        ac_class = AcademicClass.objects.create(name='Class 12', slug='class-12', code='12')
+        Chapter.objects.create(category=cat, academic_class=ac_class, name='Matrices', slug='matrices', order=1)
+
+        # Delete subject (cascades categories and chapters)
+        res_sub = self.client.delete(f'/api/admin-panel/subjects/{subject.id}/')
+        self.assertEqual(res_sub.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Subject.objects.filter(id=subject.id).exists())
+
+        # Delete academic class (sets chapter academic_class to null)
+        res_cls = self.client.delete(f'/api/admin-panel/classes/{ac_class.id}/')
+        self.assertEqual(res_cls.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(AcademicClass.objects.filter(id=ac_class.id).exists())
+
 
 
 

@@ -215,8 +215,8 @@ export default function AdminTestAnalyticsPage() {
     try {
       await apiClient.delete(`/admin-panel/rank-predictor/${id}/`);
       await loadPredictorBands();
-    } catch {
-      alert('Failed to delete calibration band.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete calibration band.');
     }
   };
 

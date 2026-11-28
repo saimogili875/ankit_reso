@@ -132,8 +132,8 @@ export default function AdminAnnouncementsPage() {
       await apiClient.delete(`/admin-panel/announcements/${id}/`);
       setFeedback({ type: 'success', message: 'Announcement deleted successfully.' });
       fetchAnnouncements();
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to delete announcement.' });
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete announcement.' });
     }
   };
 

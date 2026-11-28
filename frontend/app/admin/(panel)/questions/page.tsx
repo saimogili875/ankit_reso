@@ -404,8 +404,8 @@ export default function AdminQuestionsPage() {
       setQuestions((prev) => prev.filter((q) => !selectedIds.includes(q.id)));
       setSelectedIds([]);
       setBulkDeleteOpen(false);
-    } catch {
-      alert('Error during bulk deletion.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error during bulk deletion.');
     } finally {
       setIsBulkDeleting(false);
     }
