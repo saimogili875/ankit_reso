@@ -4,9 +4,12 @@ from .views import (
     OverviewView,
     OverviewTrendsView,
     OptionsView,
+    ExamViewSet,
     HeroSlideViewSet,
     QuickAccessViewSet,
     SubjectViewSet,
+    CategoryViewSet,
+    TopicViewSet,
     CourseViewSet,
     AcademicClassViewSet,
     QuestionViewSet,
@@ -47,9 +50,12 @@ router.register('pricing-cards', PricingCardAdminViewSet, basename='admin-pricin
 router.register('landing-banners', LandingBannerViewSet, basename='admin-landing-banners')
 router.register('hero-slides', HeroSlideViewSet, basename='admin-hero-slides')
 router.register('quick-access', QuickAccessViewSet, basename='admin-quick-access')
-router.register('subjects', SubjectViewSet, basename='admin-subjects')
-router.register('courses', CourseViewSet, basename='admin-courses')
+router.register('exams', ExamViewSet, basename='admin-exams')
 router.register('classes', AcademicClassViewSet, basename='admin-classes')
+router.register('subjects', SubjectViewSet, basename='admin-subjects')
+router.register('categories', CategoryViewSet, basename='admin-categories')
+router.register('topics', TopicViewSet, basename='admin-topics')
+router.register('courses', CourseViewSet, basename='admin-courses')
 router.register('questions', QuestionViewSet, basename='admin-questions')
 router.register('chapters', ChapterViewSet, basename='admin-chapters')
 router.register('lectures', LectureViewSet, basename='admin-lectures')
