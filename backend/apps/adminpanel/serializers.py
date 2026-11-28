@@ -77,19 +77,31 @@ class AdminQuestionSerializer(serializers.ModelSerializer):
         required=False, allow_blank=True, default='', write_only=True
     )
 
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True, allow_null=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True, allow_null=True)
+    class_name = serializers.CharField(source='subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True, default='')
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
     topic_name = serializers.CharField(source='topic.name', read_only=True)
 
     class Meta:
         model = Question
         fields = [
-            'id', 'topic', 'topic_name', 'subject', 'subject_name',
+            'id', 'topic', 'topic_name', 'subject', 'subject_id', 'subject_name', 'subject_label',
+            'class_id', 'class_name', 'exam_id', 'exam_name',
             'chapter', 'chapter_name', 'question_text', 'solution_text',
             'solution_video_url', 'difficulty', 'question_type',
             'options', 'pyq_meta', 'pyq_exam', 'pyq_year', 'pyq_shift_or_paper',
             'created_at', 'updated_at'
         ]
+
+    def get_subject_label(self, obj):
+        if obj.subject and obj.subject.academic_class:
+            return f"{obj.subject.academic_class.name} · {obj.subject.name}"
+        return obj.subject.name if obj.subject else ''
 
     def validate(self, data):
         question_text = data.get('question_text')
@@ -97,15 +109,22 @@ class AdminQuestionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"question_text": "Question text cannot be empty."})
 
         # Derive subject from chapter or topic if missing
-        subject = data.get('subject')
-        chapter = data.get('chapter')
-        topic = data.get('topic')
+        subject = data.get('subject') or getattr(self.instance, 'subject', None)
+        chapter = data.get('chapter') or getattr(self.instance, 'chapter', None)
+        topic = data.get('topic') or getattr(self.instance, 'topic', None)
 
         if not subject:
-            if chapter and chapter.category and chapter.category.subject:
-                data['subject'] = chapter.category.subject
-            elif topic and topic.chapter and topic.chapter.category and topic.chapter.category.subject:
-                data['subject'] = topic.chapter.category.subject
+            if chapter and hasattr(chapter, 'subject') and chapter.subject:
+                subject = chapter.subject
+                data['subject'] = subject
+            elif topic and topic.chapter and topic.chapter.subject:
+                subject = topic.chapter.subject
+                data['subject'] = subject
+
+        if chapter and subject and chapter.subject_id != subject.id:
+            raise serializers.ValidationError({
+                "chapter": f"Chapter '{chapter.name}' belongs to subject '{chapter.subject.name}', not '{subject.name}'."
+            })
 
         # Validate options if provided
         options_data = self.initial_data.get('options')
@@ -220,10 +239,17 @@ class AdminQuestionSerializer(serializers.ModelSerializer):
 
 
 class AdminChapterSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    subject_id = serializers.IntegerField(source='category.subject.id', read_only=True)
-    subject_name = serializers.CharField(source='category.subject.name', read_only=True)
-    academic_class_name = serializers.CharField(source='academic_class.name', read_only=True)
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True)
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    academic_class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True)
+    academic_class_name = serializers.CharField(source='subject.academic_class.name', read_only=True)
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True)
+    class_name = serializers.CharField(source='subject.academic_class.name', read_only=True)
+    exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True)
+    exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True, default='')
+
     lectures_count = serializers.SerializerMethodField()
     dpps_count = serializers.SerializerMethodField()
     questions_count = serializers.SerializerMethodField()
@@ -231,12 +257,20 @@ class AdminChapterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Chapter
         fields = [
-            'id', 'category', 'category_name', 'subject_id', 'subject_name',
-            'academic_class', 'academic_class_name', 'name', 'slug', 'order',
+            'id', 'subject', 'subject_id', 'subject_name', 'subject_label',
+            'academic_class_id', 'academic_class_name', 'class_id', 'class_name',
+            'exam_id', 'exam_name',
+            'category', 'category_name', 'name', 'slug', 'order',
             'description', 'lectures_count', 'dpps_count', 'questions_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['slug', 'created_at', 'updated_at']
+        validators = []
+
+    def get_subject_label(self, obj):
+        if obj.subject and obj.subject.academic_class:
+            return f"{obj.subject.academic_class.name} · {obj.subject.name}"
+        return obj.subject.name if obj.subject else ''
 
     def get_lectures_count(self, obj):
         return obj.lectures.count()
@@ -248,21 +282,44 @@ class AdminChapterSerializer(serializers.ModelSerializer):
         return obj.questions.count()
 
     def validate(self, data):
+        subject = data.get('subject') or getattr(self.instance, 'subject', None)
+        category = data.get('category') or getattr(self.instance, 'category', None)
+
+        if not subject and category and category.subject:
+            subject = category.subject
+            data['subject'] = subject
+
+        if not subject:
+            raise serializers.ValidationError({"subject": "Subject is required for a chapter."})
+
+        if category and category.subject_id != subject.id:
+            raise serializers.ValidationError({
+                "category": f"Category '{category.name}' belongs to subject '{category.subject.name}', not '{subject.name}'."
+            })
+
         name = data.get('name') or getattr(self.instance, 'name', '')
-        if not name.strip():
+        name = name.strip()
+        if not name:
             raise serializers.ValidationError({"name": "Chapter name is required."})
 
-        # Auto-generate slug if not set or on create
-        base_slug = slugify(name)
+        # Name uniqueness per subject
+        qs_name = Chapter.objects.filter(subject=subject, name__iexact=name)
+        if self.instance:
+            qs_name = qs_name.exclude(pk=self.instance.pk)
+        if qs_name.exists():
+            raise serializers.ValidationError({"name": f"Chapter '{name}' already exists in {subject.name}."})
+
+        # Auto-generate slug scoped per subject
+        base_slug = slugify(name) or 'chapter'
         slug = base_slug
         counter = 1
-        qs = Chapter.objects.filter(slug=slug)
+        qs = Chapter.objects.filter(subject=subject, slug=slug)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         while qs.exists():
             slug = f"{base_slug}-{counter}"
             counter += 1
-            qs = Chapter.objects.filter(slug=slug)
+            qs = Chapter.objects.filter(subject=subject, slug=slug)
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
         data['slug'] = slug
@@ -271,17 +328,30 @@ class AdminChapterSerializer(serializers.ModelSerializer):
 
 class AdminLectureSerializer(serializers.ModelSerializer):
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    subject_name = serializers.CharField(source='chapter.category.subject.name', read_only=True)
+    subject_id = serializers.IntegerField(source='chapter.subject.id', read_only=True)
+    subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='chapter.subject.academic_class.id', read_only=True, allow_null=True)
+    class_name = serializers.CharField(source='chapter.subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='chapter.subject.academic_class.exam.id', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='chapter.subject.academic_class.exam.name', read_only=True, default='')
     video = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecture
         fields = [
-            'id', 'chapter', 'chapter_name', 'subject_name', 'lecture_number',
+            'id', 'chapter', 'chapter_name', 'subject_id', 'subject_name',
+            'subject_label', 'class_id', 'class_name', 'exam_id', 'exam_name', 'lecture_number',
             'title', 'slug', 'description', 'duration_seconds', 'is_published',
             'order', 'video', 'created_at', 'updated_at'
         ]
         read_only_fields = ['slug', 'created_at', 'updated_at']
+        validators = []
+
+    def get_subject_label(self, obj):
+        if obj.chapter and obj.chapter.subject and obj.chapter.subject.academic_class:
+            return f"{obj.chapter.subject.academic_class.name} · {obj.chapter.subject.name}"
+        return obj.chapter.subject.name if (obj.chapter and obj.chapter.subject) else ''
 
     def get_video(self, obj):
         v = obj.videos.first()
@@ -375,7 +445,13 @@ class AdminDPPQuestionSerializer(serializers.ModelSerializer):
 
 class AdminDPPSerializer(serializers.ModelSerializer):
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
-    subject_name = serializers.CharField(source='chapter.category.subject.name', read_only=True)
+    subject_id = serializers.IntegerField(source='chapter.subject.id', read_only=True)
+    subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='chapter.subject.academic_class.id', read_only=True, allow_null=True)
+    class_name = serializers.CharField(source='chapter.subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='chapter.subject.academic_class.exam.id', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='chapter.subject.academic_class.exam.name', read_only=True, default='')
     dpp_questions = AdminDPPQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
 
@@ -388,11 +464,17 @@ class AdminDPPSerializer(serializers.ModelSerializer):
     class Meta:
         model = DPP
         fields = [
-            'id', 'chapter', 'chapter_name', 'subject_name', 'dpp_number',
+            'id', 'chapter', 'chapter_name', 'subject_id', 'subject_name',
+            'subject_label', 'class_id', 'class_name', 'exam_id', 'exam_name', 'dpp_number',
             'title', 'description', 'duration_minutes', 'is_published',
             'questions_count', 'dpp_questions', 'question_ids',
             'positive_marks', 'negative_marks', 'created_at', 'updated_at'
         ]
+
+    def get_subject_label(self, obj):
+        if obj.chapter and obj.chapter.subject and obj.chapter.subject.academic_class:
+            return f"{obj.chapter.subject.academic_class.name} · {obj.chapter.subject.name}"
+        return obj.chapter.subject.name if (obj.chapter and obj.chapter.subject) else ''
 
     def get_questions_count(self, obj):
         return obj.dpp_questions.count()
@@ -469,34 +551,284 @@ class AdminQuickAccessSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class AdminExamSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(required=False, allow_blank=True)
+    classes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Exam
+        fields = [
+            'id', 'name', 'slug', 'description', 'order', 'is_active',
+            'classes_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_classes_count(self, obj):
+        return obj.classes.count()
+
+    def validate_name(self, value):
+        trimmed = value.strip() if value else ''
+        if not trimmed:
+            raise serializers.ValidationError("Exam name cannot be empty.")
+        qs = Exam.objects.filter(name__iexact=trimmed)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("An exam with this name already exists.")
+        return trimmed
+
+    def create(self, validated_data):
+        if not validated_data.get('slug'):
+            base_slug = slugify(validated_data['name']) or 'exam'
+            slug = base_slug
+            counter = 1
+            while Exam.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            validated_data['slug'] = slug
+        return super().create(validated_data)
+
+
+class AdminAcademicClassSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(required=False, allow_blank=True)
+    exam_id = serializers.UUIDField(source='exam.id', read_only=True)
+    exam_name = serializers.CharField(source='exam.name', read_only=True)
+    subjects_count = serializers.SerializerMethodField()
+    chapters_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicClass
+        fields = [
+            'id', 'exam', 'exam_id', 'exam_name', 'name', 'slug', 'code',
+            'order', 'subjects_count', 'chapters_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+        validators = []
+
+    def get_subjects_count(self, obj):
+        return obj.subjects.count()
+
+    def get_chapters_count(self, obj):
+        return Chapter.objects.filter(subject__academic_class=obj).count()
+
+    def validate(self, data):
+        exam = data.get('exam') or getattr(self.instance, 'exam', None)
+        if not exam:
+            raise serializers.ValidationError({"exam": "Exam is required for an academic class."})
+
+        name = data.get('name') or getattr(self.instance, 'name', '')
+        name = name.strip()
+        if not name:
+            raise serializers.ValidationError({"name": "Class name cannot be empty."})
+
+        code = data.get('code') or getattr(self.instance, 'code', '')
+        code = code.strip() if code else ''
+
+        qs_name = AcademicClass.objects.filter(exam=exam, name__iexact=name)
+        if self.instance:
+            qs_name = qs_name.exclude(pk=self.instance.pk)
+        if qs_name.exists():
+            raise serializers.ValidationError({"name": f"Class '{name}' already exists in exam '{exam.name}'."})
+
+        if code:
+            qs_code = AcademicClass.objects.filter(exam=exam, code=code)
+            if self.instance:
+                qs_code = qs_code.exclude(pk=self.instance.pk)
+            if qs_code.exists():
+                raise serializers.ValidationError({"code": f"Class code '{code}' already exists in exam '{exam.name}'."})
+
+        if not data.get('slug'):
+            base_slug = slugify(name) or 'class'
+            slug = base_slug
+            counter = 1
+            qs_slug = AcademicClass.objects.filter(exam=exam, slug=slug)
+            if self.instance:
+                qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            while qs_slug.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs_slug = AcademicClass.objects.filter(exam=exam, slug=slug)
+                if self.instance:
+                    qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            data['slug'] = slug
+
+        return data
+
+
 class AdminSubjectSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(required=False, allow_blank=True)
+    academic_class_id = serializers.UUIDField(source='academic_class.id', read_only=True)
+    class_id = serializers.UUIDField(source='academic_class.id', read_only=True)
+    class_name = serializers.CharField(source='academic_class.name', read_only=True)
+    exam_id = serializers.UUIDField(source='academic_class.exam.id', read_only=True)
+    exam_name = serializers.CharField(source='academic_class.exam.name', read_only=True)
+    subject_id = serializers.IntegerField(source='id', read_only=True)
+    subject_name = serializers.CharField(source='name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
     categories_count = serializers.SerializerMethodField()
     chapters_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Subject
         fields = [
-            'id', 'name', 'slug', 'description', 'icon',
-            'color_hex', 'topics', 'order', 'is_visible',
-            'categories_count', 'chapters_count', 'created_at'
+            'id', 'academic_class', 'academic_class_id', 'class_id', 'class_name',
+            'exam_id', 'exam_name', 'subject_id', 'subject_name', 'name', 'slug', 'subject_label',
+            'description', 'icon', 'color_hex', 'topics', 'order',
+            'is_visible', 'categories_count', 'chapters_count', 'created_at', 'updated_at'
         ]
+        read_only_fields = ['created_at', 'updated_at']
+        validators = []
+
+    def get_subject_label(self, obj):
+        if obj.academic_class:
+            return f"{obj.academic_class.name} · {obj.name}"
+        return obj.name
 
     def get_categories_count(self, obj):
         return obj.categories.count()
 
     def get_chapters_count(self, obj):
-        return Chapter.objects.filter(category__subject=obj).count()
+        return obj.chapters.count()
 
-    def create(self, validated_data):
-        if not validated_data.get('slug'):
-            validated_data['slug'] = slugify(validated_data['name'])
-        return super().create(validated_data)
+    def validate(self, data):
+        academic_class = data.get('academic_class') or getattr(self.instance, 'academic_class', None)
+        if not academic_class:
+            raise serializers.ValidationError({"academic_class": "Academic class is required for a subject."})
+
+        name = data.get('name') or getattr(self.instance, 'name', '')
+        name = name.strip()
+        if not name:
+            raise serializers.ValidationError({"name": "Subject name cannot be empty."})
+
+        qs_name = Subject.objects.filter(academic_class=academic_class, name__iexact=name)
+        if self.instance:
+            qs_name = qs_name.exclude(pk=self.instance.pk)
+        if qs_name.exists():
+            raise serializers.ValidationError({"name": f"Subject '{name}' already exists in {academic_class.name}."})
+
+        if not data.get('slug'):
+            base_slug = slugify(name) or 'subject'
+            slug = base_slug
+            counter = 1
+            qs_slug = Subject.objects.filter(academic_class=academic_class, slug=slug)
+            if self.instance:
+                qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            while qs_slug.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs_slug = Subject.objects.filter(academic_class=academic_class, slug=slug)
+                if self.instance:
+                    qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            data['slug'] = slug
+
+        return data
+
+
+class AdminCategorySerializer(serializers.ModelSerializer):
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True)
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    chapters_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'subject', 'subject_id', 'subject_name', 'subject_label',
+            'name', 'slug', 'chapters_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+        validators = []
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True},
+        }
+
+    def get_subject_label(self, obj):
+        if obj.subject and obj.subject.academic_class:
+            return f"{obj.subject.academic_class.name} · {obj.subject.name}"
+        return obj.subject.name if obj.subject else ''
+
+    def get_chapters_count(self, obj):
+        return obj.chapters.count()
+
+    def validate(self, data):
+        subject = data.get('subject') or getattr(self.instance, 'subject', None)
+        if not subject:
+            raise serializers.ValidationError({"subject": "Subject is required for a category."})
+
+        name = data.get('name') or getattr(self.instance, 'name', '')
+        name = name.strip()
+        if not name:
+            raise serializers.ValidationError({"name": "Category name cannot be empty."})
+
+        if not data.get('slug'):
+            base_slug = slugify(name) or 'category'
+            slug = base_slug
+            counter = 1
+            qs_slug = Category.objects.filter(subject=subject, slug=slug)
+            if self.instance:
+                qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            while qs_slug.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs_slug = Category.objects.filter(subject=subject, slug=slug)
+                if self.instance:
+                    qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            data['slug'] = slug
+
+        return data
+
+
+class AdminTopicSerializer(serializers.ModelSerializer):
+    chapter_id = serializers.UUIDField(source='chapter.id', read_only=True)
+    chapter_name = serializers.CharField(source='chapter.name', read_only=True)
+    subject_id = serializers.IntegerField(source='chapter.subject.id', read_only=True)
+    subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
+
+    class Meta:
+        model = Topic
+        fields = [
+            'id', 'chapter', 'chapter_id', 'chapter_name',
+            'subject_id', 'subject_name', 'name', 'slug', 'order',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True},
+        }
+
+    def validate(self, data):
+        chapter = data.get('chapter') or getattr(self.instance, 'chapter', None)
+        if not chapter:
+            raise serializers.ValidationError({"chapter": "Chapter is required for a topic."})
+
+        name = data.get('name') or getattr(self.instance, 'name', '')
+        name = name.strip()
+        if not name:
+            raise serializers.ValidationError({"name": "Topic name cannot be empty."})
+
+        if not data.get('slug'):
+            base_slug = slugify(name) or 'topic'
+            slug = base_slug
+            counter = 1
+            qs_slug = Topic.objects.filter(chapter=chapter, slug=slug)
+            if self.instance:
+                qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            while qs_slug.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs_slug = Topic.objects.filter(chapter=chapter, slug=slug)
+                if self.instance:
+                    qs_slug = qs_slug.exclude(pk=self.instance.pk)
+            data['slug'] = slug
+
+        return data
 
 
 class AdminCourseSerializer(serializers.ModelSerializer):
     enrolled_count = serializers.SerializerMethodField()
     classes_names = serializers.SerializerMethodField()
     subjects_names = serializers.SerializerMethodField()
+    exam_name = serializers.CharField(source='exam.name', read_only=True, default='')
     category_name = serializers.CharField(source='category.name', read_only=True, default='')
     category_slug = serializers.CharField(source='category.slug', read_only=True, default='')
     academic_class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
@@ -505,7 +837,7 @@ class AdminCourseSerializer(serializers.ModelSerializer):
         model = Course
         fields = [
             'id', 'title', 'slug', 'subtitle', 'tagline', 'description',
-            'image', 'thumbnail_url', 'exam_type', 'price', 'original_price',
+            'image', 'thumbnail_url', 'exam', 'exam_name', 'exam_type', 'price', 'original_price',
             'discount_badge', 'is_free', 'features', 'has_live_classes', 'display_order',
             'category', 'category_name', 'category_slug',
             'academic_class', 'academic_class_name',
@@ -529,6 +861,27 @@ class AdminCourseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A course with this title already exists.")
         return trimmed
 
+    def validate(self, data):
+        exam = data.get('exam') or (self.instance.exam if self.instance else None)
+        classes = data.get('classes')
+        if classes is not None and exam:
+            for cls in classes:
+                if cls.exam_id != exam.id:
+                    raise serializers.ValidationError({
+                        "classes": f"Class '{cls.name}' belongs to exam '{cls.exam.name}', not '{exam.name}'."
+                    })
+
+        subjects = data.get('subjects')
+        if subjects is not None:
+            allowed_classes = set(classes) if classes is not None else (set(self.instance.classes.all()) if self.instance else set())
+            if allowed_classes:
+                for subj in subjects:
+                    if subj.academic_class not in allowed_classes:
+                        raise serializers.ValidationError({
+                            "subjects": f"Subject '{subj.name}' ({subj.academic_class.name}) does not belong to any selected class for this course."
+                        })
+        return data
+
     def get_enrolled_count(self, obj):
         return obj.enrollments.count()
 
@@ -536,7 +889,7 @@ class AdminCourseSerializer(serializers.ModelSerializer):
         return [c.name for c in obj.classes.all()]
 
     def get_subjects_names(self, obj):
-        return [s.name for s in obj.subjects.all()]
+        return [f"{s.academic_class.name} · {s.name}" if s.academic_class else s.name for s in obj.subjects.all()]
 
     def create(self, validated_data):
         if not validated_data.get('slug'):
@@ -555,17 +908,6 @@ class AdminCourseSerializer(serializers.ModelSerializer):
         if 'status' in validated_data:
             validated_data['is_published'] = (validated_data['status'] == 'PUBLISHED')
         return super().update(instance, validated_data)
-
-
-class AdminAcademicClassSerializer(serializers.ModelSerializer):
-    chapters_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = AcademicClass
-        fields = ['id', 'name', 'code', 'order', 'chapters_count', 'created_at']
-
-    def get_chapters_count(self, obj):
-        return obj.chapters.count()
 
 
 class AdminTestSeriesSerializer(serializers.ModelSerializer):
@@ -612,6 +954,34 @@ class AdminTestSerializer(serializers.ModelSerializer):
 
     course_title = serializers.CharField(source='course.title', read_only=True)
     test_series_title = serializers.CharField(source='test_series.title', read_only=True, default='')
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and 'test_type' in data:
+            val = str(data.get('test_type') or '').strip().upper()
+            mapping = {
+                'FULL': Test.TestType.MOCK,
+                'SUBJECT': Test.TestType.SECTIONAL,
+            }
+            mapped_val = mapping.get(val, val)
+            data = data.copy()
+            data['test_type'] = mapped_val
+        return super().to_internal_value(data)
+
+    def validate_test_type(self, value):
+        if not value:
+            return value
+        val_upper = str(value).strip().upper()
+        mapping = {
+            'FULL': Test.TestType.MOCK,
+            'SUBJECT': Test.TestType.SECTIONAL,
+        }
+        val_mapped = mapping.get(val_upper, val_upper)
+        valid_choices = [c[0] for c in Test.TestType.choices]
+        if val_mapped not in valid_choices:
+            raise serializers.ValidationError(
+                f"'{value}' is not a valid choice. Valid choices are: {', '.join(valid_choices)}."
+            )
+        return val_mapped
 
     class Meta:
         model = Test
@@ -669,16 +1039,29 @@ class AdminTestSerializer(serializers.ModelSerializer):
 
 
 class AdminStudyMaterialSerializer(serializers.ModelSerializer):
+    subject_id = serializers.IntegerField(source='subject.id', read_only=True, allow_null=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    class_id = serializers.UUIDField(source='subject.academic_class.id', read_only=True, allow_null=True)
+    class_name = serializers.CharField(source='subject.academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='subject.academic_class.exam.id', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True, default='')
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
 
     class Meta:
         model = StudyMaterial
         fields = [
             'id', 'title', 'description', 'material_type',
-            'subject', 'subject_name', 'chapter', 'chapter_name',
+            'subject', 'subject_id', 'subject_name', 'subject_label',
+            'class_id', 'class_name', 'exam_id', 'exam_name',
+            'chapter', 'chapter_name',
             'r2_object_key', 'file_size_bytes', 'is_published', 'created_at', 'updated_at'
         ]
+
+    def get_subject_label(self, obj):
+        if obj.subject and obj.subject.academic_class:
+            return f"{obj.subject.academic_class.name} · {obj.subject.name}"
+        return obj.subject.name if obj.subject else ''
 
 
 class AdminAnnouncementSerializer(serializers.ModelSerializer):
@@ -758,6 +1141,9 @@ class AdminStudentSerializer(serializers.ModelSerializer):
 class AdminScheduleEventSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.title', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_label = serializers.SerializerMethodField()
+    class_name = serializers.CharField(source='subject.academic_class.name', read_only=True, default='')
+    exam_name = serializers.CharField(source='subject.academic_class.exam.name', read_only=True, default='')
     chapter_name = serializers.CharField(source='chapter.name', read_only=True)
     test_title = serializers.CharField(source='test.title', read_only=True)
     dpp_title = serializers.CharField(source='dpp.title', read_only=True)
@@ -767,13 +1153,19 @@ class AdminScheduleEventSerializer(serializers.ModelSerializer):
         model = ScheduleEvent
         fields = [
             'id', 'course', 'course_title', 'event_type', 'title', 'description',
-            'subject', 'subject_name', 'chapter', 'chapter_name',
+            'subject', 'subject_name', 'subject_label', 'class_name', 'exam_name',
+            'chapter', 'chapter_name',
             'start_time', 'end_time', 'link',
             'test', 'test_title',
             'dpp', 'dpp_title',
             'lecture', 'lecture_title',
             'is_published', 'created_at', 'updated_at'
         ]
+
+    def get_subject_label(self, obj):
+        if obj.subject and obj.subject.academic_class:
+            return f"{obj.subject.academic_class.name} · {obj.subject.name}"
+        return obj.subject.name if obj.subject else ''
 
 
 class AdminNotificationSerializer(serializers.ModelSerializer):

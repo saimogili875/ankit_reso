@@ -10,9 +10,27 @@ class AcademicClassSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'code', 'order']
 
 class SubjectSerializer(serializers.ModelSerializer):
+    academic_class_id = serializers.UUIDField(source='academic_class.id', read_only=True, allow_null=True)
+    academic_class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
+    class_id = serializers.UUIDField(source='academic_class.id', read_only=True, allow_null=True)
+    class_name = serializers.CharField(source='academic_class.name', read_only=True, default='')
+    exam_id = serializers.UUIDField(source='academic_class.exam.id', read_only=True, allow_null=True)
+    exam_name = serializers.CharField(source='academic_class.exam.name', read_only=True, default='')
+    subject_label = serializers.SerializerMethodField()
+
     class Meta:
         model = Subject
-        fields = ['id', 'name', 'slug', 'icon', 'color_hex']
+        fields = [
+            'id', 'name', 'slug', 'icon', 'color_hex', 'order',
+            'academic_class_id', 'academic_class_name',
+            'class_id', 'class_name', 'exam_id', 'exam_name',
+            'subject_label',
+        ]
+
+    def get_subject_label(self, obj):
+        if obj.academic_class:
+            return f"{obj.academic_class.name} · {obj.name}"
+        return obj.name
 
 class CourseFeaturePublicSerializer(serializers.ModelSerializer):
     class Meta:

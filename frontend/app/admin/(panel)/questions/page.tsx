@@ -42,6 +42,9 @@ interface QuestionItem {
   id: string;
   subject?: number;
   subject_name?: string;
+  subject_label?: string;
+  class_name?: string;
+  exam_name?: string;
   chapter?: string;
   chapter_name?: string;
   question_text: string;
@@ -55,8 +58,8 @@ interface QuestionItem {
 }
 
 interface OptionsLookup {
-  subjects: { id: number; name: string; slug: string }[];
-  chapters: { id: string; name: string; subject_id: number; subject_name: string }[];
+  subjects: { id: number; name: string; slug: string; subject_label?: string; class_name?: string }[];
+  chapters: { id: string; name: string; subject_id: number; subject_name?: string; subject_label?: string }[];
   exams: { id: string; name: string; slug: string }[];
 }
 
@@ -532,7 +535,7 @@ export default function AdminQuestionsPage() {
                   <option value="">Auto-derive from Chapter</option>
                   {optionsLookup.subjects.map((sub) => (
                     <option key={sub.id} value={sub.id}>
-                      {sub.name}
+                      {sub.subject_label || (sub.class_name ? `${sub.class_name} · ${sub.name}` : sub.name)}
                     </option>
                   ))}
                 </select>
@@ -875,7 +878,7 @@ export default function AdminQuestionsPage() {
               <option value="">All Subjects</option>
               {optionsLookup.subjects.map((sub) => (
                 <option key={sub.id} value={sub.id}>
-                  {sub.name}
+                  {sub.subject_label || (sub.class_name ? `${sub.class_name} · ${sub.name}` : sub.name)}
                 </option>
               ))}
             </select>
@@ -992,9 +995,9 @@ export default function AdminQuestionsPage() {
                     {q.difficulty}
                   </Badge>
 
-                  {q.subject_name && (
+                  {(q.subject_label || q.subject_name) && (
                     <span className="text-xs font-semibold text-slate-300">
-                      {q.subject_name}
+                      {q.subject_label || q.subject_name}
                     </span>
                   )}
                   {q.chapter_name && (

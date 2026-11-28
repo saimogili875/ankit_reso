@@ -498,36 +498,55 @@ export default function BookDetailPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Digital PDF Option */}
-                <button
-                  type="button"
-                  onClick={() => setFormat('DIGITAL')}
-                  className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                    format === 'DIGITAL'
-                      ? 'bg-amber-400/10 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
-                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Download className="w-4 h-4 text-emerald-400" />
-                        <span className="font-bold text-white text-sm">Digital PDF Edition</span>
+                {currentBook.has_pdf !== false ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormat('DIGITAL')}
+                    className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                      format === 'DIGITAL'
+                        ? 'bg-amber-400/10 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
+                        : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Download className="w-4 h-4 text-emerald-400" />
+                          <span className="font-bold text-white text-sm">Digital PDF Edition</span>
+                        </div>
+                        {format === 'DIGITAL' && (
+                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        )}
                       </div>
-                      {format === 'DIGITAL' && (
-                        <span className="w-2 h-2 rounded-full bg-amber-400" />
-                      )}
+                      <ul className="text-[11px] text-slate-300 space-y-1">
+                        <li>✓ Instant secure download link</li>
+                        <li>✓ Searchable, high-res PDF</li>
+                        <li>✓ Read on Mobile, Tablet &amp; PC</li>
+                      </ul>
                     </div>
-                    <ul className="text-[11px] text-slate-300 space-y-1">
-                      <li>✓ Instant secure download link</li>
-                      <li>✓ Searchable, high-res PDF</li>
-                      <li>✓ Read on Mobile, Tablet &amp; PC</li>
-                    </ul>
+                    <div className="mt-4 pt-2 border-t border-slate-800 flex items-baseline justify-between">
+                      <span className="text-xs text-slate-400">Instant Access</span>
+                      <span className="text-lg font-black text-amber-400">₹{Number(currentBook.digital_price || 299)}</span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/40 text-left flex flex-col justify-between opacity-60 cursor-not-allowed">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Download className="w-4 h-4 text-slate-500" />
+                          <span className="font-bold text-slate-400 text-sm">Digital Edition Unavailable</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        This title is currently available exclusively in printed physical format.
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-2 border-t border-slate-800/60 text-xs text-slate-500">
+                      Printed Copy Available Below
+                    </div>
                   </div>
-                  <div className="mt-4 pt-2 border-t border-slate-800 flex items-baseline justify-between">
-                    <span className="text-xs text-slate-400">Instant Access</span>
-                    <span className="text-lg font-black text-amber-400">₹{Number(currentBook.digital_price || 299)}</span>
-                  </div>
-                </button>
+                )}
 
                 {/* Hard Copy Option */}
                 <button

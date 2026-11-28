@@ -11,6 +11,9 @@ from django.db import transaction, models
 from django.http import HttpResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from apps.core.exceptions import R2StorageNotConfiguredError
 import razorpay
 
 from rest_framework import generics, viewsets, permissions, status
@@ -133,6 +136,8 @@ class BookOrderCreateView(APIView):
             if product.stock_hardcopy is not None and product.stock_hardcopy <= 0:
                 return Response({'error': "Hard copy is currently out of stock."}, status=status.HTTP_400_BAD_REQUEST)
         else:
+            if not product.pdf_key:
+                return Response({'error': "Digital copy cannot be purchased because no PDF document is attached to this book."}, status=status.HTTP_400_BAD_REQUEST)
             base_amount = product.digital_price
 
         base_amount = Decimal(str(base_amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -490,7 +495,17 @@ class BookProductAdminViewSet(viewsets.ModelViewSet):
         if not file_obj:
             return Response({'error': 'No image file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        image_url, object_key = process_and_upload_book_cover(file_obj, filename_hint=product.slug)
+        try:
+            image_url, object_key = process_and_upload_book_cover(file_obj, filename_hint=product.slug)
+        except (DjangoValidationError, DRFValidationError) as exc:
+            msg = exc.message if hasattr(exc, 'message') else str(exc)
+            return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+        except R2StorageNotConfiguredError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as exc:
+            logger.exception("Failed to upload book cover: %s", exc)
+            return Response({'error': 'Failed to process cover image.'}, status=status.HTTP_400_BAD_REQUEST)
+
         product.cover_image = image_url
         product.save(update_fields=['cover_image'])
 
@@ -498,6 +513,8 @@ class BookProductAdminViewSet(viewsets.ModelViewSet):
             'message': 'Cover uploaded successfully.',
             'cover_image': image_url,
             'object_key': object_key,
+            'has_cover': True,
+            'has_pdf': bool(product.pdf_key),
         })
 
     @action(detail=True, methods=['post'], url_path='upload-pdf')
@@ -508,25 +525,93 @@ class BookProductAdminViewSet(viewsets.ModelViewSet):
         if not file_obj:
             return Response({'error': 'No PDF file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        pdf_key = upload_book_pdf_private(file_obj, filename=file_obj.name)
+        if not str(file_obj.name).lower().endswith('.pdf'):
+            return Response({'error': 'Uploaded file must be a PDF document.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            pdf_key = upload_book_pdf_private(file_obj, filename=file_obj.name)
+        except (DjangoValidationError, DRFValidationError) as exc:
+            msg = exc.message if hasattr(exc, 'message') else str(exc)
+            return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+        except R2StorageNotConfiguredError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as exc:
+            logger.exception("Failed to upload book PDF: %s", exc)
+            return Response({'error': 'Failed to upload PDF.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if not pdf_key:
             return Response({'error': 'Failed to upload PDF.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         product.pdf_key = pdf_key
 
-        # Automatically extract cover if book doesn't already have one
+        # generate a cover from page 1 ONLY when:
+        # (auto_cover is explicitly true AND the book has no cover) OR replace_cover is explicitly true.
+        # Default = never touch the cover.
         auto_cover = request.data.get('auto_cover') in ('true', '1', True)
-        if auto_cover or not product.cover_image:
-            cover_url, _ = generate_cover_from_pdf(file_obj)
-            if cover_url:
-                product.cover_image = cover_url
+        replace_cover = request.data.get('replace_cover') in ('true', '1', True)
+
+        if (auto_cover and not product.cover_image) or replace_cover:
+            try:
+                cover_url, _ = generate_cover_from_pdf(file_obj)
+                if cover_url:
+                    product.cover_image = cover_url
+            except Exception as e:
+                logger.warning(f"Could not generate cover from PDF: {e}")
 
         product.save()
 
         return Response({
             'message': 'PDF uploaded successfully.',
-            'pdf_key': pdf_key,
-            'cover_image': product.cover_image,
+            'has_pdf': True,
+            'has_cover': bool(product.cover_image),
+            'cover_image': product.cover_image or '',
+            'pdf_key': product.pdf_key,
+        })
+
+    @action(detail=True, methods=['delete'], url_path='remove-cover')
+    def remove_cover(self, request, pk=None):
+        """Removes cover image and cleans up R2 if not used by another book."""
+        product = self.get_object()
+        old_cover = product.cover_image
+        product.cover_image = ''
+        product.save(update_fields=['cover_image'])
+
+        if old_cover:
+            other_uses = BookProduct.objects.filter(cover_image=old_cover).exclude(id=product.id).exists()
+            if not other_uses and 'images/books/' in old_cover:
+                key = 'images/books/' + old_cover.split('images/books/')[-1]
+                try:
+                    from storage.service import storage_service
+                    storage_service.provider.delete_object(key, bucket=getattr(settings, 'R2_PUBLIC_BUCKET_NAME', None))
+                except Exception as exc:
+                    logger.warning("Failed to delete unused cover object from R2: %s", exc)
+
+        return Response({
+            'message': 'Cover removed successfully.',
+            'has_cover': False,
+            'cover_image': '',
+        })
+
+    @action(detail=True, methods=['delete'], url_path='remove-pdf')
+    def remove_pdf(self, request, pk=None):
+        """Removes PDF key and cleans up R2 if not used by another book."""
+        product = self.get_object()
+        old_pdf_key = product.pdf_key
+        product.pdf_key = ''
+        product.save(update_fields=['pdf_key'])
+
+        if old_pdf_key:
+            other_uses = BookProduct.objects.filter(pdf_key=old_pdf_key).exclude(id=product.id).exists()
+            if not other_uses:
+                try:
+                    from storage.service import storage_service
+                    storage_service.provider.delete_object(old_pdf_key)
+                except Exception as exc:
+                    logger.warning("Failed to delete unused PDF object from R2: %s", exc)
+
+        return Response({
+            'message': 'PDF removed successfully.',
+            'has_pdf': False,
         })
 
 

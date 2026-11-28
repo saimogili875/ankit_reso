@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
-from apps.academics.models import Subject, Category, Chapter, AcademicClass
+from apps.academics.models import Exam, AcademicClass, Subject, Category, Chapter, AcademicClass
 from apps.questions.models import DPP, Question, QuestionOption, DPPQuestion
 
 User = get_user_model()
@@ -23,7 +23,10 @@ class DPPAnswerLeakageSecurityTests(TestCase):
             role=User.Role.STUDENT,
         )
 
+        self.exam = Exam.objects.create(name='JEE Main S5', slug='jee-main-s5')
+        self.academic_class = AcademicClass.objects.create(exam=self.exam, name='Class 11', slug='class-11', code='11')
         self.subject = Subject.objects.create(
+            academic_class=self.academic_class,
             name='Physics',
             slug='physics'
         )
@@ -33,6 +36,7 @@ class DPPAnswerLeakageSecurityTests(TestCase):
             slug='mechanics'
         )
         self.chapter = Chapter.objects.create(
+            subject=self.subject,
             category=self.category,
             name='Kinematics',
             slug='kinematics',

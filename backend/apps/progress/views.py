@@ -59,21 +59,31 @@ class ProgressOverviewView(APIView):
                 streak_days += 1
                 current_check = current_check - timedelta(days=1)
 
-        # 4. Subject Accuracy Breakdown
-        subjects = Subject.objects.filter(is_visible=True).order_by('order', 'name')
+        # 4. Subject Accuracy Breakdown (keyed by Subject ID, scoped to isolated class)
+        subjects = Subject.objects.filter(is_visible=True).select_related('academic_class', 'academic_class__exam').order_by('order', 'name')
         subject_breakdown = []
 
         for subj in subjects:
-            subj_attempts = dpp_attempts.filter(dpp__chapter__category__subject=subj)
+            subj_attempts = dpp_attempts.filter(
+                models.Q(dpp__chapter__subject=subj) |
+                models.Q(dpp__chapter__category__subject=subj)
+            )
             s_correct = sum(a.correct_count for a in subj_attempts)
             s_incorrect = sum(a.incorrect_count for a in subj_attempts)
             s_total = s_correct + s_incorrect
             s_acc = round((s_correct / s_total) * 100, 1) if s_total > 0 else 0.0
 
+            cls_name = subj.academic_class.name if subj.academic_class else ''
+            label = getattr(subj, 'subject_label', f"{cls_name} · {subj.name}" if cls_name else subj.name)
+
             subject_breakdown.append({
                 'id': str(subj.id),
+                'subject_id': subj.id,
                 'name': subj.name,
                 'slug': subj.slug,
+                'subject_label': label,
+                'class_name': cls_name,
+                'exam_name': subj.academic_class.exam.name if (subj.academic_class and subj.academic_class.exam) else '',
                 'accuracy': s_acc,
                 'questions_attempted': s_total,
                 'questions_correct': s_correct,
@@ -81,7 +91,7 @@ class ProgressOverviewView(APIView):
 
         # 5. Weak Chapters (< 60% accuracy on attempted questions)
         weak_chapters = []
-        for chap in Chapter.objects.select_related('category__subject').all():
+        for chap in Chapter.objects.select_related('subject', 'subject__academic_class', 'category__subject').all():
             chap_attempts = dpp_attempts.filter(dpp__chapter=chap)
             c_correct = sum(a.correct_count for a in chap_attempts)
             c_incorrect = sum(a.incorrect_count for a in chap_attempts)
@@ -89,10 +99,14 @@ class ProgressOverviewView(APIView):
             if c_total > 0:
                 c_acc = round((c_correct / c_total) * 100, 1)
                 if c_acc < 60.0:
+                    sub = chap.subject or (chap.category.subject if chap.category else None)
+                    sub_label = f"{sub.academic_class.name} · {sub.name}" if (sub and getattr(sub, 'academic_class', None)) else (sub.name if sub else '')
                     weak_chapters.append({
                         'id': str(chap.id),
                         'name': chap.name,
-                        'subject_name': chap.category.subject.name if chap.category and chap.category.subject else '',
+                        'subject_id': str(sub.id) if sub else '',
+                        'subject_name': sub.name if sub else '',
+                        'subject_label': sub_label,
                         'accuracy': c_acc,
                         'total_attempted': c_total,
                     })

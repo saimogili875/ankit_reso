@@ -39,16 +39,19 @@ from apps.accounts.serializers import UserSerializer
 from apps.payments.models import Payment
 
 from .serializers import (
-    AdminQuestionSerializer,
+    AdminExamSerializer,
+    AdminAcademicClassSerializer,
+    AdminSubjectSerializer,
+    AdminCategorySerializer,
+    AdminTopicSerializer,
     AdminChapterSerializer,
+    AdminQuestionSerializer,
     AdminLectureSerializer,
     AdminVideoSerializer,
     AdminDPPSerializer,
     AdminHeroSlideSerializer,
     AdminQuickAccessSerializer,
-    AdminSubjectSerializer,
     AdminCourseSerializer,
-    AdminAcademicClassSerializer,
     AdminTestSeriesSerializer,
     AdminTestSerializer,
     AdminStudyMaterialSerializer,
@@ -169,39 +172,135 @@ class OverviewTrendsView(APIView):
 class OptionsView(APIView):
     """
     Lookup choices for forms across Question, Chapter, Lecture, Video, Test, Material, and DPP creation.
+    Supports ?exam=<id>, ?class=<id>, ?subject=<id> filtering and returns full hierarchical tree.
     """
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        subjects = Subject.objects.all().order_by('order', 'name').values('id', 'name', 'slug', 'color_hex')
-        categories = Category.objects.select_related('subject').all().order_by('subject__name', 'name')
-        classes = AcademicClass.objects.all().order_by('order', 'name').values('id', 'name', 'code')
+        exam_id = request.query_params.get('exam')
+        class_id = request.query_params.get('class') or request.query_params.get('academic_class')
+        subject_id = request.query_params.get('subject')
+
+        exams_qs = Exam.objects.filter(is_active=True).order_by('order', 'name')
+        if exam_id:
+            exams_qs = exams_qs.filter(id=exam_id)
+
+        classes_qs = AcademicClass.objects.select_related('exam').all().order_by('order', 'name')
+        if exam_id:
+            classes_qs = classes_qs.filter(exam_id=exam_id)
+        if class_id:
+            classes_qs = classes_qs.filter(id=class_id)
+
+        subjects_qs = Subject.objects.select_related('academic_class__exam').all().order_by('order', 'name')
+        if exam_id:
+            subjects_qs = subjects_qs.filter(academic_class__exam_id=exam_id)
+        if class_id:
+            subjects_qs = subjects_qs.filter(academic_class_id=class_id)
+        if subject_id:
+            subjects_qs = subjects_qs.filter(id=subject_id)
+
+        chapters_qs = Chapter.objects.select_related('subject__academic_class__exam', 'category').all().order_by('subject__name', 'order', 'name')
+        if exam_id:
+            chapters_qs = chapters_qs.filter(subject__academic_class__exam_id=exam_id)
+        if class_id:
+            chapters_qs = chapters_qs.filter(subject__academic_class_id=class_id)
+        if subject_id:
+            chapters_qs = chapters_qs.filter(subject_id=subject_id)
+
+        categories_qs = Category.objects.select_related('subject__academic_class').all().order_by('subject__name', 'name')
+        if subject_id:
+            categories_qs = categories_qs.filter(subject_id=subject_id)
+        elif class_id:
+            categories_qs = categories_qs.filter(subject__academic_class_id=class_id)
+        elif exam_id:
+            categories_qs = categories_qs.filter(subject__academic_class__exam_id=exam_id)
+
+        topics_qs = Topic.objects.select_related('chapter__subject').all().order_by('order', 'name')
+        if subject_id:
+            topics_qs = topics_qs.filter(chapter__subject_id=subject_id)
+        elif class_id:
+            topics_qs = topics_qs.filter(chapter__subject__academic_class_id=class_id)
+        elif exam_id:
+            topics_qs = topics_qs.filter(chapter__subject__academic_class__exam_id=exam_id)
+
         courses = Course.objects.all().order_by('-created_at').values('id', 'title', 'slug')
-        chapters = Chapter.objects.select_related('category__subject', 'academic_class').all().order_by('category__subject__name', 'name')
         lectures = Lecture.objects.select_related('chapter').all().order_by('chapter__name', 'lecture_number')
-        exams = Exam.objects.all().values('id', 'name', 'slug')
+        tests = Test.objects.filter(is_published=True).values('id', 'title', 'test_type')
+        dpps = DPP.objects.filter(is_published=True).values('id', 'title', 'chapter_id')
+
+        exams_data = [
+            {'id': str(e.id), 'name': e.name, 'slug': e.slug, 'order': e.order, 'is_active': e.is_active}
+            for e in exams_qs
+        ]
+
+        classes_data = [
+            {
+                'id': str(c.id),
+                'name': c.name,
+                'code': c.code,
+                'slug': c.slug,
+                'order': c.order,
+                'exam_id': str(c.exam.id),
+                'exam_name': c.exam.name,
+            }
+            for c in classes_qs
+        ]
+
+        subjects_data = [
+            {
+                'id': s.id,
+                'name': s.name,
+                'slug': s.slug,
+                'color_hex': s.color_hex,
+                'order': s.order,
+                'academic_class_id': str(s.academic_class.id) if s.academic_class else None,
+                'class_name': s.academic_class.name if s.academic_class else '',
+                'exam_id': str(s.academic_class.exam.id) if (s.academic_class and s.academic_class.exam) else None,
+                'exam_name': s.academic_class.exam.name if (s.academic_class and s.academic_class.exam) else '',
+                'subject_label': f"{s.academic_class.name} · {s.name}" if s.academic_class else s.name,
+            }
+            for s in subjects_qs
+        ]
 
         categories_data = [
             {
                 'id': str(c.id),
                 'name': c.name,
-                'subject_id': str(c.subject.id),
+                'slug': c.slug,
+                'subject_id': c.subject.id,
                 'subject_name': c.subject.name,
+                'subject_label': f"{c.subject.academic_class.name} · {c.subject.name}" if (c.subject and c.subject.academic_class) else c.subject.name,
             }
-            for c in categories
+            for c in categories_qs
         ]
 
         chapters_data = [
             {
                 'id': str(ch.id),
                 'name': ch.name,
-                'category_id': str(ch.category.id),
-                'subject_id': str(ch.category.subject.id),
-                'subject_name': ch.category.subject.name,
-                'class_id': str(ch.academic_class.id) if ch.academic_class else None,
-                'class_name': ch.academic_class.name if ch.academic_class else None,
+                'slug': ch.slug,
+                'category_id': str(ch.category.id) if ch.category else None,
+                'category_name': ch.category.name if ch.category else None,
+                'subject_id': ch.subject.id if ch.subject else None,
+                'subject_name': ch.subject.name if ch.subject else None,
+                'subject_label': f"{ch.subject.academic_class.name} · {ch.subject.name}" if (ch.subject and ch.subject.academic_class) else (ch.subject.name if ch.subject else ''),
+                'class_id': str(ch.subject.academic_class.id) if (ch.subject and ch.subject.academic_class) else None,
+                'class_name': ch.subject.academic_class.name if (ch.subject and ch.subject.academic_class) else None,
+                'exam_id': str(ch.subject.academic_class.exam.id) if (ch.subject and ch.subject.academic_class and ch.subject.academic_class.exam) else None,
+                'exam_name': ch.subject.academic_class.exam.name if (ch.subject and ch.subject.academic_class and ch.subject.academic_class.exam) else None,
             }
-            for ch in chapters
+            for ch in chapters_qs
+        ]
+
+        topics_data = [
+            {
+                'id': str(t.id),
+                'name': t.name,
+                'slug': t.slug,
+                'chapter_id': str(t.chapter.id),
+                'chapter_name': t.chapter.name,
+            }
+            for t in topics_qs
         ]
 
         lectures_data = [
@@ -215,19 +314,54 @@ class OptionsView(APIView):
             for l in lectures
         ]
 
-        tests = Test.objects.filter(is_published=True).values('id', 'title', 'test_type')
-        dpps = DPP.objects.filter(is_published=True).values('id', 'title', 'chapter_id')
+        # Build cascading tree
+        all_exams = Exam.objects.filter(is_active=True).prefetch_related(
+            'classes__subjects__chapters'
+        ).order_by('order', 'name')
+
+        tree = []
+        for e in all_exams:
+            e_node = {
+                'id': str(e.id),
+                'name': e.name,
+                'slug': e.slug,
+                'classes': []
+            }
+            for c in e.classes.all():
+                c_node = {
+                    'id': str(c.id),
+                    'name': c.name,
+                    'code': c.code,
+                    'slug': c.slug,
+                    'subjects': []
+                }
+                for s in c.subjects.all():
+                    s_node = {
+                        'id': s.id,
+                        'name': s.name,
+                        'slug': s.slug,
+                        'label': f"{c.name} · {s.name}",
+                        'chapters': [
+                            {'id': str(ch.id), 'name': ch.name, 'slug': ch.slug}
+                            for ch in s.chapters.all()
+                        ]
+                    }
+                    c_node['subjects'].append(s_node)
+                e_node['classes'].append(c_node)
+            tree.append(e_node)
 
         return Response({
-            'subjects': list(subjects),
+            'exams': exams_data,
+            'classes': classes_data,
+            'subjects': subjects_data,
             'categories': categories_data,
-            'classes': list(classes),
-            'courses': list(courses),
             'chapters': chapters_data,
+            'topics': topics_data,
+            'courses': list(courses),
             'lectures': lectures_data,
-            'exams': list(exams),
             'tests': list(tests),
             'dpps': list(dpps),
+            'tree': tree,
         }, status=status.HTTP_200_OK)
 
 
@@ -268,13 +402,129 @@ class QuickAccessViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'description']
 
 
+class ExamViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminExamSerializer
+    pagination_class = None
+    queryset = Exam.objects.all().order_by('order', 'name')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug']
+
+    @action(detail=True, methods=['get'])
+    def cascade_info(self, request, pk=None):
+        exam = self.get_object()
+        classes = exam.classes.all()
+        subjects_count = Subject.objects.filter(academic_class__exam=exam).count()
+        chapters_count = Chapter.objects.filter(subject__academic_class__exam=exam).count()
+        courses_count = Course.objects.filter(exam=exam).count()
+        return Response({
+            'exam_id': str(exam.id),
+            'exam_name': exam.name,
+            'classes_count': classes.count(),
+            'subjects_count': subjects_count,
+            'chapters_count': chapters_count,
+            'courses_count': courses_count,
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        exam = self.get_object()
+        confirm = request.query_params.get('confirm') == 'true'
+        classes_count = exam.classes.count()
+        courses_count = Course.objects.filter(exam=exam).count()
+        if (classes_count > 0 or courses_count > 0) and not confirm:
+            return Response({
+                'error': f"Exam '{exam.name}' has {classes_count} classes and {courses_count} courses. Pass ?confirm=true to delete.",
+                'classes_count': classes_count,
+                'courses_count': courses_count,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+
 class SubjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminSubjectSerializer
     pagination_class = None
-    queryset = Subject.objects.all().order_by('order', 'name')
+    queryset = Subject.objects.select_related('academic_class__exam').all().order_by('order', 'name')
     filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'slug']
+    search_fields = ['name', 'slug', 'academic_class__name']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        class_id = self.request.query_params.get('academic_class') or self.request.query_params.get('class')
+        exam_id = self.request.query_params.get('exam')
+        if class_id:
+            qs = qs.filter(academic_class_id=class_id)
+        if exam_id:
+            qs = qs.filter(academic_class__exam_id=exam_id)
+        return qs
+
+    @action(detail=True, methods=['get'])
+    def cascade_info(self, request, pk=None):
+        subject = self.get_object()
+        chapters_count = subject.chapters.count()
+        categories_count = subject.categories.count()
+        questions_count = subject.questions.count()
+        materials_count = StudyMaterial.objects.filter(subject=subject).count()
+        return Response({
+            'subject_id': subject.id,
+            'subject_name': subject.name,
+            'class_name': subject.academic_class.name if subject.academic_class else '',
+            'exam_name': subject.academic_class.exam.name if (subject.academic_class and subject.academic_class.exam) else '',
+            'chapters_count': chapters_count,
+            'categories_count': categories_count,
+            'questions_count': questions_count,
+            'materials_count': materials_count,
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        subject = self.get_object()
+        confirm = request.query_params.get('confirm') == 'true'
+        chapters_count = subject.chapters.count()
+        questions_count = subject.questions.count()
+        total_items = chapters_count + questions_count
+        if total_items > 0 and not confirm:
+            return Response({
+                'error': f"Subject '{subject.name}' has {chapters_count} chapters and {questions_count} questions. Pass ?confirm=true to delete.",
+                'chapters_count': chapters_count,
+                'questions_count': questions_count,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminCategorySerializer
+    pagination_class = None
+    queryset = Category.objects.select_related('subject__academic_class').all().order_by('name')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug', 'subject__name']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+        return qs
+
+    @action(detail=True, methods=['get'])
+    def cascade_info(self, request, pk=None):
+        cat = self.get_object()
+        return Response({
+            'category_id': str(cat.id),
+            'category_name': cat.name,
+            'chapters_count': cat.chapters.count(),
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        cat = self.get_object()
+        confirm = request.query_params.get('confirm') == 'true'
+        chapters_count = cat.chapters.count()
+        if chapters_count > 0 and not confirm:
+            return Response({
+                'error': f"Category '{cat.name}' has {chapters_count} chapters. Pass ?confirm=true to delete.",
+                'chapters_count': chapters_count,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
 
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -327,14 +577,17 @@ class CourseViewSet(viewsets.ModelViewSet):
         user = User.objects.filter(id=user_id, role=User.Role.STUDENT).first()
         if not user:
             return Response({'error': 'Valid student user_id is required.'}, status=status.HTTP_404_NOT_FOUND)
-        Enrollment.objects.get_or_create(user=user, course=course, defaults={'status': 'ACTIVE'})
+        enrollment, created = Enrollment.objects.get_or_create(user=user, course=course, defaults={'status': 'ACTIVE'})
+        if not created and enrollment.status != 'ACTIVE':
+            enrollment.status = 'ACTIVE'
+            enrollment.save(update_fields=['status'])
         return Response({'message': f"Student {user.email} enrolled successfully into {course.title}."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='unenroll-student')
     def unenroll_student(self, request, pk=None):
         course = self.get_object()
         user_id = request.data.get('user_id')
-        Enrollment.objects.filter(course=course, user_id=user_id).delete()
+        Enrollment.objects.filter(course=course, user_id=user_id).update(status='INACTIVE')
         return Response({'message': f"Student un-enrolled from {course.title} successfully."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-image')
@@ -358,12 +611,35 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Response({'error': 'features must be a list'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            course.course_features.all().delete()
+            existing_features = {str(f.id): f for f in course.course_features.all()}
+            keep_ids = set()
+
             for idx, item in enumerate(features_data, start=1):
-                text = item if isinstance(item, str) else item.get('text', '')
-                order = idx if isinstance(item, str) else item.get('order', idx)
-                if text.strip():
-                    CourseFeature.objects.create(course=course, text=text.strip(), order=order)
+                feature_id = None
+                text = ''
+                order = idx
+                if isinstance(item, str):
+                    text = item.strip()
+                elif isinstance(item, dict):
+                    feature_id = str(item.get('id')) if item.get('id') else None
+                    text = str(item.get('text', '')).strip()
+                    order = item.get('order', idx)
+
+                if not text:
+                    continue
+
+                if feature_id and feature_id in existing_features:
+                    feat = existing_features[feature_id]
+                    feat.text = text
+                    feat.order = order
+                    feat.save(update_fields=['text', 'order'])
+                    keep_ids.add(feat.id)
+                else:
+                    new_feat = CourseFeature.objects.create(course=course, text=text, order=order)
+                    keep_ids.add(new_feat.id)
+
+            course.course_features.exclude(id__in=keep_ids).delete()
+
         from apps.academics.serializers import CourseSerializer
         return Response(CourseSerializer(course).data)
 
@@ -375,17 +651,44 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Response({'error': 'addons must be a list'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            course.addons.all().delete()
+            existing_addons = {str(a.id): a for a in course.addons.all()}
+            keep_ids = set()
+
             for idx, it in enumerate(addons_data, start=1):
-                CourseAddon.objects.create(
-                    course=course,
-                    title=it.get('title', 'Addon'),
-                    addon_type=it.get('addon_type', CourseAddon.AddonType.MODULE),
-                    price=it.get('price', 0),
-                    description=it.get('description', ''),
-                    order=it.get('order', idx),
-                    is_published=it.get('is_published', True),
-                )
+                if not isinstance(it, dict):
+                    continue
+                addon_id = str(it.get('id')) if it.get('id') else None
+                title = it.get('title', 'Addon')
+                addon_type = it.get('addon_type', CourseAddon.AddonType.MODULE)
+                price = it.get('price', 0)
+                description = it.get('description', '')
+                order = it.get('order', idx)
+                is_published = it.get('is_published', True)
+
+                if addon_id and addon_id in existing_addons:
+                    addon = existing_addons[addon_id]
+                    addon.title = title
+                    addon.addon_type = addon_type
+                    addon.price = price
+                    addon.description = description
+                    addon.order = order
+                    addon.is_published = is_published
+                    addon.save(update_fields=['title', 'addon_type', 'price', 'description', 'order', 'is_published'])
+                    keep_ids.add(addon.id)
+                else:
+                    new_addon = CourseAddon.objects.create(
+                        course=course,
+                        title=title,
+                        addon_type=addon_type,
+                        price=price,
+                        description=description,
+                        order=order,
+                        is_published=is_published,
+                    )
+                    keep_ids.add(new_addon.id)
+
+            course.addons.exclude(id__in=keep_ids).delete()
+
         from apps.academics.serializers import CourseSerializer
         return Response(CourseSerializer(course).data)
 
@@ -394,16 +697,50 @@ class AcademicClassViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminAcademicClassSerializer
     pagination_class = None
-    queryset = AcademicClass.objects.all().order_by('order', 'name')
+    queryset = AcademicClass.objects.select_related('exam').all().order_by('order', 'name')
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'code']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        exam_id = self.request.query_params.get('exam')
+        if exam_id:
+            qs = qs.filter(exam_id=exam_id)
+        return qs
+
+    @action(detail=True, methods=['get'])
+    def cascade_info(self, request, pk=None):
+        cls = self.get_object()
+        subjects_count = cls.subjects.count()
+        chapters_count = Chapter.objects.filter(subject__academic_class=cls).count()
+        courses_count = cls.courses.count()
+        return Response({
+            'class_id': str(cls.id),
+            'class_name': cls.name,
+            'exam_id': str(cls.exam.id) if cls.exam else None,
+            'exam_name': cls.exam.name if cls.exam else '',
+            'subjects_count': subjects_count,
+            'chapters_count': chapters_count,
+            'courses_count': courses_count,
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        cls = self.get_object()
+        confirm = request.query_params.get('confirm') == 'true'
+        subjects_count = cls.subjects.count()
+        if subjects_count > 0 and not confirm:
+            return Response({
+                'error': f"Class '{cls.name}' has {subjects_count} subjects. Pass ?confirm=true to delete.",
+                'subjects_count': subjects_count,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminQuestionSerializer
     pagination_class = AdminPagination
-    queryset = Question.objects.select_related('subject', 'chapter__category__subject', 'topic').prefetch_related('options', 'pyq_meta__exam').all().order_by('-created_at')
+    queryset = Question.objects.select_related('subject__academic_class__exam', 'chapter__subject', 'topic').prefetch_related('options', 'pyq_meta__exam').all().order_by('-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['question_text', 'chapter__name', 'subject__name']
 
@@ -416,7 +753,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         if chapter_id:
             qs = qs.filter(chapter_id=chapter_id)
         if subject_id:
-            qs = qs.filter(Q(subject_id=subject_id) | Q(chapter__category__subject_id=subject_id))
+            qs = qs.filter(Q(subject_id=subject_id) | Q(chapter__subject_id=subject_id))
         if difficulty:
             qs = qs.filter(difficulty=difficulty)
         return qs
@@ -483,19 +820,22 @@ class ChapterViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminRole]
     serializer_class = AdminChapterSerializer
     pagination_class = AdminPagination
-    queryset = Chapter.objects.select_related('category__subject', 'academic_class').all().order_by('category__subject__name', 'order', 'name')
+    queryset = Chapter.objects.select_related('subject__academic_class__exam', 'category').all().order_by('subject__name', 'order', 'name')
     filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'category__subject__name', 'description']
+    search_fields = ['name', 'subject__name', 'description']
 
     def get_queryset(self):
         qs = super().get_queryset()
         subject_id = self.request.query_params.get('subject')
-        class_id = self.request.query_params.get('academic_class')
+        class_id = self.request.query_params.get('academic_class') or self.request.query_params.get('class')
+        exam_id = self.request.query_params.get('exam')
 
         if subject_id:
-            qs = qs.filter(category__subject_id=subject_id)
+            qs = qs.filter(subject_id=subject_id)
         if class_id:
-            qs = qs.filter(academic_class_id=class_id)
+            qs = qs.filter(subject__academic_class_id=class_id)
+        if exam_id:
+            qs = qs.filter(subject__academic_class__exam_id=exam_id)
         return qs
 
     @action(detail=True, methods=['get'])
@@ -507,7 +847,37 @@ class ChapterViewSet(viewsets.ModelViewSet):
             'lectures_count': chapter.lectures.count(),
             'dpps_count': chapter.dpps.count(),
             'questions_count': chapter.questions.count(),
+            'materials_count': StudyMaterial.objects.filter(chapter=chapter).count(),
         }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        chapter = self.get_object()
+        confirm = request.query_params.get('confirm') == 'true'
+        children = chapter.lectures.count() + chapter.dpps.count() + chapter.questions.count()
+        if children > 0 and not confirm:
+            return Response({
+                'error': f"Chapter '{chapter.name}' has {children} associated items (lectures, DPPs, questions). Pass ?confirm=true to delete.",
+                'lectures_count': chapter.lectures.count(),
+                'dpps_count': chapter.dpps.count(),
+                'questions_count': chapter.questions.count(),
+            }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+
+class TopicViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminTopicSerializer
+    pagination_class = None
+    queryset = Topic.objects.select_related('chapter__subject').all().order_by('order', 'name')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug', 'chapter__name']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        chapter_id = self.request.query_params.get('chapter')
+        if chapter_id:
+            qs = qs.filter(chapter_id=chapter_id)
+        return qs
 
 
 class LectureViewSet(viewsets.ModelViewSet):
@@ -756,7 +1126,7 @@ class StudentViewSet(viewsets.ReadOnlyModelViewSet):
     def unenroll_course(self, request, pk=None):
         student = self.get_object()
         course_id = request.data.get('course_id')
-        Enrollment.objects.filter(user=student, course_id=course_id).delete()
+        Enrollment.objects.filter(user=student, course_id=course_id).update(status='INACTIVE')
         return Response({'message': "Course un-enrolled successfully."}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='progress')

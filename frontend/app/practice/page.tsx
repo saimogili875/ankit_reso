@@ -26,7 +26,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-type ClassChoice = 'class11' | 'class12';
+interface AcademicClassChoice {
+  id: string | number;
+  name: string;
+  code?: string;
+  slug?: string;
+  exam_name?: string;
+}
 
 interface ApiSubject {
   id: string;
@@ -106,7 +112,8 @@ export default function PracticePage() {
       setSelectedCourse(true);
     }
   }, [activeCourse, enrolledCount]);
-  const [selectedClass, setSelectedClass] = useState<ClassChoice | null>(null);
+  const [classes, setClasses] = useState<AcademicClassChoice[]>([]);
+  const [selectedClass, setSelectedClass] = useState<AcademicClassChoice | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<ApiSubject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<ApiChapter | null>(null);
   const [activeDPP, setActiveDPP] = useState<ApiDPPDetail | null>(null);
@@ -117,6 +124,7 @@ export default function PracticePage() {
   const [dpps, setDpps] = useState<ApiDPP[]>([]);
 
   // Loading states
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [isLoadingDpps, setIsLoadingDpps] = useState(false);
@@ -129,17 +137,54 @@ export default function PracticePage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
 
-  // 1. Fetch Subjects on mount
+  // 1. Fetch Classes for active course (or all academic classes)
   useEffect(() => {
     let isMounted = true;
+    setIsLoadingClasses(true);
+    const endpoint = activeCourse?.id ? `/academics/courses/${activeCourse.id}/classes/` : '/academics/classes/';
+    apiClient.get<AcademicClassChoice[] | { results?: AcademicClassChoice[] }>(endpoint)
+      .then((data) => {
+        if (!isMounted) return;
+        const list = asList<AcademicClassChoice>(data);
+        setClasses(list.length > 0 ? list : [
+          { id: '11', name: 'Class 11', code: '11', slug: 'class-11' },
+          { id: '12', name: 'Class 12', code: '12', slug: 'class-12' },
+        ]);
+      })
+      .catch(() => {
+        if (isMounted) {
+          setClasses([
+            { id: '11', name: 'Class 11', code: '11', slug: 'class-11' },
+            { id: '12', name: 'Class 12', code: '12', slug: 'class-12' },
+          ]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingClasses(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCourse]);
+
+  // 2. Fetch Subjects when class selected
+  useEffect(() => {
+    if (!selectedClass) {
+      setSubjects([]);
+      return;
+    }
+
+    let isMounted = true;
     setIsLoadingSubjects(true);
-    apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>('/academics/subjects/')
+    const endpoint = `/academics/classes/${selectedClass.id}/subjects/`;
+    apiClient.get<ApiSubject[] | { results?: ApiSubject[] }>(endpoint)
       .then((data) => {
         if (!isMounted) return;
         setSubjects(asList<ApiSubject>(data));
       })
       .catch((err) => {
-        console.warn('Failed to load subjects:', err);
+        console.warn('Failed to load class subjects:', err);
       })
       .finally(() => {
         if (isMounted) setIsLoadingSubjects(false);
@@ -148,9 +193,9 @@ export default function PracticePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [selectedClass]);
 
-  // 2. Fetch Chapters when subject & class selected
+  // 3. Fetch Chapters when subject & class selected
   useEffect(() => {
     if (!selectedSubject) {
       setChapters([]);
@@ -159,7 +204,7 @@ export default function PracticePage() {
 
     let isMounted = true;
     setIsLoadingChapters(true);
-    const query = selectedClass ? `?class=${selectedClass}` : '';
+    const query = selectedClass ? `?class=${selectedClass.id}` : '';
     apiClient.get<ApiChapter[]>(`/academics/subjects/${selectedSubject.id}/chapters/${query}`)
       .then((data) => {
         if (!isMounted) return;
@@ -312,7 +357,7 @@ export default function PracticePage() {
             {selectedClass && (
               <>
                 <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="capitalize">{selectedClass === 'class11' ? 'Class 11' : 'Class 12'}</span>
+                <span className="capitalize">{selectedClass.name}</span>
               </>
             )}
             {selectedSubject && (
@@ -686,7 +731,7 @@ export default function PracticePage() {
         /* VIEW 4: CHAPTERS LIST IN SUBJECT */
         <div className="space-y-6">
           <div>
-            <Badge variant="blue" className="capitalize">{selectedClass === 'class11' ? 'Class 11' : 'Class 12'}</Badge>
+            <Badge variant="blue" className="capitalize">{selectedClass.name}</Badge>
             <h2 className="text-xl font-extrabold text-white mt-1">{selectedSubject.name} Chapters</h2>
             <p className="text-xs text-slate-400">Select a chapter to access Daily Practice Problems</p>
           </div>
@@ -734,9 +779,9 @@ export default function PracticePage() {
         /* VIEW 3: SELECT SUBJECT */
         <div className="space-y-6">
           <div>
-            <Badge variant="blue" className="capitalize">{selectedClass === 'class11' ? 'Class 11' : 'Class 12'}</Badge>
+            <Badge variant="blue" className="capitalize">{selectedClass.name}</Badge>
             <h2 className="text-xl font-extrabold text-white mt-1">Select Subject</h2>
-            <p className="text-xs text-slate-400">Choose Physics, Chemistry, or Mathematics</p>
+            <p className="text-xs text-slate-400">Choose a subject to continue</p>
           </div>
 
           {isLoadingSubjects ? (
@@ -767,7 +812,7 @@ export default function PracticePage() {
                     <div>
                       <h3 className="font-extrabold text-lg text-slate-100">{subj.name}</h3>
                       <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                        {subj.description || `JEE Practice Problems for ${subj.name}`}
+                        {subj.description || `Practice Problems for ${subj.name}`}
                       </p>
                     </div>
                     <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-emerald-400">
@@ -784,45 +829,46 @@ export default function PracticePage() {
         /* VIEW 2: SELECT CLASS */
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-extrabold text-white">Select Class</h2>
-            <p className="text-xs text-slate-400">Choose Class 11 or Class 12 syllabus</p>
+            <h2 className="text-xl font-extrabold text-white">Select Academic Class</h2>
+            <p className="text-xs text-slate-400">Choose your academic class syllabus</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl">
-            <Card
-              hoverEffect
-              onClick={() => setSelectedClass('class11')}
-              className="cursor-pointer space-y-4 bg-slate-900 border-slate-800 hover:border-emerald-500/50 p-6 text-center"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-                <BookOpen className="w-7 h-7" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-extrabold text-white">CLASS 11</h3>
-                <p className="text-xs text-slate-400 mt-1">Physics, Chemistry & Mathematics</p>
-              </div>
-              <Button variant="primary" className="w-full font-bold bg-emerald-600 hover:bg-emerald-500">
-                <span>Start Practice →</span>
-              </Button>
+          {isLoadingClasses ? (
+            <div className="flex items-center justify-center min-h-[200px]">
+              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            </div>
+          ) : classes.length === 0 ? (
+            <Card className="p-8 text-center space-y-2 bg-slate-900 border-slate-800">
+              <BookOpen className="w-8 h-8 text-slate-500 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-200">No classes assigned to this course</h3>
+              <p className="text-xs text-slate-400">Please configure classes for this course in the Admin Panel.</p>
             </Card>
-
-            <Card
-              hoverEffect
-              onClick={() => setSelectedClass('class12')}
-              className="cursor-pointer space-y-4 bg-slate-900 border-slate-800 hover:border-emerald-500/50 p-6 text-center"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
-                <BookOpen className="w-7 h-7" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-extrabold text-white">CLASS 12</h3>
-                <p className="text-xs text-slate-400 mt-1">Physics, Chemistry & Mathematics</p>
-              </div>
-              <Button variant="primary" className="w-full font-bold bg-purple-600 hover:bg-purple-500">
-                <span>Start Practice →</span>
-              </Button>
-            </Card>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl">
+              {classes.map((cls, idx) => (
+                <Card
+                  key={cls.id}
+                  hoverEffect
+                  onClick={() => setSelectedClass(cls)}
+                  className="cursor-pointer space-y-4 bg-slate-900 border-slate-800 hover:border-emerald-500/50 p-6 text-center"
+                >
+                  <div className={`w-14 h-14 rounded-2xl ${idx % 2 === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'} border flex items-center justify-center mx-auto`}>
+                    <BookOpen className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-white uppercase">{cls.name}</h3>
+                    {cls.exam_name && (
+                      <p className="text-xs text-emerald-400/90 font-medium mt-0.5">{cls.exam_name}</p>
+                    )}
+                    <p className="text-xs text-slate-400 mt-1">Structured syllabus & daily problems</p>
+                  </div>
+                  <Button variant="primary" className={`w-full font-bold ${idx % 2 === 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
+                    <span>Start Practice →</span>
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         /* VIEW 1: MY ENROLLED COURSES LIST */

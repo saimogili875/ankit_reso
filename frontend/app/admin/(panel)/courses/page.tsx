@@ -29,6 +29,8 @@ interface CourseItem {
   subtitle: string;
   description: string;
   thumbnail_url: string;
+  exam?: string | null;
+  exam_name?: string | null;
   exam_type: 'JEE_MAIN' | 'JEE_ADVANCED' | 'BOTH';
   price: string | number;
   original_price: string | number;
@@ -48,9 +50,21 @@ interface CourseItem {
   created_at: string;
 }
 
+interface ExamOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface OptionItem {
   id: number | string;
   name: string;
+  code?: string;
+  exam_id?: string;
+  exam_name?: string;
+  academic_class_id?: number;
+  class_name?: string;
+  subject_label?: string;
 }
 
 interface EnrolledStudent {
@@ -73,6 +87,7 @@ interface AdminTestSeriesItem {
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<CourseItem[]>([]);
+  const [examsList, setExamsList] = useState<ExamOption[]>([]);
   const [classesList, setClassesList] = useState<OptionItem[]>([]);
   const [subjectsList, setSubjectsList] = useState<OptionItem[]>([]);
   const [allStudentsList, setAllStudentsList] = useState<Array<{ id: string; email: string; name: string }>>([]);
@@ -88,6 +103,7 @@ export default function AdminCoursesPage() {
     subtitle: '',
     description: '',
     thumbnail_url: '/images/hero/slide-1.jpg',
+    exam: '',
     exam_type: 'BOTH' as 'JEE_MAIN' | 'JEE_ADVANCED' | 'BOTH',
     price: 0,
     original_price: 7999,
@@ -186,9 +202,10 @@ export default function AdminCoursesPage() {
     try {
       const [courseRes, optRes] = await Promise.all([
         apiClient.get<CourseItem[]>('/admin-panel/courses/'),
-        apiClient.get<{ classes: OptionItem[]; subjects: OptionItem[] }>('/admin-panel/options/'),
+        apiClient.get<{ exams?: ExamOption[]; classes: OptionItem[]; subjects: OptionItem[] }>('/admin-panel/options/'),
       ]);
       setCourses(asList<CourseItem>(courseRes));
+      setExamsList(optRes?.exams || []);
       setClassesList(optRes?.classes || []);
       setSubjectsList(optRes?.subjects || []);
     } catch (err: unknown) {
@@ -213,6 +230,7 @@ export default function AdminCoursesPage() {
       subtitle: '',
       description: '',
       thumbnail_url: '/images/hero/slide-1.jpg',
+      exam: '',
       exam_type: 'BOTH',
       price: 0,
       original_price: 7999,
@@ -224,8 +242,8 @@ export default function AdminCoursesPage() {
       end_date: '',
       status: 'PUBLISHED',
       allow_self_enrollment: true,
-      classes: classesList.map((c) => Number(c.id)),
-      subjects: subjectsList.map((s) => Number(s.id)),
+      classes: [],
+      subjects: [],
     });
     setIsModalOpen(true);
   };
@@ -239,6 +257,7 @@ export default function AdminCoursesPage() {
       subtitle: course.subtitle || '',
       description: course.description || '',
       thumbnail_url: course.thumbnail_url || '/images/hero/slide-1.jpg',
+      exam: course.exam ? String(course.exam) : '',
       exam_type: course.exam_type || 'BOTH',
       price: Number(course.price) || 0,
       original_price: Number(course.original_price) || 7999,
@@ -286,6 +305,7 @@ export default function AdminCoursesPage() {
         subtitle: formData.subtitle.trim(),
         description: formData.description.trim(),
         thumbnail_url: formData.thumbnail_url.trim() || '/images/hero/slide-1.jpg',
+        exam: formData.exam || null,
         exam_type: formData.exam_type,
         price: Number(formData.price) || 0,
         original_price: Number(formData.original_price) || 0,
@@ -499,7 +519,7 @@ export default function AdminCoursesPage() {
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="border-brand-500/30 text-brand-400 bg-brand-500/10 text-xs">
-                      {course.exam_type.replace('_', ' ')}
+                      {course.exam_name || (course.exam_type ? course.exam_type.replace('_', ' ') : 'General')}
                     </Badge>
                     <button
                       onClick={() => handleToggleStatus(course)}
@@ -661,9 +681,33 @@ export default function AdminCoursesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Exam Type</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Academic Exam</label>
+                  <select
+                    value={formData.exam}
+                    onChange={(e) => {
+                      const newExam = e.target.value;
+                      setFormData({
+                        ...formData,
+                        exam: newExam,
+                        classes: [],
+                        subjects: [],
+                      });
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-brand-500"
+                  >
+                    <option value="">No Specific Exam (General)</option>
+                    {examsList.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Legacy Exam Type</label>
                   <select
                     value={formData.exam_type}
                     onChange={(e) => setFormData({ ...formData, exam_type: e.target.value as CourseItem['exam_type'] })}
@@ -674,7 +718,89 @@ export default function AdminCoursesPage() {
                     <option value="JEE_ADVANCED">JEE Advanced Focus</option>
                   </select>
                 </div>
+              </div>
 
+              {/* Dependent Classes Selection */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Enrolled Academic Classes {formData.exam && <span className="text-slate-500">(Filtered by selected exam)</span>}
+                </label>
+                <div className="flex flex-wrap gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-lg max-h-32 overflow-y-auto">
+                  {classesList
+                    .filter((cls) => !formData.exam || String(cls.exam_id) === formData.exam)
+                    .map((cls) => {
+                      const idNum = Number(cls.id);
+                      const isSelected = formData.classes.includes(idNum);
+                      return (
+                        <button
+                          key={cls.id}
+                          type="button"
+                          onClick={() => {
+                            const newClasses = isSelected
+                              ? formData.classes.filter((c) => c !== idNum)
+                              : [...formData.classes, idNum];
+                            const newSubjects = formData.subjects.filter((sId) => {
+                              const sObj = subjectsList.find((s) => Number(s.id) === sId);
+                              return sObj && sObj.academic_class_id && newClasses.includes(sObj.academic_class_id);
+                            });
+                            setFormData({ ...formData, classes: newClasses, subjects: newSubjects });
+                          }}
+                          className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                            isSelected
+                              ? 'bg-brand-500/20 border-brand-500 text-brand-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          {cls.name} {cls.code ? `(${cls.code})` : ''}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Dependent Subjects Selection */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Enrolled Subjects {formData.classes.length > 0 && <span className="text-slate-500">(Filtered by selected classes)</span>}
+                </label>
+                <div className="flex flex-wrap gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-lg max-h-36 overflow-y-auto">
+                  {subjectsList
+                    .filter((sub) => {
+                      if (formData.classes.length > 0) {
+                        return sub.academic_class_id && formData.classes.includes(sub.academic_class_id);
+                      }
+                      if (formData.exam) {
+                        return String(sub.exam_id) === formData.exam;
+                      }
+                      return true;
+                    })
+                    .map((sub) => {
+                      const idNum = Number(sub.id);
+                      const isSelected = formData.subjects.includes(idNum);
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => {
+                            const newSubs = isSelected
+                              ? formData.subjects.filter((s) => s !== idNum)
+                              : [...formData.subjects, idNum];
+                            setFormData({ ...formData, subjects: newSubs });
+                          }}
+                          className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                            isSelected
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          {sub.subject_label || (sub.class_name ? `${sub.class_name} · ${sub.name}` : sub.name)}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Offer Price (₹)</label>
                   <input

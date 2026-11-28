@@ -35,14 +35,15 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         )
 
         # Academics fixtures
-        self.subject = Subject.objects.create(name='Physics', slug='physics')
-        self.category = Category.objects.create(subject=self.subject, name='Mechanics', slug='mechanics')
-        self.academic_class = AcademicClass.objects.create(name='Class 11', slug='class-11', code='11')
+        self.exam, _ = Exam.objects.get_or_create(slug='jee-main', defaults={'name': 'JEE Main'})
+        self.academic_class = AcademicClass.objects.create(name='Class 11 Test', slug='class-11-test', code='11T', exam=self.exam)
+        self.subject = Subject.objects.create(name='Physics Test', slug='physics-test', academic_class=self.academic_class)
+        self.category = Category.objects.create(subject=self.subject, name='Mechanics Test', slug='mechanics-test')
         self.chapter = Chapter.objects.create(
+            subject=self.subject,
             category=self.category,
-            academic_class=self.academic_class,
-            name='Kinematics',
-            slug='kinematics',
+            name='Kinematics Test',
+            slug='kinematics-test',
             order=1
         )
         self.lecture = Lecture.objects.create(
@@ -51,7 +52,6 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
             title='Intro to Motion',
             duration_seconds=1200
         )
-        self.exam = Exam.objects.create(name='JEE Main', slug='jee-main')
 
     def test_anonymous_and_student_blocked_on_admin_endpoints(self):
         endpoints = [
@@ -386,7 +386,7 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
         }, format='json')
         self.assertEqual(res1.status_code, status.HTTP_200_OK)
         self.assertIn('reply', res1.data)
-        self.assertIn('6:30 PM', res1.data['reply'])
+        self.assertIn('Schedule dashboard', res1.data['reply'])
 
         # 2. Chatbot handles fee query without inventing fees (directs to WhatsApp)
         res2 = self.client.post(reverse('chatbot'), {
@@ -609,20 +609,290 @@ class AdminPanelSecurityAndCrudTests(APITestCase):
 
     def test_delete_subject_and_academic_class_with_chapters_returns_204(self):
         self.client.force_authenticate(user=self.admin)
-        subject = Subject.objects.create(name='Mathematics', slug='mathematics')
+        exam = Exam.objects.create(name='NEET Exam', slug='neet-exam')
+        ac_class = AcademicClass.objects.create(name='Class 12', slug='class-12', code='12', exam=exam)
+        subject = Subject.objects.create(name='Mathematics', slug='mathematics', academic_class=ac_class)
         cat = Category.objects.create(subject=subject, name='Algebra', slug='algebra')
-        ac_class = AcademicClass.objects.create(name='Class 12', slug='class-12', code='12')
-        Chapter.objects.create(category=cat, academic_class=ac_class, name='Matrices', slug='matrices', order=1)
+        Chapter.objects.create(subject=subject, category=cat, name='Matrices', slug='matrices', order=1)
 
-        # Delete subject (cascades categories and chapters)
-        res_sub = self.client.delete(f'/api/admin-panel/subjects/{subject.id}/')
+        # Delete subject without confirm returns 400
+        res_sub_unconfirmed = self.client.delete(f'/api/admin-panel/subjects/{subject.id}/')
+        self.assertEqual(res_sub_unconfirmed.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Delete subject with confirm succeeds
+        res_sub = self.client.delete(f'/api/admin-panel/subjects/{subject.id}/?confirm=true')
         self.assertEqual(res_sub.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Subject.objects.filter(id=subject.id).exists())
 
-        # Delete academic class (sets chapter academic_class to null)
-        res_cls = self.client.delete(f'/api/admin-panel/classes/{ac_class.id}/')
+        # Create another subject under ac_class to test class delete safeguard
+        Subject.objects.create(name='Biology', slug='biology', academic_class=ac_class)
+
+        # Delete academic class without confirm returns 400
+        res_cls_unconfirmed = self.client.delete(f'/api/admin-panel/classes/{ac_class.id}/')
+        self.assertEqual(res_cls_unconfirmed.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Delete academic class with confirm succeeds
+        res_cls = self.client.delete(f'/api/admin-panel/classes/{ac_class.id}/?confirm=true')
         self.assertEqual(res_cls.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(AcademicClass.objects.filter(id=ac_class.id).exists())
+
+    def test_exam_viewset_crud_and_cascade_info(self):
+        self.client.force_authenticate(user=self.admin)
+        # Create
+        res = self.client.post('/api/admin-panel/exams/', {
+            'name': 'KVPY',
+            'description': 'KVPY Exam'
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        exam_id = res.data['id']
+        self.assertEqual(res.data['slug'], 'kvpy')
+
+        # Add class
+        cls = AcademicClass.objects.create(name='SX', slug='sx', code='SX', exam_id=exam_id)
+
+        # Cascade info
+        res_cascade = self.client.get(f'/api/admin-panel/exams/{exam_id}/cascade_info/')
+        self.assertEqual(res_cascade.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_cascade.data['classes_count'], 1)
+
+        # Delete without confirm returns 400
+        res_del = self.client.delete(f'/api/admin-panel/exams/{exam_id}/')
+        self.assertEqual(res_del.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Delete with confirm succeeds
+        res_del_ok = self.client.delete(f'/api/admin-panel/exams/{exam_id}/?confirm=true')
+        self.assertEqual(res_del_ok.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_subject_viewset_scoping_and_duplicate_handling(self):
+        self.client.force_authenticate(user=self.admin)
+        exam_jee = Exam.objects.create(name='JEE Adv', slug='jee-adv')
+        cls_11 = AcademicClass.objects.create(name='Class 11', slug='c11', code='C11', exam=exam_jee)
+        cls_12 = AcademicClass.objects.create(name='Class 12', slug='c12', code='C12', exam=exam_jee)
+
+        # Create Physics under Class 11
+        res1 = self.client.post('/api/admin-panel/subjects/', {
+            'academic_class': str(cls_11.id),
+            'name': 'Physics'
+        })
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED, res1.data)
+        self.assertEqual(res1.data['subject_label'], 'Class 11 · Physics')
+
+        # Duplicate in Class 11 is rejected
+        res_dup = self.client.post('/api/admin-panel/subjects/', {
+            'academic_class': str(cls_11.id),
+            'name': 'physics'  # case-insensitive
+        })
+        self.assertEqual(res_dup.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Same name in Class 12 is ALLOWED
+        res2 = self.client.post('/api/admin-panel/subjects/', {
+            'academic_class': str(cls_12.id),
+            'name': 'Physics'
+        })
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res2.data['subject_label'], 'Class 12 · Physics')
+
+        # Filter by class
+        res_filter = self.client.get(f'/api/admin-panel/subjects/?class={cls_11.id}')
+        self.assertEqual(res_filter.status_code, status.HTTP_200_OK)
+        returned_ids = [s['id'] for s in res_filter.data]
+        self.assertIn(res1.data['id'], returned_ids)
+        self.assertNotIn(res2.data['id'], returned_ids)
+
+    def test_chapter_viewset_scoping_and_slug_autogen(self):
+        self.client.force_authenticate(user=self.admin)
+        exam = Exam.objects.create(name='Olympiad', slug='olympiad')
+        cls = AcademicClass.objects.create(name='Junior', slug='junior', code='JR', exam=exam)
+        subj = Subject.objects.create(name='Astronomy', slug='astronomy', academic_class=cls)
+
+        # Create chapter
+        res1 = self.client.post('/api/admin-panel/chapters/', {
+            'subject': subj.id,
+            'name': 'Solar System'
+        })
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED, res1.data)
+        self.assertEqual(res1.data['slug'], 'solar-system')
+        self.assertEqual(res1.data['subject_label'], 'Junior · Astronomy')
+
+        # Duplicate chapter name in same subject rejected
+        res_dup = self.client.post('/api/admin-panel/chapters/', {
+            'subject': subj.id,
+            'name': 'Solar System'
+        })
+        self.assertEqual(res_dup.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_course_serializer_exam_class_subject_validation(self):
+        self.client.force_authenticate(user=self.admin)
+        exam1 = Exam.objects.create(name='Exam A', slug='exam-a')
+        exam2 = Exam.objects.create(name='Exam B', slug='exam-b')
+
+        cls_a = AcademicClass.objects.create(name='Class A1', slug='ca1', code='CA1', exam=exam1)
+        cls_b = AcademicClass.objects.create(name='Class B1', slug='cb1', code='CB1', exam=exam2)
+
+        subj_a = Subject.objects.create(name='Subject A', slug='sa', academic_class=cls_a)
+        subj_b = Subject.objects.create(name='Subject B', slug='sb', academic_class=cls_b)
+
+        # Mismatch: course has exam1, but selected class is from exam2
+        res_mismatch = self.client.post('/api/admin-panel/courses/', {
+            'title': 'Invalid Exam Course',
+            'exam': str(exam1.id),
+            'classes': [str(cls_b.id)],
+            'price': 100
+        })
+        self.assertEqual(res_mismatch.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('classes', res_mismatch.data)
+
+        # Mismatch: subject does not belong to selected classes
+        res_subj_mismatch = self.client.post('/api/admin-panel/courses/', {
+            'title': 'Invalid Subject Course',
+            'exam': str(exam1.id),
+            'classes': [str(cls_a.id)],
+            'subjects': [subj_b.id],
+            'price': 100
+        })
+        self.assertEqual(res_subj_mismatch.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('subjects', res_subj_mismatch.data)
+
+    def test_options_view_hierarchy_tree(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/admin-panel/options/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('exams', res.data)
+        self.assertIn('classes', res.data)
+        self.assertIn('subjects', res.data)
+        self.assertIn('categories', res.data)
+        self.assertIn('chapters', res.data)
+        self.assertIn('topics', res.data)
+        self.assertIn('tree', res.data)
+        self.assertIsInstance(res.data['tree'], list)
+
+    def test_admin_test_serializer_test_type_mapping(self):
+        """AdminTestSerializer maps legacy FULL to MOCK and SUBJECT to SECTIONAL."""
+        from apps.adminpanel.serializers import AdminTestSerializer
+
+        # Test FULL -> MOCK
+        data_full = {
+            'title': 'Test Full Mock',
+            'test_type': 'FULL',
+            'duration_minutes': 180,
+            'total_marks': 300,
+            'exam': self.exam.id,
+            'classes': [self.academic_class.id],
+            'subjects': [self.subject.id],
+        }
+        ser_full = AdminTestSerializer(data=data_full)
+        self.assertTrue(ser_full.is_valid(), ser_full.errors)
+        self.assertEqual(ser_full.validated_data['test_type'], 'MOCK')
+
+        # Test SUBJECT -> SECTIONAL
+        data_subj = {
+            'title': 'Test Sectional',
+            'test_type': 'SUBJECT',
+            'duration_minutes': 60,
+            'total_marks': 100,
+            'exam': self.exam.id,
+            'classes': [self.academic_class.id],
+            'subjects': [self.subject.id],
+        }
+        ser_subj = AdminTestSerializer(data=data_subj)
+        self.assertTrue(ser_subj.is_valid(), ser_subj.errors)
+        self.assertEqual(ser_subj.validated_data['test_type'], 'SECTIONAL')
+
+        # Test invalid type returns validation error with allowed choices
+        data_invalid = {
+            'title': 'Invalid Type Test',
+            'test_type': 'RANDOM_TYPE',
+            'duration_minutes': 60,
+            'total_marks': 100,
+            'exam': self.exam.id,
+        }
+        ser_invalid = AdminTestSerializer(data=data_invalid)
+        self.assertFalse(ser_invalid.is_valid())
+        self.assertIn('test_type', ser_invalid.errors)
+
+    def test_question_subject_forced_from_chapter_and_mismatch_rejected(self):
+        """When a chapter is set, question subject must match chapter.subject."""
+        from apps.questions.models import Question
+        from apps.adminpanel.serializers import AdminQuestionSerializer
+
+        # 1. Model save automatically derives subject from chapter if missing
+        q = Question.objects.create(
+            chapter=self.chapter,
+            question_text="What is displacement?",
+            difficulty=Question.Difficulty.EASY
+        )
+        self.assertEqual(q.subject, self.chapter.subject)
+
+        # 2. Serializer validation rejects mismatch
+        other_subj = Subject.objects.create(name='Other Subject', slug='other-sub', academic_class=self.academic_class)
+        data = {
+            'chapter': self.chapter.id,
+            'subject': other_subj.id,
+            'question_text': 'Mismatched question',
+            'difficulty': 'EASY',
+            'question_type': 'SINGLE',
+            'options': [
+                {'option_text': 'A', 'is_correct': True},
+                {'option_text': 'B', 'is_correct': False},
+            ]
+        }
+        ser = AdminQuestionSerializer(data=data)
+        self.assertFalse(ser.is_valid())
+        self.assertIn('chapter', ser.errors)
+
+    def test_course_sync_features_and_addons_differential(self):
+        """sync_features and sync_addons preserve existing row IDs and do not delete-all-recreate."""
+        self.client.force_authenticate(user=self.admin)
+        course = Course.objects.create(title='Sync Test Course', slug='sync-test-course', exam=self.exam, price=100)
+        f1 = CourseFeature.objects.create(course=course, text='Original Feature 1', order=1)
+        f2 = CourseFeature.objects.create(course=course, text='Original Feature 2', order=2)
+
+        # Sync features: update f1 text, omit f2 (deleted), add new f3
+        res = self.client.post(f'/api/admin-panel/courses/{course.id}/sync-features/', {
+            'features': [
+                {'id': f1.id, 'text': 'Updated Feature 1', 'order': 1},
+                {'text': 'New Feature 3', 'order': 2}
+            ]
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # f1 still exists with same PK
+        f1.refresh_from_db()
+        self.assertEqual(f1.text, 'Updated Feature 1')
+        self.assertFalse(CourseFeature.objects.filter(id=f2.id).exists())
+        self.assertTrue(CourseFeature.objects.filter(course=course, text='New Feature 3').exists())
+
+        # Sync addons: differential update
+        a1 = CourseAddon.objects.create(course=course, title='Addon 1', price=50, order=1)
+        a2 = CourseAddon.objects.create(course=course, title='Addon 2', price=75, order=2)
+
+        res_a = self.client.post(f'/api/admin-panel/courses/{course.id}/sync-addons/', {
+            'addons': [
+                {'id': a1.id, 'title': 'Updated Addon 1', 'price': 60, 'order': 1},
+                {'title': 'New Addon 3', 'price': 90, 'order': 2}
+            ]
+        }, format='json')
+        self.assertEqual(res_a.status_code, status.HTTP_200_OK)
+        a1.refresh_from_db()
+        self.assertEqual(a1.title, 'Updated Addon 1')
+        self.assertEqual(a1.price, 60)
+        self.assertFalse(CourseAddon.objects.filter(id=a2.id).exists())
+        self.assertTrue(CourseAddon.objects.filter(course=course, title='New Addon 3').exists())
+
+    def test_unenroll_student_sets_status_inactive(self):
+        """Unenrolling a student sets Enrollment.status to INACTIVE instead of deleting."""
+        self.client.force_authenticate(user=self.admin)
+        course = Course.objects.create(title='Unenroll Test Course', slug='unenroll-test-course', exam=self.exam, price=100)
+        enrollment = Enrollment.objects.create(user=self.student, course=course, status='ACTIVE')
+
+        res = self.client.post(f'/api/admin-panel/courses/{course.id}/unenroll-student/', {
+            'user_id': self.student.id
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        enrollment.refresh_from_db()
+        self.assertEqual(enrollment.status, 'INACTIVE')
+
+
+
 
 
 

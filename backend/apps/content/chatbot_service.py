@@ -44,11 +44,9 @@ def get_keyword_faq_response(user_message: str) -> str:
 
     if any(k in msg for k in ['course', 'timing', 'schedule', 'time', 'hours', 'dropper', 'evening', 'morning', 'class 11', 'class 12']):
         return (
-            "Our live class schedules are:\n"
-            "• Class 11 & 12 Evening Schedule: Mon–Sat, 6:30 PM – 8:30 PM\n"
-            "• Droppers Accelerated Immersion: Mon–Sat, 9:00 AM – 12:00 Noon\n"
-            "• Sunday: All-India CBT Mock Tests\n\n"
-            "All sessions include 2-hour HD recording uploads to your student vault."
+            "Our live interactive lectures and doubt clearing sessions are scheduled across morning and evening slots.\n"
+            "Please check your personalized student Schedule dashboard for exact course lecture timings, live meet links, and test dates.\n"
+            "All sessions include HD recording uploads to your student vault within 2 hours of lecture completion."
         )
 
     if any(k in msg for k in ['demo', 'trial', 'free class', 'sample', 'youtube']):

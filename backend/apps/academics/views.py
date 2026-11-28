@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -12,55 +12,127 @@ from .serializers import (
 
 class CourseListView(generics.ListAPIView):
     serializer_class = CourseSerializer
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         return Course.objects.filter(is_published=True)
 
 class CourseDetailView(generics.RetrieveAPIView):
     serializer_class = CourseSerializer
-    queryset = Course.objects.all()
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        user = self.request.user
+        is_admin = user.is_authenticated and (getattr(user, 'role', '') == 'ADMIN' or user.is_staff or user.is_superuser)
+        if is_admin:
+            return Course.objects.all()
+        return Course.objects.filter(is_published=True)
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_value = self.kwargs.get(lookup_url_kwarg, self.kwargs.get('pk'))
+        import uuid
+        try:
+            uuid.UUID(str(filter_value))
+            obj = generics.get_object_or_404(queryset, id=filter_value)
+        except (ValueError, AttributeError):
+            obj = generics.get_object_or_404(queryset, slug=filter_value)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
 class CourseClassesView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request, pk):
+        user = request.user
+        is_admin = user.is_authenticated and (getattr(user, 'role', '') == 'ADMIN' or user.is_staff or user.is_superuser)
         try:
-            course = Course.objects.get(pk=pk)
+            qs = Course.objects.all() if is_admin else Course.objects.filter(is_published=True)
+            import uuid
+            try:
+                uuid.UUID(str(pk))
+                course = qs.get(pk=pk)
+            except (ValueError, AttributeError):
+                course = qs.get(slug=pk)
             classes = course.classes.all().order_by('order', 'name')
             serializer = AcademicClassSerializer(classes, many=True)
             return Response(serializer.data)
         except Course.DoesNotExist:
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
 
+class AcademicClassListView(generics.ListAPIView):
+    serializer_class = AcademicClassSerializer
+    queryset = AcademicClass.objects.all().order_by('order', 'name')
+    pagination_class = None
+
 class SubjectListView(generics.ListAPIView):
     serializer_class = SubjectSerializer
-    queryset = Subject.objects.all().order_by('name')
     pagination_class = None
+
+    def get_queryset(self):
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            user = self.request.user
+            if not user or not user.is_authenticated:
+                from rest_framework.exceptions import NotAuthenticated
+                raise NotAuthenticated()
+
+            is_admin = getattr(user, 'role', '') == 'ADMIN' or user.is_staff or user.is_superuser
+            if not is_admin:
+                is_enrolled = Enrollment.objects.filter(
+                    user=user,
+                    course_id=course_id,
+                    status='ACTIVE'
+                ).exists()
+                if not is_enrolled:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("You are not actively enrolled in this course.")
+
+            try:
+                course = Course.objects.get(id=course_id)
+                return course.subjects.select_related('academic_class', 'academic_class__exam').order_by('order', 'name')
+            except (Course.DoesNotExist, ValueError):
+                return Subject.objects.none()
+
+        return Subject.objects.select_related('academic_class', 'academic_class__exam').all().order_by('order', 'name')
 
 class ClassSubjectsView(APIView):
     def get(self, request, pk):
-        subjects = Subject.objects.all().order_by('name')
+        subjects = Subject.objects.filter(
+            models.Q(academic_class_id=pk) |
+            models.Q(academic_class__code=pk) |
+            models.Q(academic_class__slug=pk)
+        ).order_by('order', 'name')
         return Response(SubjectSerializer(subjects, many=True).data)
 
 class SubjectChaptersView(APIView):
     def get(self, request, pk):
+        class_param = request.query_params.get('class', None)
         subject = None
         try:
-            subject = Subject.objects.filter(models.Q(id=pk) | models.Q(slug=pk)).first()
+            subject = Subject.objects.filter(id=pk).first()
         except (ValidationError, ValueError):
-            subject = Subject.objects.filter(slug=pk).first()
+            pass
+
+        if not subject:
+            qs = Subject.objects.filter(slug=pk)
+            if class_param:
+                qs = qs.filter(
+                    models.Q(academic_class_id=class_param) |
+                    models.Q(academic_class__code=class_param) |
+                    models.Q(academic_class__slug=class_param)
+                )
+            subject = qs.first()
 
         if not subject:
             return Response({'error': 'Subject not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        chapters = Chapter.objects.filter(category__subject=subject)
+        chapters = Chapter.objects.filter(
+            models.Q(subject=subject) | models.Q(category__subject=subject)
+        ).distinct().order_by('order', 'id')
 
-        class_code = request.query_params.get('class', None)
-        if class_code:
-            chapters = chapters.filter(
-                models.Q(academic_class__code=class_code) |
-                models.Q(academic_class__id=class_code)
-            )
-
-        serializer = ChapterSerializer(chapters.order_by('order', 'id'), many=True)
+        serializer = ChapterSerializer(chapters, many=True)
         return Response(serializer.data)
 
 class ChapterLecturesView(generics.ListAPIView):
@@ -86,6 +158,9 @@ class EnrollView(APIView):
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
 
         is_admin_or_staff = request.user.is_staff or getattr(request.user, 'role', '') == 'ADMIN'
+        if not course.is_published and not is_admin_or_staff:
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+
         if not course.allow_self_enrollment and not is_admin_or_staff:
             return Response({
                 'error': 'Direct self-enrollment is disabled for this course. Please contact administration to enroll.'

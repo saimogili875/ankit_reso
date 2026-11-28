@@ -19,6 +19,7 @@ import {
   Package,
   PlusCircle,
   Settings,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     title: 'Academics',
     items: [
+      { label: 'Exams & Classes', href: '/admin/exams', icon: Layers, hint: 'Manage academic exams, classes and subjects hierarchy' },
       { label: 'Courses', href: '/admin/courses', icon: GraduationCap, hint: 'Create courses, pricing, add-ons and modules' },
       { label: 'Course Content', href: '/admin/course-content', icon: FolderTree, hint: 'Manage sections & items: modules, practice, notes, test series' },
       { label: 'Curriculum & Modules', href: '/admin/modules', icon: FolderTree, hint: 'Subjects, chapters, lectures and DPPs' },
@@ -61,7 +63,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { label: 'Question Bank', href: '/admin/questions', icon: HelpCircle, hint: 'Single, multi and numerical questions' },
       { label: 'Study Materials', href: '/admin/materials', icon: FileText, hint: 'PDFs, notes and handouts' },
       { label: 'CBT Mock Tests', href: '/admin/tests', icon: Clock, hint: 'Build and publish timed tests' },
-      { label: 'Add Exam', href: '/admin/tests?create=true', icon: PlusCircle, hint: 'Create an exam (title, duration, marks, questions)' },
+      { label: 'Add Test', href: '/admin/tests?create=true', icon: PlusCircle, hint: 'Create a timed test' },
     ],
   },
   {

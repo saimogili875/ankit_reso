@@ -1,35 +1,62 @@
 import uuid
 from django.core.management.base import BaseCommand
-from apps.academics.models import AcademicClass, Subject, Course, Category, Chapter, Lecture
+from apps.academics.models import Exam, AcademicClass, Subject, Course, Category, Chapter, Lecture
 from apps.content.models import Video
 from apps.questions.models import Question, QuestionOption, DPP, DPPQuestion
 
 class Command(BaseCommand):
-    help = 'Seeds initial course, class, subject, chapter, lecture, DPP, and question data into Django database'
+    help = 'Seeds initial demo course, class, subject, chapter, lecture, DPP, and question data into Django database (DEMO ONLY)'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS("Starting database seeding for AdeptEduverse..."))
+        self.stdout.write(self.style.SUCCESS("Starting demo database seeding for AdeptEduverse..."))
+
+        # 0. Demo Exam
+        demo_exam, _ = Exam.objects.get_or_create(
+            slug='jee-main',
+            defaults={'name': 'JEE Main', 'order': 1, 'is_active': True, 'description': 'Demo JEE Main Exam'}
+        )
 
         # 1. Academic Classes
         c11, _ = AcademicClass.objects.get_or_create(
+            exam=demo_exam,
             code='class11',
             defaults={'name': 'Class 11', 'slug': 'class-11', 'order': 1}
         )
         c12, _ = AcademicClass.objects.get_or_create(
+            exam=demo_exam,
             code='class12',
             defaults={'name': 'Class 12', 'slug': 'class-12', 'order': 2}
         )
 
-        # 2. Subjects
-        phy, _ = Subject.objects.get_or_create(
+        # 2. Subjects per AcademicClass
+        phy_11, _ = Subject.objects.get_or_create(
+            academic_class=c11,
             slug='physics',
             defaults={'name': 'Physics', 'icon': 'Atom', 'color_hex': '#3B82F6'}
         )
-        chem, _ = Subject.objects.get_or_create(
+        chem_11, _ = Subject.objects.get_or_create(
+            academic_class=c11,
             slug='chemistry',
             defaults={'name': 'Chemistry', 'icon': 'FlaskConical', 'color_hex': '#10B981'}
         )
-        math, _ = Subject.objects.get_or_create(
+        math_11, _ = Subject.objects.get_or_create(
+            academic_class=c11,
+            slug='mathematics',
+            defaults={'name': 'Mathematics', 'icon': 'Calculator', 'color_hex': '#8B5CF6'}
+        )
+
+        phy_12, _ = Subject.objects.get_or_create(
+            academic_class=c12,
+            slug='physics',
+            defaults={'name': 'Physics', 'icon': 'Atom', 'color_hex': '#3B82F6'}
+        )
+        chem_12, _ = Subject.objects.get_or_create(
+            academic_class=c12,
+            slug='chemistry',
+            defaults={'name': 'Chemistry', 'icon': 'FlaskConical', 'color_hex': '#10B981'}
+        )
+        math_12, _ = Subject.objects.get_or_create(
+            academic_class=c12,
             slug='mathematics',
             defaults={'name': 'Mathematics', 'icon': 'Calculator', 'color_hex': '#8B5CF6'}
         )
@@ -38,6 +65,7 @@ class Command(BaseCommand):
         course, _ = Course.objects.get_or_create(
             slug='jee-complete-2025',
             defaults={
+                'exam': demo_exam,
                 'title': 'JEE Main + Advanced Complete Preparation Course',
                 'subtitle': 'Structured learning, expert lectures, practice questions, mock tests and complete revision for Class 11 & Class 12.',
                 'description': 'Comprehensive JEE preparation package covering Physics, Chemistry, and Mathematics.',
@@ -49,23 +77,23 @@ class Command(BaseCommand):
             }
         )
         course.classes.set([c11, c12])
-        course.subjects.set([phy, chem, math])
+        course.subjects.set([phy_11, chem_11, math_11, phy_12, chem_12, math_12])
 
         # Demo YouTube Video IDs
         demo_videos = ['dQw4w9WgXcQ', 'M7lc1UVf-VE', 'L_LUpnjgPso']
 
         # Helper to create Category & Chapters
-        def create_chapter_data(subj, ac_class, cat_name, chap_name, chap_slug, lectures_data, dpps_data):
+        def create_chapter_data(subj, cat_name, chap_name, chap_slug, lectures_data, dpps_data):
             cat, _ = Category.objects.get_or_create(
                 subject=subj,
-                slug=f"{subj.slug}-{ac_class.code}-{cat_name.lower().replace(' ', '-')}",
+                slug=f"{subj.slug}-{cat_name.lower().replace(' ', '-')}",
                 defaults={'name': cat_name}
             )
             chap, _ = Chapter.objects.get_or_create(
+                subject=subj,
                 slug=chap_slug,
                 defaults={
                     'category': cat,
-                    'academic_class': ac_class,
                     'name': chap_name,
                     'order': 1,
                     'description': f"Complete JEE preparation module for {chap_name}."
@@ -138,7 +166,7 @@ class Command(BaseCommand):
 
         # Class 11 - Physics Chapters
         create_chapter_data(
-            phy, c11, 'Mechanics', 'Units & Measurements', 'phy-11-c1',
+            phy_11, 'Mechanics', 'Units & Measurements', 'phy-11-c1',
             [
                 {'title': 'Introduction to Physical Quantities & SI Units', 'duration_seconds': 1680},
                 {'title': 'Dimensional Analysis & Applications', 'duration_seconds': 2100},
@@ -220,7 +248,7 @@ class Command(BaseCommand):
 
         # Class 12 - Physics Chapters
         create_chapter_data(
-            phy, c12, 'Electromagnetism', 'Electrostatics', 'phy-12-c1',
+            phy_12, 'Electromagnetism', 'Electrostatics', 'phy-12-c1',
             [
                 {'title': 'Coulombs Law & Vector Form', 'duration_seconds': 2280},
                 {'title': 'Electric Field & Gauss Theorem Applications', 'duration_seconds': 2640},

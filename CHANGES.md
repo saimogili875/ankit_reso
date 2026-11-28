@@ -1,5 +1,100 @@
 # AdeptEduverse / ANKIT JEE — Full-Stack Platform Update
 
+## Phase 1 — Step 1.2: Exam > Class > Subject Hierarchy Refinements & Course Feature/Addon Differential Sync
+
+### Summary of Major Deliverables
+1. **Model & Question Association Safeguards**:
+   - `Question.clean()` & `Question.save()`: Model-level enforcement ensuring `subject = chapter.subject` when chapter is set. Serializer validation rejects any mismatch between a question's subject and its chapter's subject.
+   - Preserved `topics` JSONField for legacy support while strictly binding subjects to their parent `academic_class`.
+
+2. **Course Differential Addon & Feature Updates**:
+   - Refactored `CourseViewSet.sync_features`: Identifies existing rows by ID and performs in-place differential updates (`feat.text`, `feat.order`) rather than destructive `delete()`-and-recreate cycles. Creates new records and prunes only omitted IDs.
+   - Refactored `CourseViewSet.sync_addons`: Updates existing addon records in place by ID, creates newly added addons, and deletes only omitted records.
+   - Replaced enrollment deletion in `CourseViewSet.unenroll_student` and `StudentViewSet.unenroll_course` with non-destructive status updates (`status='INACTIVE'`).
+
+3. **Complete Contextual Scoping on Admin & Student Serializers**:
+   - Added complete hierarchical metadata across `AdminSubjectSerializer`, `AdminChapterSerializer`, `AdminLectureSerializer`, `AdminDPPSerializer`, `AdminQuestionSerializer`, and `AdminStudyMaterialSerializer`: `exam_id`, `exam_name`, `class_id`, `class_name`, `subject_id`, `subject_name`, and formatted `subject_label` (`"Class 11 · Physics"`).
+   - Added `academic_class_id`, `academic_class_name`, `class_id`, `class_name`, `exam_id`, `exam_name`, and `subject_label` to public `SubjectSerializer`.
+
+4. **Student Subject Listing Scoped to Active Course Enrollment**:
+   - `SubjectListView`: Supports `?course=<id>`. Requires active enrollment (`Enrollment.status == 'ACTIVE'`) for students (returning 403 Forbidden for non-enrolled students and 401 Unauthorized for unauthenticated visitors) while permitting staff/admins. Returns only the subjects associated with the course.
+
+5. **Chatbot Service & Demo Data Refinements**:
+   - Made live class schedule copy in `apps.content.chatbot_service` generic, directing students to their dynamic student Schedule dashboard.
+   - Maintained `seed_course_data.py` and `seed_pricing.py` as optional, non-automatic DEMO seeds properly adhering to `Exam -> AcademicClass -> Subject`.
+
+---
+
+## Phase 1 — Step 1.1: Quick Fixes (Test Types, Books Cover/PDF Independence & Draft Gating)
+
+### Summary of Major Deliverables
+1. **Test Type Normalization & Mapping**:
+   - Resolved mismatch where frontend passed legacy `FULL` or `SUBJECT` while backend enum required `MOCK`, `PYQ`, `CHAPTER`, `SECTIONAL`.
+   - Updated `AdminTestSerializer` with `to_internal_value()` mapping `FULL` -> `MOCK` and `SUBJECT` -> `SECTIONAL` case-insensitively, and custom `validate_test_type()` returning descriptive allowed choices.
+   - Updated frontend TypeScript interface (`Test.test_type: 'MOCK' | 'PYQ' | 'CHAPTER' | 'SECTIONAL'`) and admin test modal dropdown with human-friendly labels.
+   - Enhanced `handleSaveTest` in admin tests console to catch and render structured DRF validation error payloads.
+   - Renamed admin navigation item from `"Add Exam"` to `"Add Test"` with hint `"Create a timed test"`.
+
+2. **Books Cover & PDF Independence**:
+   - Decoupled cover image and PDF document uploads so either can exist or be updated without the other.
+   - Updated `BookProductAdminSerializer` and `BookProductPublicSerializer` with computed boolean indicators `has_cover` and `has_pdf`. Kept `pdf_key` strictly admin-only.
+   - Enforced validation rule in `BookProductAdminSerializer` disallowing publishing of books with `digital_price > 0` unless a valid PDF document is attached.
+   - Guarded digital guest checkout (`BookOrderCreateView`): returns 400 Bad Request if digital copy is purchased for a book without an attached PDF.
+   - Updated `upload_pdf` in `books/views.py`: default behavior preserves existing cover images; page-1 cover extraction is only performed when explicitly requested via `auto_cover=True` (and no cover is set) or `replace_cover=True`.
+   - Added dedicated admin endpoints `@action(detail=True, methods=['delete'])` for `/remove-cover/` and `/remove-pdf/`.
+   - Admin Books UI updated with:
+     - Clear status chips in catalog table: `Cover set` / `No cover`, `PDF attached` / `No PDF` / `PDF not needed`.
+     - Labelled action buttons for `Cover` and `PDF`.
+     - Independent Cover Image (preview, upload, remove) and Book PDF (status, upload, remove, optional page-1 cover checkbox) sections in Create/Edit modal.
+     - Student storefront guards: digital purchase disabled with clear badges if digital edition lacks an attached PDF.
+
+3. **Draft Course Gating**:
+   - `CourseDetailView.get_queryset()`: returns unpublished courses strictly for staff/admins; returns 404 for non-admin students and unauthenticated visitors.
+   - `CourseClassesView.get()`: non-admins receive 404 for draft courses.
+   - `EnrollView.post()`: rejects student self-enrollment into unpublished courses with 404.
+
+---
+
+## Admin-Driven Academic Hierarchy (Phase 1 - Phase 5)
+
+### Summary of Major Deliverables
+1. **Dynamic Academic Hierarchy Architecture**:
+   - Replaced fixed, global academic structures with an admin-driven tree:
+     `Exam -> AcademicClass -> Subject -> Chapter -> (Topic, Lecture->Video, DPP, Question)`
+   - Decoupled all components from hardcoded "Class 11", "Class 12", "JEE Main", or "JEE Advanced" assumptions.
+   - Enforced strict scoped ownership:
+     - `Exam`: unique `(name, slug)` globally.
+     - `AcademicClass`: scoped uniquely to `(exam, slug)`, `(exam, code)`, `(exam, Lower('name'))`.
+     - `Subject`: belongs to exactly one `AcademicClass`. Scoped uniquely to `(academic_class, slug)` and `(academic_class, Lower('name'))`. Subjects across classes (e.g. "Physics" in Class 11 and "Physics" in Class 12) are completely isolated database rows with no cross-talk.
+     - `Category`: optional grouping scoped to `(subject, slug)`.
+     - `Chapter`: scoped uniquely to `(subject, slug)` and `(subject, name)`.
+     - `DPP`: scoped uniquely to `(chapter, dpp_number)`.
+   - Data-preserving migrations (`academics/0010`, `0011`, `0012`, `questions/0004`) and idempotent backfill management command (`migrate_academic_hierarchy.py`).
+
+2. **Admin Panel Management API & Cascade Safeguards (Phase 2)**:
+   - Full CRUD endpoints for `Exam`, `AcademicClass`, `Subject`, `Category`, `Topic`, `Chapter`.
+   - Built downstream cascade analysis endpoint (`GET /api/admin-panel/<model>/<id>/cascade_info/`).
+   - Guarded destructive deletions: requires `?confirm=true` if downstream entities (classes, subjects, chapters, questions, DPPs) exist.
+   - Cascading options tree in `OptionsView` (`GET /api/admin-panel/options/`).
+
+3. **Admin Frontend Hierarchy Tools (Phase 3)**:
+   - Dedicated 3-column management console at `/admin/exams` for managing Exams, Classes, and Subjects.
+   - Reusable `<AcademicPicker />` component with cascading dropdowns (`Exam -> Class -> Subject -> Chapter`).
+   - Integrated cascading scope filter bar in `/admin/modules`.
+   - Dynamic exam/class/subject chip multi-selectors in `/admin/courses`.
+   - Clear contextual labels (`"Class 11 · Physics"`) in Questions, Materials, Videos, and Schedule.
+
+4. **Student Experience Decoupling (Phase 4)**:
+   - Dynamic class and subject discovery in `/learn` and `/practice` scoped to the student's enrolled course.
+   - Test results (`/tests/[id]/result`) and student analytics keyed and filtered by Subject ID instead of global string names.
+
+5. **Verification & Testing (Phase 5)**:
+   - Full test suite: 42 backend test cases across `academics` and `adminpanel` passing cleanly in 21s.
+   - Integration test suite (`AcademicHierarchyIntegrationTestCase`) covering cross-parent composite uniqueness, data isolation, student endpoints, and cascade deletion guards.
+   - Zero-error Next.js production build (`60/60 static pages generated`).
+
+---
+
 ## Phase 1 & Phase 2: Course Architecture, Test Series Bundles, Exams Section, Gated Rank Board & Multi-Course Scoping (Feature Release)
 
 ### Summary of Major Deliverables

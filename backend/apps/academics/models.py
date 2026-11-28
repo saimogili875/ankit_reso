@@ -1,39 +1,59 @@
 from django.db import models
+from django.db.models.functions import Lower
 from apps.core.models import TimeStampedModel
+
 
 class Exam(TimeStampedModel):
     """
-    JEE Main, JEE Advanced, etc.
+    Top-level Exam (e.g. JEE Main, NEET, CBSE Board).
+    Admin-driven hierarchy root.
     """
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.name
-
-class AcademicClass(TimeStampedModel):
-    """
-    Represents Class 11, Class 12, etc.
-    """
-    name = models.CharField(max_length=50, unique=True) # e.g. "Class 11", "Class 12"
-    slug = models.SlugField(max_length=50, unique=True) # e.g. "class-11", "class-12"
-    code = models.CharField(max_length=20, unique=True) # e.g. "class11", "class12"
     order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        verbose_name_plural = "Academic Classes"
         ordering = ['order', 'name']
 
     def __str__(self):
         return self.name
 
+
+class AcademicClass(TimeStampedModel):
+    """
+    Class under a specific Exam (e.g. Class 11 under JEE Main).
+    Unique per Exam.
+    """
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='classes')
+    name = models.CharField(max_length=50) # e.g. "Class 11", "Class 12"
+    slug = models.SlugField(max_length=50) # e.g. "class-11", "class-12"
+    code = models.CharField(max_length=20) # e.g. "class11", "class12"
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name_plural = "Academic Classes"
+        ordering = ['order', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['exam', 'slug'], name='unique_exam_class_slug'),
+            models.UniqueConstraint(fields=['exam', 'code'], name='unique_exam_class_code'),
+            models.UniqueConstraint(Lower('name'), 'exam', name='unique_exam_class_name'),
+        ]
+
+    def __str__(self):
+        exam_name = self.exam.name if hasattr(self, 'exam') and self.exam else "Unassigned"
+        return f"{self.name} ({exam_name})"
+
+
 class Subject(TimeStampedModel):
     """
-    Physics, Chemistry, Mathematics.
+    Subject under a specific AcademicClass (e.g. Physics under Class 11).
+    A Subject belongs to exactly ONE AcademicClass.
     """
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    academic_class = models.ForeignKey(AcademicClass, on_delete=models.CASCADE, related_name='subjects')
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     icon = models.CharField(max_length=50, blank=True)
     color_hex = models.CharField(max_length=10, default='#3B82F6')
@@ -43,30 +63,31 @@ class Subject(TimeStampedModel):
 
     class Meta:
         ordering = ['order', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['academic_class', 'slug'], name='unique_class_subject_slug'),
+            models.UniqueConstraint(Lower('name'), 'academic_class', name='unique_class_subject_name'),
+        ]
 
     def __str__(self):
-        return self.name
+        class_str = self.academic_class.name if hasattr(self, 'academic_class') and self.academic_class else "Unassigned"
+        return f"{class_str} · {self.name}"
+
 
 class Course(TimeStampedModel):
     """
     Central Course product (e.g. JEE Main + Advanced Complete Preparation Course).
-    Aggregates AcademicClasses and Subjects.
+    Aggregates an Exam, AcademicClasses and Subjects.
     """
-    class ExamType(models.TextChoices):
-        JEE_MAIN = 'JEE_MAIN', 'JEE Main'
-        JEE_ADVANCED = 'JEE_ADVANCED', 'JEE Advanced'
-        BOTH = 'BOTH', 'JEE Main & Advanced'
-
     class Status(models.TextChoices):
         DRAFT = 'DRAFT', 'Draft'
         PUBLISHED = 'PUBLISHED', 'Published'
 
+    exam = models.ForeignKey(Exam, on_delete=models.SET_NULL, null=True, blank=True, related_name='courses')
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     subtitle = models.CharField(max_length=500, blank=True)
     description = models.TextField(blank=True)
     thumbnail_url = models.CharField(max_length=500, blank=True, default='/images/hero/slide-1.jpg')
-    exam_type = models.CharField(max_length=50, choices=ExamType.choices, default=ExamType.BOTH)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     original_price = models.DecimalField(max_digits=10, decimal_places=2, default=7999.00)
     discount_badge = models.CharField(max_length=50, default='100% OFF (FREE)')
@@ -86,8 +107,16 @@ class Course(TimeStampedModel):
     has_live_classes = models.BooleanField(default=False, help_text="Set to True only if course conducts live classes")
     display_order = models.IntegerField(default=0)
 
+    @property
+    def exam_type(self) -> str:
+        """Backward-compatible read-only string for legacy callers during rollout."""
+        if self.exam:
+            return self.exam.name
+        return "JEE"
+
     def __str__(self):
         return self.title
+
 
 class Category(TimeStampedModel):
     """
@@ -99,25 +128,40 @@ class Category(TimeStampedModel):
 
     class Meta:
         verbose_name_plural = "Categories"
+        constraints = [
+            models.UniqueConstraint(fields=['subject', 'slug'], name='unique_subject_category_slug')
+        ]
 
     def __str__(self):
-        return f"{self.subject.name} - {self.name}"
+        return f"{self.subject} -> {self.name}"
+
 
 class Chapter(TimeStampedModel):
     """
     Specific chapters (e.g. Kinematics, Chemical Bonding, Vectors).
-    Optionally associated with an AcademicClass (Class 11 / Class 12).
+    Belongs directly to a Subject.
     """
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='chapters')
-    academic_class = models.ForeignKey(AcademicClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='chapters')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='chapters')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='chapters')
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200)
     order = models.IntegerField(default=0)
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ['order', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['subject', 'slug'], name='unique_subject_chapter_slug'),
+            models.UniqueConstraint(fields=['subject', 'name'], name='unique_subject_chapter_name'),
+        ]
+
+    @property
+    def academic_class(self):
+        """Derived from subject for backward compatibility."""
+        return self.subject.academic_class if self.subject else None
+
     def __str__(self):
-        class_label = f"[{self.academic_class.name}] " if self.academic_class else ""
-        return f"{class_label}{self.category.subject.name} -> {self.name}"
+        return f"{self.subject} -> {self.name}"
 
 class Topic(TimeStampedModel):
     """

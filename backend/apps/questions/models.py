@@ -26,6 +26,21 @@ class Question(TimeStampedModel):
     numerical_lower_bound = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
     numerical_upper_bound = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
 
+    def clean(self):
+        super().clean()
+        if self.chapter and self.chapter.subject:
+            if self.subject and self.subject_id != self.chapter.subject_id:
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'subject': f"Question subject ({self.subject}) must match chapter's subject ({self.chapter.subject})."
+                })
+            self.subject = self.chapter.subject
+
+    def save(self, *args, **kwargs):
+        if self.chapter and self.chapter.subject:
+            self.subject = self.chapter.subject
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Question #{self.id} ({self.difficulty})"
 
@@ -62,6 +77,9 @@ class DPP(TimeStampedModel):
 
     class Meta:
         ordering = ['dpp_number', 'title']
+        constraints = [
+            models.UniqueConstraint(fields=['chapter', 'dpp_number'], name='unique_chapter_dpp_number')
+        ]
 
     def __str__(self):
         return f"DPP {self.dpp_number}: {self.title} ({self.chapter.name})"

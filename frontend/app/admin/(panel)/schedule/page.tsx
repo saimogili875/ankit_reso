@@ -27,6 +27,8 @@ interface CourseOption {
 interface SubjectOption {
   id: number;
   name: string;
+  subject_label?: string;
+  class_name?: string;
 }
 
 interface ChapterOption {
@@ -58,6 +60,9 @@ interface ScheduleEventItem {
   description: string;
   subject?: number;
   subject_name?: string;
+  subject_label?: string;
+  class_name?: string;
+  exam_name?: string;
   chapter?: string;
   chapter_name?: string;
   start_time: string;
@@ -319,8 +324,8 @@ export default function AdminSchedulePage() {
                     <Badge variant="outline" className="border-slate-800 bg-slate-950 text-slate-300 text-xs">
                       {ev.course_title}
                     </Badge>
-                    {ev.subject_name && (
-                      <span className="text-xs text-brand-400 font-semibold">{ev.subject_name}</span>
+                    {(ev.subject_label || ev.subject_name) && (
+                      <span className="text-xs text-brand-400 font-semibold">{ev.subject_label || ev.subject_name}</span>
                     )}
                   </div>
 
@@ -523,7 +528,9 @@ export default function AdminSchedulePage() {
                   >
                     <option value="">General Academic</option>
                     {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.subject_label || (s.class_name ? `${s.class_name} · ${s.name}` : s.name)}
+                      </option>
                     ))}
                   </select>
                 </div>

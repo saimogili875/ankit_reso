@@ -11,6 +11,9 @@ class BookProductPublicSerializer(serializers.ModelSerializer):
     Public student/guest-facing serializer for books catalog.
     Strictly excludes pdf_key to prevent direct unauthorized access.
     """
+    has_cover = serializers.SerializerMethodField()
+    has_pdf = serializers.SerializerMethodField()
+
     class Meta:
         model = BookProduct
         fields = [
@@ -35,16 +38,26 @@ class BookProductPublicSerializer(serializers.ModelSerializer):
             'stock_hardcopy',
             'highlights',
             'badge',
+            'has_cover',
+            'has_pdf',
             'created_at',
             'updated_at',
         ]
         read_only_fields = fields
+
+    def get_has_cover(self, obj):
+        return bool(obj.cover_image)
+
+    def get_has_pdf(self, obj):
+        return bool(obj.pdf_key)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         from storage.service import storage_service
         if ret.get('cover_image'):
             ret['cover_image'] = storage_service.normalize_public_url(ret['cover_image'])
+        ret['has_cover'] = bool(instance.cover_image)
+        ret['has_pdf'] = bool(instance.pdf_key)
         return ret
 
 
@@ -53,6 +66,15 @@ class BookProductAdminSerializer(serializers.ModelSerializer):
     Full admin serializer for BookProduct CRUD management.
     Includes pdf_key and internal stock controls.
     """
+    has_cover = serializers.SerializerMethodField()
+    has_pdf = serializers.SerializerMethodField()
+
+    def get_has_cover(self, obj):
+        return bool(obj.cover_image)
+
+    def get_has_pdf(self, obj):
+        return bool(obj.pdf_key)
+
     class Meta:
         model = BookProduct
         fields = [
@@ -62,6 +84,7 @@ class BookProductAdminSerializer(serializers.ModelSerializer):
             'subtitle',
             'description',
             'cover_image',
+            'has_cover',
             'class_label',
             'book_type',
             'exam_board',
@@ -73,6 +96,7 @@ class BookProductAdminSerializer(serializers.ModelSerializer):
             'original_price',
             'gst_percent',
             'pdf_key',
+            'has_pdf',
             'is_published',
             'display_order',
             'stock_hardcopy',
@@ -81,13 +105,38 @@ class BookProductAdminSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'has_cover', 'has_pdf', 'created_at', 'updated_at']
+
+    def get_has_cover(self, obj):
+        return bool(obj.cover_image)
+
+    def get_has_pdf(self, obj):
+        return bool(obj.pdf_key)
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # Digital safety check: if publishing as digital-only (no hardcopy) without a PDF attached, reject
+        is_published = data.get('is_published', getattr(self.instance, 'is_published', False) if self.instance else False)
+        pdf_key = data.get('pdf_key', getattr(self.instance, 'pdf_key', '') if self.instance else '')
+        digital_price = data.get('digital_price', getattr(self.instance, 'digital_price', 0) if self.instance else 0)
+        hardcopy_price = data.get('hardcopy_price', getattr(self.instance, 'hardcopy_price', 0) if self.instance else 0)
+
+        has_hardcopy = hardcopy_price and float(hardcopy_price) > 0
+        has_digital = digital_price and float(digital_price) > 0
+
+        if is_published and has_digital and not has_hardcopy and not pdf_key:
+            raise serializers.ValidationError({
+                'pdf_key': "Cannot publish digital-only book without attaching a PDF file."
+            })
+        return data
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         from storage.service import storage_service
         if ret.get('cover_image'):
             ret['cover_image'] = storage_service.normalize_public_url(ret['cover_image'])
+        ret['has_cover'] = bool(instance.cover_image)
+        ret['has_pdf'] = bool(instance.pdf_key)
         return ret
 
 

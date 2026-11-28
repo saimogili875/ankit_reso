@@ -14,7 +14,7 @@ A production-ready EdTech platform for **JEE Main** and **JEE Advanced** prepara
 - **API Client**: Axios HTTP Wrapper
 
 ### Backend
-- **Framework**: Python 3.11 / Django 4.2 & Django REST Framework (DRF)
+- **Framework**: Python 3.11 / Django 5.1 & Django REST Framework (DRF)
 - **Architecture**: Modular Monolith (`apps/accounts`, `apps/academics`, `apps/content`, `apps/questions`, `apps/tests`, `apps/progress`, `apps/materials`, `apps/analytics`, `apps/core`)
 - **API Documentation**: OpenAPI 3.0 / Swagger UI (`drf-spectacular`)
 
@@ -118,6 +118,9 @@ adepteduverse/
    ```bash
    python manage.py check
    python manage.py migrate
+   # Backfill or initialize academic hierarchy (safe & idempotent):
+   python manage.py migrate_academic_hierarchy
+   ```
    ```
 5. Start development server:
    ```bash

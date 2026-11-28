@@ -466,7 +466,13 @@ export default function TestResultPage() {
   // Filtered review questions
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      if (qSubjectFilter !== 'All' && q.subject_name !== qSubjectFilter) return false;
+      if (
+        qSubjectFilter !== 'All' &&
+        String((q as { subject_id?: string | number }).subject_id || q.subject_name) !== qSubjectFilter &&
+        q.subject_name !== qSubjectFilter
+      ) {
+        return false;
+      }
       if (qTypeFilter === 'correct') return q.is_correct;
       if (qTypeFilter === 'wrong') return !q.is_correct && Boolean(q.selected_answer);
       if (qTypeFilter === 'skipped') return !q.selected_answer;
@@ -689,10 +695,10 @@ export default function TestResultPage() {
                 <div className="space-y-2">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject Performance Cards</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(ov.subject_cards || []).map((sc) => (
-                      <div key={sc.subject_name} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                    {(ov.subject_cards || []).map((sc, scIdx) => (
+                      <div key={String((sc as { subject_id?: string | number }).subject_id || sc.subject_name || scIdx)} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="font-extrabold text-sm text-slate-200">{sc.subject_name}</span>
+                          <span className="font-extrabold text-sm text-slate-200">{(sc as { subject_label?: string }).subject_label || sc.subject_name}</span>
                           <span className="text-xs font-bold text-blue-400">{sc.score} / {sc.max_marks}</span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -1163,7 +1169,9 @@ export default function TestResultPage() {
                       >
                         <option value="All">All Subjects</option>
                         {sectionsList.map((s) => (
-                          <option key={s.id} value={s.subject_name}>{s.subject_name}</option>
+                          <option key={s.id} value={String((s as { subject_id?: string | number }).subject_id || s.subject_name)}>
+                            {(s as { subject_label?: string }).subject_label || s.subject_name}
+                          </option>
                         ))}
                       </select>
 
@@ -1209,7 +1217,7 @@ export default function TestResultPage() {
                         {filteredQuestions.map((q) => (
                           <tr key={q.question_id} className="hover:bg-slate-800/30 transition-colors">
                             <td className="py-3 px-3 font-bold text-slate-100">Q#{q.order}</td>
-                            <td className="py-3 px-3">{q.subject_name}</td>
+                            <td className="py-3 px-3">{(q as { subject_label?: string }).subject_label || q.subject_name}</td>
                             <td className="py-3 px-3">{q.chapter_name}</td>
                             <td className="py-3 px-3">
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
