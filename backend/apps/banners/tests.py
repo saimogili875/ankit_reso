@@ -2,6 +2,7 @@ import io
 from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.accounts.models import User
@@ -17,6 +18,7 @@ def create_test_image(format='PNG', size=(400, 300), color=(255, 0, 0)) -> Simpl
     return SimpleUploadedFile(f"test_image.{ext}", file_io.getvalue(), content_type=f"image/{ext}")
 
 
+@override_settings(DEBUG=True)
 class BannerBackendUnitTests(APITestCase):
     def setUp(self):
         # Create student user

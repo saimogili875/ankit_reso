@@ -3,19 +3,42 @@ import traceback
 from django.db import DatabaseError
 from django.db.models import ProtectedError, RestrictedError
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 logger = logging.getLogger(__name__)
 
 
+class R2StorageNotConfiguredError(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "File storage (R2) is not configured. Add the R2_* environment variables."
+    default_code = "storage_not_configured"
+
+    def __init__(self, detail=None, code=None):
+        if detail is None:
+            detail = self.default_detail
+        super().__init__(detail, code)
+
+
 def api_exception_handler(exc, context):
     """
     Custom exception handler for Django REST Framework.
+    - Handles R2StorageNotConfiguredError: returns HTTP 503 Service Unavailable.
     - Handles ProtectedError and RestrictedError: returns HTTP 409 Conflict with details on blocking objects.
     - Handles DatabaseError: logs traceback and returns error detail to staff/admin users.
     - Captures other unhandled exceptions and formats a clean response.
     """
+    if isinstance(exc, R2StorageNotConfiguredError):
+        msg = str(getattr(exc, 'detail', R2StorageNotConfiguredError.default_detail))
+        return Response(
+            {
+                'detail': msg,
+                'error': msg,
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+
     response = drf_exception_handler(exc, context)
 
     request = context.get('request') if context else None

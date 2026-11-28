@@ -1,6 +1,6 @@
 import csv
 from django.http import HttpResponse
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, permissions
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -244,6 +244,19 @@ class HeroSlideViewSet(viewsets.ModelViewSet):
     queryset = HeroSlide.objects.all().order_by('order', '-created_at')
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'subtitle']
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-image')
+    def upload_image(self, request, pk=None):
+        slide = self.get_object()
+        uploaded_file = request.FILES.get('image') or request.FILES.get('file')
+        if not uploaded_file:
+            return Response({'error': 'No image file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.banners.services import process_and_upload_banner_image
+        image_url, _ = process_and_upload_banner_image(uploaded_file, filename_hint=f"hero-{slide.id}")
+        slide.image_url = image_url
+        slide.save(update_fields=['image_url'])
+        return Response({'success': True, 'image_url': image_url})
 
 
 class QuickAccessViewSet(viewsets.ModelViewSet):
@@ -1203,6 +1216,20 @@ class LandingBannerSettingsView(APIView):
             return Response({'display_count': settings_obj.display_count}, status=status.HTTP_200_OK)
         except (ValueError, TypeError):
             return Response({'error': 'A valid integer (1 or 2) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StorageStatusView(APIView):
+    """
+    GET /api/admin-panel/storage-status/ (and /api/admin/storage-status/)
+    Admin-only diagnostic endpoint reporting Cloudflare R2 credentials configuration
+    and reachability of both private and public buckets.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        from storage.service import storage_service
+        data = storage_service.provider.get_storage_status()
+        return Response(data, status=status.HTTP_200_OK)
 
 
 

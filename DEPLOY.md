@@ -11,13 +11,16 @@ This document provides a comprehensive, production-grade guide to deploying **Ad
 
 ## 1. Cloudflare R2 Object Storage Setup
 
-Cloudflare R2 provides S3-compatible cloud storage with **zero egress bandwidth fees**, making it optimal for storing course lecture video replays and media.
+Cloudflare R2 provides S3-compatible cloud storage with **zero egress bandwidth fees**, making it optimal for storing course lecture video replays and media. Production uses **two distinct buckets**:
+1. **Private Bucket (`R2_BUCKET_NAME`)**: Stores private book PDFs, lecture recordings, and sensitive documents. Served exclusively via short-lived (10-minute) presigned URLs.
+2. **Public Bucket (`R2_PUBLIC_BUCKET_NAME`)**: Stores public assets (book covers, promotional banners, course images). Served through permanent CDN/R2 URLs (`R2_PUBLIC_URL/<key>`).
 
-### 2.1 Create Bucket
+### 1.1 Create Buckets
 1. Sign in to the [Cloudflare Dashboard](https://dash.cloudflare.com/) and go to **R2 Object Storage**.
-2. Click **Create bucket**. Name it (e.g., `adepteduverse-storage`).
-3. Choose location (e.g., `Automatic` or your preferred region).
-4. Under **Bucket Settings** → **CORS Policy**, add:
+2. Click **Create bucket**. Name the private bucket (e.g., `adepteduverse-storage`).
+3. Click **Create bucket** again to create the public bucket (e.g., `adepteduverse-public`).
+4. In the public bucket, go to **Settings** → **Public Access** and enable a custom domain or `r2.dev` subdomain (e.g. `https://pub-xxxx.r2.dev`). Set this as `R2_PUBLIC_URL`.
+5. Under **Bucket Settings** → **CORS Policy** for each bucket, add:
    ```json
    [
      {
@@ -29,15 +32,18 @@ Cloudflare R2 provides S3-compatible cloud storage with **zero egress bandwidth 
    ]
    ```
 
-### 2.2 Generate API Tokens
+### 1.2 Generate API Tokens
 1. In R2 overview, click **Manage R2 API Tokens** → **Create API token**.
 2. Permissions: **Object Read & Write**.
-3. Apply to bucket: `adepteduverse-storage`.
-4. Copy:
-   - **Account ID** (`R2_ACCOUNT_ID`)
-   - **Access Key ID** (`R2_ACCESS_KEY_ID`)
-   - **Secret Access Key** (`R2_SECRET_ACCESS_KEY`)
-   - **Endpoint** (`R2_ENDPOINT`): `https://<account_id>.r2.cloudflarestorage.com`
+3. Apply to both buckets (`adepteduverse-storage` and `adepteduverse-public`).
+4. Required environment variables:
+   - `R2_ACCOUNT_ID`: Cloudflare R2 Account Identifier
+   - `R2_ACCESS_KEY_ID`: R2 S3-compatible Access Key ID
+   - `R2_SECRET_ACCESS_KEY`: R2 S3-compatible Secret Access Key
+   - `R2_ENDPOINT`: `https://<account_id>.r2.cloudflarestorage.com`
+   - `R2_BUCKET_NAME`: Private bucket name (e.g. `adepteduverse-storage`)
+   - `R2_PUBLIC_BUCKET_NAME`: Public bucket name (e.g. `adepteduverse-public`)
+   - `R2_PUBLIC_URL`: Permanent public URL base (e.g. `https://pub-xxxx.r2.dev`)
 
 ---
 
